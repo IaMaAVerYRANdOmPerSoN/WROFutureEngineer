@@ -2,26 +2,23 @@ import aioserial
 import asyncio
 import json
 import numpy as np
-from warnings import warn, simplefilter
 import re
 import sys
 from loguru import logger
 from itertools import cycle
 from typing import Sequence
-import 
-
-simplefilter('always', RuntimeWarning)
 
 class RaspberryPiClient():
-    def __init__(self, port='/dev/ttyACM0', baud = 115200, timeout=0.3, log = "log.txt"):
+    def __init__(self, port='/dev/ttyACM0', baud = 115200, timeout=0.3, log = "log.txt", log_verbose = "verbose.txt"):
         logger.remove()
         fmt = (
             "<blue>[{time:HH:mm:ss:SSS}]</blue> │ "
             "<cyan>{line:03}: {function: <18}</cyan> │ "
             "<level>{level: <8}</level> │ "
             "<level>{message}</level>")
-        logger.add(sys.stderr, level="INFO", format=fmt) # Change to DEBUG for debug
-        logger.add(log, enqueue=True, rotation="10 MB", retention="10 days", format=fmt)
+        logger.add(sys.stderr, level="WARNING", format=fmt)
+        logger.add(log, level="WARNING", enqueue=True, rotation="5 MB", retention="10 days", format=fmt)
+        logger.add(log_verbose, level="DEBUG", enqueue=True, rotation="1 MB", retention="3 days", format=fmt, backtrace=True, diagnose=True)
         
         self.SERIAL = aioserial.AioSerial(port, baud)
         self.DEFAULT_TIMEOUT = timeout
@@ -103,8 +100,8 @@ class RaspberryPiClient():
         finally:
             self._pending_requests.pop(tid, None)
 
-    async def __run_multiple_requests(self, requests: Sequence[Sequence[str, float]|Sequence[str, float, float]], timeout = 2.0): # type annotaion because it's takes complicated arguments
-        data = {}
+    async def run_multiple_requests(self, requests: Sequence[Sequence[str, float]|Sequence[str, float, float]], timeout = 2.0): # type annotaion because it's takes complicated arguments
+        """data = {}
         inital_futures = []
         long_process_futures = []
         for command, *arguments in requests:
@@ -140,7 +137,8 @@ class RaspberryPiClient():
         finally:
             for commands in data.values():
                 for command in commands:
-                    self._pending_requests.pop(command[0])
+                    self._pending_requests.pop(command[0])"""
+        raise NotImplementedError("Batch requests not yet supported sever-side.")
             
     async def verify_connection(self, retries=5): # 1
         logger.info("Establishing Serial interface...")
@@ -175,7 +173,6 @@ class RaspberryPiClient():
     async def drive_motors(self, speed, duration): # 4
         duration = abs(duration) # No time travel sorry
         if speed > self.MAX_SPEED:
-            warn(f"Speed Exceeds Practical Limits. Clamping to {self.MAX_SPEED}", RuntimeWarning)
             logger.warning(f"Invalid argument supplied: {speed} > {self.MAX_SPEED}. Clamped to {self.MAX_SPEED}")
             product = speed * duration
             speed = self.MAX_SPEED
@@ -207,7 +204,7 @@ class RaspberryPiClient():
     async def get_camera_data(self):
         raise NotImplementedError
     
-    def __fast_arc_to_target(self, current_x, current_y, target_x, target_y, speed, current_heading_rad=0): 
+    def fast_arc_to_target(self, current_x, current_y, target_x, target_y, speed, current_heading_rad=0): 
         dx = target_x - current_x
         dy = target_y - current_y
         l_fw = np.sqrt(dx**2 + dy**2) 
@@ -233,7 +230,7 @@ class RaspberryPiClient():
         
         commands = []
         for targetX, targetY in points:
-            res = self.__fast_arc_to_target(current_x, current_y, targetX, targetY, speed, current_hdg)
+            res = self.fast_arc_to_target(current_x, current_y, targetX, targetY, speed, current_hdg)
             if isinstance(res, str): continue
             
             steer, duration, current_hdg = res
@@ -241,9 +238,13 @@ class RaspberryPiClient():
             current_x, current_y = targetX, targetY
         
         for steer_rad, duration in commands:
-            servo_angle = 90 + np.degrees(steer_rad) 
-            await self.set_servo_angle(servo_angle)
-            await self.drive_motors(speed, duration)
+            servo_angle = 90 + np.degrees(steer_rad)
+            result1 = await self.set_servo_angle(servo_angle)
+            result2 = await self.drive_motors(speed, duration)
+            if not result1:
+                logger.error(f"Arduino failed to process tasks: set_servo_angle({servo_angle}). See verbose logs for more details")
+            if not result2:
+                logger.error(f"Arduino failed to process tasks: drive_motors({speed}, {duration}). See verbose logs for more details")
     
     async def set_led_state(self, state): #5
         command = f'SET_LED {state}'
@@ -268,12 +269,8 @@ async def main():
                 await client.get_encoder_value()
                 await client.set_led_state(0.0)
                 await asyncio.sleep(0.1)
-            
-            try:
-                await asyncio.wait_for(drive_task, timeout=30.0) # Will update this dynamically later
-            except asyncio.TimeoutError:
-                logger.warning(f"Drive task '{drive_task}' Timed out")
-            
+
+            await asyncio.wait_for(drive_task, timeout=30.0) # Will update this dynamically later
             await asyncio.sleep(0.15)
 
 if __name__ == "__main__":
