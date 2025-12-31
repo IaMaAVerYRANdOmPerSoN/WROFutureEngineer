@@ -6,21 +6,23 @@ import re
 import sys
 from loguru import logger
 from itertools import cycle
-from typing import Sequence
+from typing import Sequence, NoReturn
 
-class RaspberryPiClient():
-    def __init__(self, port='/dev/ttyACM0', baud = 115200, timeout=0.3, log = "log.txt", log_verbose = "verbose.txt"):
-        logger.remove()
-        fmt = (
-            "<blue>[{time:HH:mm:ss:SSS}]</blue> │ "
-            "<cyan>{line:03}: {function: <18}</cyan> │ "
-            "<level>{level: <8}</level> │ "
-            "<level>{message}</level>")
-        logger.add(sys.stderr, level="WARNING", format=fmt)
-        logger.add(log, level="WARNING", enqueue=True, rotation="5 MB", retention="10 days", format=fmt)
-        logger.add(log_verbose, level="DEBUG", enqueue=True, rotation="1 MB", retention="3 days", format=fmt, backtrace=True, diagnose=True)
+class Client():
+    def __init__(self, port='/dev/ttyACM0', baud = 115200, timeout=0.3, ):
+        """
+        The constructor for the `Client` class
         
-        self.SERIAL = aioserial.AioSerial(port, baud)
+        :param self: The instance of Client
+        :param port: The serial port passed to `aioserial.AioSerial`.
+        :param baud: The buadrate of the serial protocol.
+        :param timeout: Default timeout for granular requests.
+
+        :returns self: an instance of `Client`
+        """
+
+        self.SERIAL = None
+        self.port, self.baud = port, baud
         self.DEFAULT_TIMEOUT = timeout
         self.TIDS = cycle([i for i in range(1, 501)])
         self.WHEELBASE = 0.1 
@@ -35,6 +37,12 @@ class RaspberryPiClient():
         logger.info(f"======= CLIENT INSTANCE STARTED: Port = {port}, Baud = {baud}, Timeout = {timeout} ======= ")
     
     async def __serial_listener(self):
+        """
+        A background asynchronous serial listener that resolves serial IO dependent futures.
+        
+        :param self: The instance of `Client`
+        :return: `NoReturn`
+        """
         while True:
             line = await self.SERIAL.readline_async()
             response = line.decode('utf-8').strip()
@@ -52,6 +60,16 @@ class RaspberryPiClient():
                     future.set_result((tid, message))
 
     async def __aenter__(self):
+        """
+        Reserved function, automatically called on entering an `async with` or `async for` block. Intializes hardware resources
+        asyncronously.
+        
+        :param self: The instance of
+        :return: Description
+        :rtype: list | list[str]
+        """
+        self.SERIAL = aioserial.AioSerial(self.port, self.baud)
+
         if not hasattr(self, "_listener_task"):
             self._listener_task = asyncio.create_task(self.__serial_listener())
             logger.info("Serial Listener Started")
@@ -77,14 +95,14 @@ class RaspberryPiClient():
             await self.SERIAL.write_async(f"{tid} {command}\n".encode('utf-8'))
             logger.info(f"Sending Request: {command} with timeout {timeout} and transaction ID {tid}")
             
-            response = await asyncio.wait_for(future, timeout)[1]
+            _, response = await asyncio.wait_for(future, timeout)
             
             if matches := self.WAIT_RE.search(response):
                 requested_timeout = int(matches.group(1))/1000 + 0.5
                 logger.info(f"    ⤷ Arduino processing task, requires delay of {matches.group(1)}ms")
                 future = self.loop.create_future()
                 self._pending_requests[tid] = future
-                response = await asyncio.wait_for(future, requested_timeout + 0.5)[1]
+                _, response = await asyncio.wait_for(future, requested_timeout)
             
             logger.success(f"    ⤷ Sucessfully processed request: '{command}' with response '{response}'")
             if response.endswith('ERR'):
@@ -251,8 +269,9 @@ class RaspberryPiClient():
         response = await self.__request(command)
         return response == '200 OK'
 
+# Move this to a tests folder
 async def main():
-    async with RaspberryPiClient() as client:
+    async with Client() as client:
         await asyncio.sleep(2)
         if not await client.verify_connection():
             return

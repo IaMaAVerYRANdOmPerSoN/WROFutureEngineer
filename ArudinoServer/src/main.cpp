@@ -12,7 +12,7 @@ struct Request {
     int processed;
 };
 
-class ArduinoServer {
+class Server {
     private:
         Stream* _serial;
         Hashtable<String, Request> CurrentProcesses;
@@ -122,7 +122,7 @@ class ArduinoServer {
         }
         
     public:
-        ArduinoServer(Stream& s) : _serial(&s) {
+        Server(Stream& s) : _serial(&s) {
             commands.push_back("PING");
             commands.push_back("SET_SERVO");
             commands.push_back("INC_SERVO");
@@ -152,7 +152,7 @@ class ArduinoServer {
     }
 };
 
-ArduinoServer* server;
+Server* server;
 
 void setup() {
     // these are all LEDs for testing
@@ -164,7 +164,7 @@ void setup() {
     pinMode(12, OUTPUT);
 
     Serial.begin(115200);
-    server = new ArduinoServer(Serial);
+    server = new Server(Serial);
 }
 
 void loop() {
