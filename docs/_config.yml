@@ -1,0 +1,6 @@
+theme: jekyll-theme-minimal
+title: "{Package Name}"
+description: "Documentation for {Package Name}"
+kramdown:
+  input: GFM
+  syntax_highlighter: rouge

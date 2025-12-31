@@ -3,11 +3,14 @@ import numpy as np
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from typing import Sequence
+from loguru import logger
+from multiprocessing import shared_memory
 
 class VisionObject():
-    def __init__(self, contour):
+    def __init__(self, color, contour):
         self.contour = contour
         self.area = cv2.contourArea(contour)
+        self.color = color
 
         self.bbox = cv2.boundingRect(contour)
         x, y, w, h = self.bbox
@@ -15,56 +18,177 @@ class VisionObject():
         self.y_centroid = y + h/2
         self.bottom_y = y + h # Use this to find closest object
         
-class VisionProcessor():
+class VisionProcessor(): 
     def __init__(self):
-        pass # Not sure what to put here yet
+        self.lower_orange = np.array([33, 194])
+        self.upper_orange = np.array([73, 234])
+
+        self.lower_blue = np.array([216, 63])
+        self.upper_blue = np.array([255, 103])
+
+        self.lower_green = np.array([0, 0])
+        self.upper_green = np.array([110, 110])
+
+        self.lower_red = np.array([100, 140])
+        self.upper_red = np.array([130, 255])
+
+    def __find_blocks(self, masks, colors):
+        all_detected = []
+
+        for mask, color in zip(masks, colors):
+            contours, *_ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            
+            all_detected.extend([(color, contour) for contour in contours if cv2.contourArea(contour) > 50])
+
+        if not all_detected:
+            return tuple()
+        
+        all_detected.sort(key=lambda i: cv2.contourArea(i[1]), reverse=True)
+        
+        logger.info(f"Detected {len(all_detected)} objects.")
+        return tuple(VisionObject(color, contour) for color, contour in all_detected)
 
     def find_obstacles(self, frame):
-        uv = np.ascontiguousarray(frame[:, :, 1:3])
-        
-        green_mask = cv2.inRange(uv, (0, 0), (110, 110)) # Green: Low U and Low V
-        
-        red_mask = cv2.inRange(uv, (100, 140), (130, 255)) # Red: High V; Cap U to 130 to exclude Magenta
-        
-        magenta_mask = cv2.inRange(uv, (150, 150), (255, 255)) # Magneta: High U and V
+        logger.info("Searching for traffic signs...")
+        uv = frame[:, :, 1:3]
+        green_mask = cv2.inRange(uv, self.lower_green, self.upper_green)
+        red_mask = cv2.inRange(uv, self.lower_red, self.upper_red)
 
-        contours = {
-            "green": cv2.findContours(green_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[0],
-            "red": cv2.findContours(red_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[0],
-            "magenta": cv2.findContours(magenta_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[0]
-        }
+        return self.__find_blocks([green_mask, red_mask], ["green", "red"])
 
-        contours = {color: contour for color, contour in contours.items() if len(contour) > 0}
+    def check_corner_lines(self, frame):
+        logger.info("Searching for turn aids...")
+        uv = frame[:, :, 1:3]
+        blue_mask = cv2.inRange(uv, self.lower_blue, self.upper_blue)
+        orange_mask = cv2.inRange(uv, self.lower_orange, self.upper_orange)
 
-        return {
-            "green" : [VisionObject(contour) for contour in contours.get("green")],
-            "red" : [VisionObject(contour) for contour in contours.get("red")],
-            "magenta": [VisionObject(contour) for contour in contours.get("magenta")]
-        }
+        return self.__find_blocks([blue_mask, orange_mask], ["blue", "orange"])
 
     def check_field_bonds(self, frame):
-        y = np.ascontiguousarray(frame[:, :, 0])
+        logger.info("Fetching drivable field bondaries...")
 
-        white_mask = cv2.inRange(y, (200, 255))
+        y = frame[:, :, 0]
+        white_mask = cv2.inRange(y, 200, 255)
 
-        contours = cv2.findContours(white_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[0]
-        contigous_field_bondary = max(contours, key = cv2.contourArea)
-        return VisionObject(contigous_field_bondary)
+        contours, *_ = cv2.findContours(white_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if contours:
+            drivable_area = max(contours, key=cv2.contourArea)
+        else:
+            return None
+        
+        return VisionObject("white", drivable_area)
     
-    def check_corner_markers(self, frame):
-        raise NotImplementedError 
+    def find_walls(self, frame):
+        logger.info("Checking for walls")
+
+        y = frame[:, :, 0]
+        black_mask = cv2.inRange(y, 0, 100)
+
+        return self.__find_blocks(black_mask)
     
-class AynscVisionProcessor(VisionProcessor):
+    def get_distance(self,  items: Sequence[VisionObject], frame_width = 160):
+        center_x = frame_width // 2
+
+        dists = []
+
+        if not items:
+            return len(items) * [float("inf")]
+        
+        for item in items: # Should already be sorted
+            if item.x_centroid >= center_x and item.y_centroid > 30: # Wall on the right, get left edge, crop to bottom ROI
+                x, *_ = item.bbox
+                dists.append(x - center_x)
+            if item.x_centroid < center_x and item.y_centroid > 30: # Wall on the left, get right edge, crop to bootom ROI
+                x, _, w, _ = item.bbox
+                dists.append(center_x - (x + w))
+
+        return dists
+
+    def get_wall_distance(self, items: Sequence[VisionObject], frame_width = 160):
+        center_x = frame_width // 2
+
+        wall_dists = {
+            "left": float("inf"),
+            "right": float("inf")
+        }
+
+        if not items:
+            return wall_dists
+
+        for item in items:
+            if item.x_centroid >= center_x and item.y_centroid > 30: # Wall on the right, get left edge, crop to bottom ROI
+                x, *_ = item.bbox
+                wall_dists["right"] = x - center_x
+            if item.x_centroid < center_x and item.y_centroid > 30: # Wall on the left, get right edge, crop to bootom ROI
+                x, _, w, _ = item.bbox
+                wall_dists["left"] = center_x - (x + w)
+
+        return wall_dists
+    
+    def comprehensive_analysis(self, frame):
+        zone, walls, obstacles, corner_lines = (
+            self.check_field_bonds(frame),
+            self.find_walls(frame),
+            self.find_obstacles(frame),
+            self.check_corner_lines(frame),
+        )
+
+        wall_dists = self.get_wall_distance(walls)
+        obstacle_dists = self.get_distance(obstacles)
+
+        return zone, walls, obstacles, corner_lines, wall_dists, obstacle_dists
+    
+class AsyncVisionProcessor(VisionProcessor):
     def __init__(self, *args):
-        super.__init__(*args)
-        self.executor = ThreadPoolExecutor(10)
+        super(AsyncVisionProcessor, self).__init__(*args)
+        self.executor = None
         self.loop = asyncio.get_event_loop()
 
-    async def find_obstacles(self, frame):
-        return await self.loop.run_in_executor(self.executor, super().find_obstacles, frame)
+    async def __aenter__(self):
+        self.executor = ThreadPoolExecutor(6)
+        return self
+
+    async def __aexit__(self, *args): # Error handling in main loop
+        if hasattr(self, "executor") and self.executor:
+            self.executor.shutdown(wait=False)
+
+    async def find_obstacles(self, frame) -> tuple[VisionObject]:
+        return await self.loop.run_in_executor(self.executor, super(AsyncVisionProcessor, self).find_obstacles, frame)
     
     async def check_field_bonds(self, frame):
-        return await self.loop.run_in_executor(self.executor, super().check_field_bonds, frame)
+        return await self.loop.run_in_executor(self.executor, super(AsyncVisionProcessor, self).check_field_bonds, frame)
     
-    async def check_corner_markers(self, frame):
-        return await self.loop.run_in_executor(self.executor, super().check_corner_markers, frame)
+    async def check_corner_lines(self, frame):
+        return await self.loop.run_in_executor(self.executor, super(AsyncVisionProcessor, self).check_corner_lines, frame)
+    
+    async def get_distance(self, items: Sequence[VisionObject], frame_width=160):
+        return await self.loop.run_in_executor(self.executor, super().get_distance, items, frame_width)
+    
+    async def get_wall_distance(self, walls: Sequence[VisionObject], frame_width=160):
+        return await self.loop.run_in_executor(self.executor, super(AsyncVisionProcessor, self).get_wall_distance, walls, frame_width)
+    
+    async def comprehensive_analysis(self, shm, sender, receiver):
+        shm = shared_memory.SharedMemory(name=shm)
+        while True:
+            if receiver.recv():
+                frame = np.ndarray((shm.size,), dtype=np.uint8, buffer=shm.buf)
+                round1 = [
+                    self.check_field_bonds(frame),
+                    self.find_walls(frame),
+                    self.find_obstacles(frame),
+                    self.check_corner_lines(frame)
+                ]
+                zone, walls, obstacles, corner_lines = await asyncio.gather(*round1)
+                round2 = [
+                    self.get_wall_distance(walls),
+                    self.get_distance(obstacles)
+                ]
+                wall_dists, obstacle_dists = await asyncio.gather(*round2)
+
+                sender.send((zone, walls, obstacles, corner_lines, wall_dists, obstacle_dists,))
+
+    @staticmethod
+    async def data_yielder(receiver):
+        while True:
+            if receiver.poll():
+                yield receiver.recv()
