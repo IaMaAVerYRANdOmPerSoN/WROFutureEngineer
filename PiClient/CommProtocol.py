@@ -31,6 +31,7 @@ class Client():
         self.is_connected = False
         self.loop = asyncio.get_event_loop()
         self._pending_requests = {} # {TID: future} -> {TID: response}
+        self._lock = asyncio.Lock()
         self.servo_angle = 0
         self.encoder_value = 0
 
@@ -92,10 +93,11 @@ class Client():
         self._pending_requests[tid] = future
         
         try:
-            await self.SERIAL.write_async(f"{tid} {command}\n".encode('utf-8'))
-            logger.info(f"Sending Request: {command} with timeout {timeout} and transaction ID {tid}")
-            
-            _, response = await asyncio.wait_for(future, timeout)
+            async with self._lock:
+                await self.SERIAL.write_async(f"{tid} {command}\n".encode('utf-8'))
+                logger.info(f"Sending Request: {command} with timeout {timeout} and transaction ID {tid}")
+                
+                _, response = await asyncio.wait_for(future, timeout)
             
             if matches := self.WAIT_RE.search(response):
                 requested_timeout = int(matches.group(1))/1000 + 0.5
@@ -176,9 +178,12 @@ class Client():
         return False
     
     async def set_servo_angle(self, angle): # 2
-        if 180 < angle or angle < -180:
-            logger.warning(f"Invaild request blocked: 'SET_SERVO {angle}'. {angle} is not in [-180, 180]")
-            return "ERR_ANGLE_UNBOUNDED"
+        if 180 < angle:
+            logger.warning(f"Invaild request clamped: 'SET_SERVO {angle}'. {angle} is not in [-180, 180]")
+            angle = 180
+        elif -180 > angle:
+            logger.warning(f"Invaild request clamped: 'SET_SERVO {angle}'. {angle} is not in [-180, 180]")
+            angle = -180
         command = f'SET_SERVO {angle}'
         response =  await self.__request(command)
         return response == '200 OK'
@@ -218,16 +223,13 @@ class Client():
             logger.warning(f"Recived non-interger response '{response}' from request 'M_ANGLE'")
         
         return False
-        
-    async def get_camera_data(self):
-        raise NotImplementedError
     
-    def fast_arc_to_target(self, current_x, current_y, target_x, target_y, speed, current_heading_rad=0): 
-        dx = target_x - current_x
-        dy = target_y - current_y
+    async def fast_arc_to_target(self, target_x, target_y, speed, current_heading_rad=0): 
+        dx = target_x # Assume robot is (0,0)
+        dy = target_y
         l_fw = np.sqrt(dx**2 + dy**2) 
         if l_fw < 1e-6:
-            logger.warning(f'Zero division error ecountured in __fast_arc_to_target, with arguments {current_x, current_y, target_x, target_y, speed, current_heading_rad}')
+            logger.warning(f'Zero division error ecountured in __fast_arc_to_target, with arguments {target_x, target_y, speed, current_heading_rad}')
             return 'ERR_ZERO_DIVISION'
 
         target_angle_global = np.arctan2(dx, dy) # Abosulte angle
@@ -239,70 +241,11 @@ class Client():
         steering_angle_rad = np.arctan(self.WHEELBASE * kappa)
         duration = l_fw / speed if abs(kappa) < 1e-6 else (2 * alpha / kappa) / speed
 
-        exit_angle_rad = (current_heading_rad + 2 * alpha) # exit angle
-        
-        return (steering_angle_rad, duration, exit_angle_rad)
-    
-    async def arc_spline(self, speed, points):
-        current_x, current_y, current_hdg = 0.0, 0.0, 0.0
-        
-        commands = []
-        for targetX, targetY in points:
-            res = self.fast_arc_to_target(current_x, current_y, targetX, targetY, speed, current_hdg)
-            if isinstance(res, str): continue
-            
-            steer, duration, current_hdg = res
-            commands.append((steer, duration))
-            current_x, current_y = targetX, targetY
-        
-        for steer_rad, duration in commands:
-            servo_angle = 90 + np.degrees(steer_rad)
-            result1 = await self.set_servo_angle(servo_angle)
-            result2 = await self.drive_motors(speed, duration)
-            if not result1:
-                logger.error(f"Arduino failed to process tasks: set_servo_angle({servo_angle}). See verbose logs for more details")
-            if not result2:
-                logger.error(f"Arduino failed to process tasks: drive_motors({speed}, {duration}). See verbose logs for more details")
+        asyncio.create_task(self.set_servo_angle(steering_angle_rad))
+        await self.drive_motors(speed, duration)
     
     async def set_led_state(self, state): #5
         command = f'SET_LED {state}'
         response = await self.__request(command)
         return response == '200 OK'
 
-# Move this to a tests folder
-async def main():
-    async with Client() as client:
-        await asyncio.sleep(2)
-        if not await client.verify_connection():
-            return
-        
-        await asyncio.sleep(0.5)
-
-        while True:  
-            drive_task = asyncio.create_task(client.arc_spline(7, [[1, 4], [3, 18], [6, 14], [7, 11], [7, 13], [7, 18], [8, 10], [10, 19], [11, 12], [13, 16]]))
-            await asyncio.sleep(0) # let the task run
-
-            for _ in range(100):
-                await client.set_led_state(1.0)
-                await client.get_servo_angle()
-                await client.get_encoder_value()
-                await client.set_led_state(0.0)
-                await asyncio.sleep(0.1)
-
-            await asyncio.wait_for(drive_task, timeout=30.0) # Will update this dynamically later
-            await asyncio.sleep(0.15)
-
-if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-        exitcode = 0
-    except KeyboardInterrupt:
-        logger.error("Process Interupted by User")
-        exitcode = 0
-    except Exception:
-        logger.exception("A FATAL EXECPTION HAS OCCURED")
-        exitcode = 1
-    finally:
-        logger.info(f"Cleaning up with exitcode {exitcode}...")
-        logger.remove()
-        sys.exit(exitcode)
