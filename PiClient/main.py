@@ -6,6 +6,8 @@ from visionProcessing import AsyncVisionProcessor
 from asyncCamera import AsyncCamera
 from controller import PD
 import multiprocessing as mp
+import cv2
+import numpy as np
 
 logger.remove()
 fmt = (
@@ -19,7 +21,8 @@ logger.add("verbose.txt", level="DEBUG", enqueue=True, rotation="1 MB", retentio
 
 async def main():
     async with Client() as client, AsyncVisionProcessor() as vision, AsyncCamera() as camera:
-        controller = PD(1, 0.2)
+        wall_follow = PD(1, 0.2)
+        corner_turn_controller = PD(1, 0.2)
 
         # Starting code here
         state = "Follow wall"
@@ -41,7 +44,7 @@ async def main():
                 elif obstacles:
                     state = "Avoid obstacles"
 
-                elif corner_lines:
+                elif corner_lines and corner_lines[0].bottom_y > 80:
                     state = "Turn"
 
                 else:
@@ -64,8 +67,18 @@ async def main():
                     look_ahead_task = asyncio.create_task(client.fast_arc_to_target(midpoint, largest_obstacle.bottom_y)) # Need more rigorous distance estimation
 
                 case "Turn":
-                    # Create a series of commands to turn to the next straight section.
-                    pass
+                    if not corner_lines:
+                        logger.warning("State 'Turn' selected but no corner lines detected; skipping turn computation for this frame.")
+                    else:
+                        vx, vy, *_ = cv2.fitLine(corner_lines[0].contour, cv2.DIST_L2, 0, 0.01, 0.01)
+                        current_angle = np.degrees(np.arctan2(vy, vx))
+                    servo_angle = corner_turn.tick(0, current_angle)
+                        if current_angle < -90: current_angle += 180
+                        error = 0 - current_angle 
+                        servo_angle = corner_turn.tick(error) 
+                        
+                        asyncio.create_task(client.set_servo_angle(servo_angle))
+                        asyncio.create_task(client.drive_motors(5, 0.1))
 
                 case "Follow wall":
                     logger.debug(f"State: Follow Wall")
@@ -73,7 +86,7 @@ async def main():
                     detected_walls = {k: v for k, v in wall_x_diffs.items() if v != float("inf")}
                     closest_wall = min(detected_walls.keys(), key = lambda k: detected_walls.get(k))
 
-                    servo_angle = controller.tick(30, detected_walls[closest_wall]) if closest_wall == "left" else -controller.tick(30, detected_walls[closest_wall]) # negative steering is towards the left
+                    servo_angle = wall_follow.tick(45, detected_walls[closest_wall]) if closest_wall == "left" else -wall_follow.tick(30, detected_walls[closest_wall]) # negative steering is towards the left
 
                     asyncio.create_task(client.set_servo_angle(servo_angle))
                     asyncio.create_task(client.drive_motors(6, 0.1)) # Defaults to overwriting, will simply overwrite next iteration
@@ -82,10 +95,10 @@ async def main():
 if __name__ == "__main__":
     try:
         asyncio.run(main())
-        exitcode = 0
+        logger.error("Process Interrupted by User")
     except KeyboardInterrupt:
         logger.error("Process Interupted by User")
-        exitcode = 0
+        logger.exception("A FATAL EXCEPTION HAS OCCURRED")
     except Exception:
         logger.exception("A FATAL EXECPTION HAS OCCURED")
         exitcode = 1

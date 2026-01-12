@@ -1,6 +1,8 @@
 #include <Arduino.h>
 #include <math.h>
 #include <Hashtable.h>
+#include <L293D.h>
+#include <Servo.h>
 
 struct Request {
     int tid;
@@ -12,11 +14,22 @@ struct Request {
     int processed;
 };
 
+#define MOTOR_A      7   // motor pin a
+#define MOTOR_B      8   // motor pin b
+#define MOTOR_ENABLE 9   // Enable (also PWM pin)
+
+#define STEERING_PWM 12 // Servo PWM
+
+L293D motor(MOTOR_A, MOTOR_B, MOTOR_ENABLE);
+Servo steering;
+
 class Server {
     private:
         Stream* _serial;
         Hashtable<String, Request> CurrentProcesses;
         SimpleVector<String> commands;
+        L293D& _motor;
+        Servo& _steering;
 
         Request parseRequest() {
             Request req = {0, "", 0, 0, 0, 0, 1};
@@ -50,30 +63,34 @@ class Server {
                 end("PING");
             } 
             else if (request.command == "SET_SERVO") {
-                unsigned long duration = 200;
+                unsigned int current_angle = _steering.read();
+                unsigned long duration = fabs(request.arg1 - current_angle);
                 request.timeout = millis() + duration;
                 _serial->println(prefix + "WAITMS " + String(duration));
-                digitalWrite(4, HIGH);
+                _steering.write(request.arg1);
+                digitalWrite(3, HIGH);
             } 
             else if (request.command == "INC_SERVO") {
-                unsigned long duration = (unsigned long)(5 * request.arg1);
+                unsigned long duration = (unsigned long)(request.arg1);
                 request.timeout = millis() + duration;
                 _serial->println(prefix + "WAITMS " + String(duration));
-                digitalWrite(6, HIGH);
+                _steering.write(_steering.read() + request.arg1);
+                digitalWrite(4, HIGH);
             } 
             else if (request.command == "DRIVE_MOTORS") {
                 unsigned long duration = (unsigned long)(fabs(request.arg2) * 1000.0f + 0.5f);
                 request.timeout = millis() + duration;
                 _serial->println(prefix + "WAITMS " + String(duration));
-                digitalWrite(8, HIGH);
+                _motor.SetMotorSpeed(request.arg1); // Speed passed in percent
+                digitalWrite(5, HIGH);
             }
             else if (request.command == "SET_LED") {
                 request.timeout = 0;
                 request.processed = 1;
                 if (request.arg1 > 1e-6) {
-                    digitalWrite(10, HIGH);
+                    digitalWrite(6, HIGH);
                 } else {
-                    digitalWrite(10, LOW); // Only 1 is on
+                    digitalWrite(6, LOW); // Only 1 is on
                 }
                 end("SET_LED");
             } 
@@ -88,8 +105,9 @@ class Server {
                 end("M_ANGLE");
             }
             else {
-                digitalWrite(12, HIGH);
+                digitalWrite(10, HIGH);
                 _serial->println(prefix + "404 ERR");
+                end("404 ERR");
             }
         }
 
@@ -101,33 +119,36 @@ class Server {
                 _serial->println(prefix + "PONG");
                 digitalWrite(2, LOW);
             } else if (command == "SET_SERVO") {
-                digitalWrite(4, LOW);
+                digitalWrite(3, LOW);
                 _serial->println(prefix + "200 OK");
             } else if (command == "INC_SERVO") {
-                digitalWrite(6, LOW);
+                digitalWrite(4, LOW);
                 _serial->println(prefix + "200 OK");
             } else if (command == "DRIVE_MOTORS") {
-                digitalWrite(8, LOW);
+                _motor.Stop();
+                digitalWrite(5, LOW);
                 _serial->println(prefix + "200 OK");
             } else if (command == "SET_LED") {
                 // Keep the led's current state
                 _serial->println(prefix + "200 OK");
             } else if (command == "SERVO_ANGLE") {
-                _serial -> println(prefix + " 100"); // Arbitrary Value, No real servo to interface with yet :D
-            } else if (command == "M_ANGLE") {
-                _serial -> println(prefix + " 222"); // Arbitrary Value
+                _serial->println(prefix + _steering.read());
+            }else if (command == "M_ANGLE") {
+                _serial->println(prefix + _motor.GetCurrentMotorSpeed());
             } else if (command == "404 ERR") {
-                digitalWrite(12, LOW);
+                digitalWrite(10, LOW);
             }
         }
         
     public:
-        Server(Stream& s) : _serial(&s) {
+        Server(Stream& s, L293D& motor, Servo& steering) : _serial(&s), _motor(motor), _steering(steering) {
             commands.push_back("PING");
             commands.push_back("SET_SERVO");
             commands.push_back("INC_SERVO");
             commands.push_back("DRIVE_MOTORS");
             commands.push_back("SET_LED");
+            commands.push_back("SERVO_ANGLE");
+            commands.push_back("M_ANGLE");
         }
 
     void ProcessRequest() {
@@ -157,14 +178,20 @@ Server* server;
 void setup() {
     // these are all LEDs for testing
     pinMode(2, OUTPUT);
+    pinMode(3, OUTPUT);
     pinMode(4, OUTPUT);
+    pinMode(5, OUTPUT);
     pinMode(6, OUTPUT);
-    pinMode(8, OUTPUT);
     pinMode(10, OUTPUT);
-    pinMode(12, OUTPUT);
+
+    //L293D
+    pinMode(MOTOR_A, OUTPUT);
+    pinMode(MOTOR_B, OUTPUT);
 
     Serial.begin(115200);
-    server = new Server(Serial);
+    motor.begin(true);
+    steering.attach(STEERING_PWM);
+    server = new Server(Serial, motor, steering);
 }
 
 void loop() {

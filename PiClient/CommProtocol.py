@@ -198,7 +198,7 @@ class Client():
         if abs(speed) > self.MAX_SPEED:
             logger.warning(f"Invalid argument supplied: {speed} > {self.MAX_SPEED}. Clamped to {self.MAX_SPEED}")
             product = speed * duration
-            speed = self.MAX_SPEED
+            speed = self.MAX_SPEED if speed > 0 else -self.MAX_SPEED
             duration = product / speed
         command = f'DRIVE_MOTORS {speed} {duration}'
         response = await self.__request(command)
