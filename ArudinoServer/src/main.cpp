@@ -30,10 +30,10 @@ class Server {
                 req.count = sscanf(line.c_str(), "%d %31s %31s %31s", &req.tid, serialBuff, arg1Buff, arg2Buff);
                 req.command = String(serialBuff);
                 if (req.count >= 3) {
-                    req.arg1 = String(arg1Buff).toFloat();
+                    req.arg1 = atof(arg1Buff);
                 }
                 if (req.count >= 4) {
-                    req.arg2 = String(arg2Buff).toFloat();
+                    req.arg2 = atof(arg2Buff);
                 }
                 req.processed = 0;
             }

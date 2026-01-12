@@ -26,7 +26,7 @@ class Client():
         self.DEFAULT_TIMEOUT = timeout
         self.TIDS = cycle([i for i in range(1, 501)])
         self.WHEELBASE = 0.1 
-        self.MAX_SPEED = 8
+        self.MAX_SPEED = 100
         self.WAIT_RE = re.compile(r"WAITMS ([0-9]+)")
         self.is_connected = False
         self.loop = asyncio.get_event_loop()
@@ -106,13 +106,13 @@ class Client():
                 self._pending_requests[tid] = future
                 _, response = await asyncio.wait_for(future, requested_timeout)
             
-            logger.success(f"    ⤷ Sucessfully processed request: '{command}' with response '{response}'")
+            logger.success(f"    ⤷ Successfully processed request: '{command}' with response '{response}'")
             if response.endswith('ERR'):
-                logger.warning(f"        ⤷ Although request was sucessfully proccessed client-side, arudino has errored ({response})")
+                logger.warning(f"        ⤷ Although request was successfully processed client-side, arduino has errored ({response})")
                 
             return response
         except asyncio.TimeoutError:
-            logger.error(f"    ⤷ Timed out awaiting responce for: '{command}'")
+            logger.error(f"    ⤷ Timed out awaiting response for: '{command}'")
             return "ERR_TIMED_OUT"
         except Exception as e:
             logger.error(f"    ⤷ Error during request '{command}': '{e}'")
@@ -120,7 +120,7 @@ class Client():
         finally:
             self._pending_requests.pop(tid, None)
 
-    async def run_multiple_requests(self, requests: Sequence[Sequence[str, float]|Sequence[str, float, float]], timeout = 2.0): # type annotaion because it's takes complicated arguments
+    async def run_multiple_requests(self, requests, timeout = 2.0): # type annotaion because it's takes complicated arguments
         """data = {}
         inital_futures = []
         long_process_futures = []
@@ -158,7 +158,7 @@ class Client():
             for commands in data.values():
                 for command in commands:
                     self._pending_requests.pop(command[0])"""
-        raise NotImplementedError("Batch requests not yet supported sever-side.")
+        raise NotImplementedError("Batch requests not yet supported sever-side.") # This isn't needed anyway lol
             
     async def verify_connection(self, retries=5): # 1
         logger.info("Establishing Serial interface...")
@@ -195,7 +195,7 @@ class Client():
     
     async def drive_motors(self, speed, duration): # 4
         duration = abs(duration) # No time travel sorry
-        if speed > self.MAX_SPEED:
+        if abs(speed) > self.MAX_SPEED:
             logger.warning(f"Invalid argument supplied: {speed} > {self.MAX_SPEED}. Clamped to {self.MAX_SPEED}")
             product = speed * duration
             speed = self.MAX_SPEED
@@ -210,7 +210,7 @@ class Client():
             self.servo_angle = int(response)
             return True
         except ValueError:
-            logger.warning(f"Recived non-interger response '{response}' from request 'SERVO_ANGLE'")
+            logger.warning(f"Received non-integer response '{response}' from request 'SERVO_ANGLE'")
         
         return False
     
@@ -220,7 +220,7 @@ class Client():
             self.encoder_value = int(response)
             return True
         except ValueError:
-            logger.warning(f"Recived non-interger response '{response}' from request 'M_ANGLE'")
+            logger.warning(f"Received non-integer response '{response}' from request 'M_ANGLE'")
         
         return False
     
@@ -229,7 +229,7 @@ class Client():
         dy = target_y
         l_fw = np.sqrt(dx**2 + dy**2) 
         if l_fw < 1e-6:
-            logger.warning(f'Zero division error ecountured in __fast_arc_to_target, with arguments {target_x, target_y, speed, current_heading_rad}')
+            logger.warning(f'Zero division error encountered in __fast_arc_to_target, with arguments {target_x, target_y, speed, current_heading_rad}')
             return 'ERR_ZERO_DIVISION'
 
         target_angle_global = np.arctan2(dx, dy) # Abosulte angle

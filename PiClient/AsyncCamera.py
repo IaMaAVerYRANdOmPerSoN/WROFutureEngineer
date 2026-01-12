@@ -7,7 +7,7 @@ import multiprocessing as mp
 from multiprocessing import shared_memory
 
 class AsyncCamera():
-    def __init__(self, config = {"format": "YUV420", "size": (128, 96)}):
+    def __init__(self, config = {"format": "YUV420", "size": (512, 384)}):
         """
         The constructor for the AsyncCamera class.
         
@@ -49,11 +49,7 @@ class AsyncCamera():
             controls_config = {
                 # Lock frame rate to 60 FPS (min/max duration = 16.6ms)
                 "FrameDurationLimits": (16666, 16666), 
-                
-                # Disable Auto Exposure to prevent the 12 FPS "shutter lock"
-                "AeEnable": False, 
-                "ExposureTime": 10000, # 10ms shutter prevents motion blur
-                "AnalogueGain": 8.0,    # Crank gain to compensate for fast shutter
+                "AeEnable": True, 
             }
             config = self._cam.create_preview_configuration(main=self._config, sensor = sensor_config, controls=controls_config)
 
@@ -93,12 +89,15 @@ class AsyncCamera():
             try:
                 frame = await asyncio.wait_for(self.loop.run_in_executor(self.executor, self._cam.capture_array), timeout)
                 frame = frame.flatten()
-                y_plane = frame[:12288].reshape((96, 128))
-                u_plane_raw = frame[12288:15360].reshape((48, 64))
-                v_plane_raw = frame[15360:].reshape((48, 64))
+                y_end = 512*384
+                u_end = y_end + (256*192)
 
-                u_plane = u_plane_raw.repeat(2, axis=0).repeat(2, axis=1)
-                v_plane = v_plane_raw.repeat(2, axis=0).repeat(2, axis=1)
+                y_plane = frame[:y_end].reshape((384, 512))
+                u_plane_raw = frame[y_end:u_end].reshape((192, 256))
+                v_plane_raw = frame[u_end:].reshape((192, 256))
+
+                u_plane = np.broadcast_to(u_plane_raw[:, None, :, None], (192, 2, 256, 2)).reshape((384, 512))
+                v_plane = np.broadcast_to(v_plane_raw[:, None, :, None], (192, 2, 256, 2)).reshape((384, 512))
 
                 full_yuv = np.dstack((y_plane, u_plane, v_plane))
                 self.failures = 0
@@ -139,7 +138,7 @@ class AsyncCamera():
         :returns: `None`
         """
         shm = shared_memory.SharedMemory(name=shm)
-        array = np.ndarray((96, 128, 3), dtype=np.uint8, buffer=shm.buf)
+        array = np.ndarray((384, 512, 3), dtype=np.uint8, buffer=shm.buf)
 
         while True:
             frame = await self.get_frame_async()
@@ -147,8 +146,8 @@ class AsyncCamera():
                 array[:] = frame[:]
                 sender.send(True)
                 
-    @classmethod
-    async def frame_yeilder(self, receiver):
+    @staticmethod
+    async def frame_yielder(receiver):
         while True:
             if receiver.poll():
                 yield receiver.recv()

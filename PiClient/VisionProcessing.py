@@ -1,9 +1,10 @@
 import cv2
 import numpy as np
 import asyncio
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 from typing import Sequence
 from loguru import logger
+from multiprocessing import shared_memory
 
 class VisionObject():
     def __init__(self, color, contour):
@@ -123,7 +124,19 @@ class VisionProcessor():
                 wall_dists["left"] = center_x - (x + w)
 
         return wall_dists
-        
+    
+    def comprehensive_analysis(self, frame):
+        zone, walls, obstacles, corner_lines = (
+            self.check_field_bonds(frame),
+            self.find_walls(frame),
+            self.find_obstacles(frame),
+            self.check_corner_lines(frame),
+        )
+
+        wall_dists = self.get_wall_distance(walls)
+        obstacle_dists = self.get_distance(obstacles)
+
+        return zone, walls, obstacles, corner_lines, wall_dists, obstacle_dists
     
 class AsyncVisionProcessor(VisionProcessor):
     def __init__(self, *args):
@@ -132,7 +145,7 @@ class AsyncVisionProcessor(VisionProcessor):
         self.loop = asyncio.get_event_loop()
 
     async def __aenter__(self):
-        self.executor = ProcessPoolExecutor(1)
+        self.executor = ThreadPoolExecutor(6)
         return self
 
     async def __aexit__(self, *args): # Error handling in main loop
@@ -154,18 +167,28 @@ class AsyncVisionProcessor(VisionProcessor):
     async def get_wall_distance(self, walls: Sequence[VisionObject], frame_width=160):
         return await self.loop.run_in_executor(self.executor, super(AsyncVisionProcessor, self).get_wall_distance, walls, frame_width)
     
-    async def comprehensive_analysis(self, frame):
-        def work(f):
-            zone, walls, obstacles, corner_lines = (
-                super(AsyncVisionProcessor, self).check_field_bonds(f),
-                super(AsyncVisionProcessor, self).find_walls(f),
-                super(AsyncVisionProcessor, self).find_obstacles(f),
-                super(AsyncVisionProcessor, self).check_corner_lines(f),
-            )
+    async def comprehensive_analysis(self, shm, sender, receiver):
+        shm = shared_memory.SharedMemory(name=shm)
+        while True:
+            if receiver.recv():
+                frame = np.ndarray((shm.size,), dtype=np.uint8, buffer=shm.buf)
+                round1 = [
+                    self.check_field_bonds(frame),
+                    self.find_walls(frame),
+                    self.find_obstacles(frame),
+                    self.check_corner_lines(frame)
+                ]
+                zone, walls, obstacles, corner_lines = await asyncio.gather(*round1)
+                round2 = [
+                    self.get_wall_distance(walls),
+                    self.get_distance(obstacles)
+                ]
+                wall_dists, obstacle_dists = await asyncio.gather(*round2)
 
-            wall_dists = super(AsyncVisionProcessor, self).get_wall_distance(walls)
-            obstacle_dists = super(AsyncVisionProcessor, self).get_distance(obstacles)
+                sender.send((zone, walls, obstacles, corner_lines, wall_dists, obstacle_dists,))
 
-            return zone, walls, obstacles, corner_lines, wall_dists, obstacle_dists
-        
-        return await self.loop.run_in_executor(self.executor, work, frame)
+    @staticmethod
+    async def data_yielder(receiver):
+        while True:
+            if receiver.poll():
+                yield receiver.recv()
