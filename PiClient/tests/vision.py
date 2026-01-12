@@ -55,3 +55,7 @@ async def main():
         shm.unlink()
         logger.info("Exiting...")
         sys.exit()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+    
