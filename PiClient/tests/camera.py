@@ -64,7 +64,7 @@ async def test_streaming_pipe():
                     logger.success(
                         f"Successfully fetched 30 frames: Average Framerate {fps:.2f} fps.")
                     return True
-
+                
     finally:
         camera_process.terminate()
         camera_process.join()
