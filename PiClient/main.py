@@ -72,12 +72,10 @@ async def main():
                     else:
                         vx, vy, *_ = cv2.fitLine(corner_lines[0].contour, cv2.DIST_L2, 0, 0.01, 0.01)
                         current_angle = np.degrees(np.arctan2(vy, vx))
-                    servo_angle = corner_turn.tick(0, current_angle)
-                        if current_angle < -90: current_angle += 180
-                        error = 0 - current_angle 
-                        servo_angle = corner_turn.tick(error) 
-                        
-                        asyncio.create_task(client.set_servo_angle(servo_angle))
+                        if current_angle < -90:
+                            current_angle += 180
+                        error = 0 - current_angle
+                        servo_angle = corner_turn_controller.tick(error)
                         asyncio.create_task(client.drive_motors(5, 0.1))
 
                 case "Follow wall":
@@ -99,10 +97,10 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         logger.error("Process Interupted by User")
         logger.exception("A FATAL EXCEPTION HAS OCCURRED")
-    except Exception:
+        logger.error("Process Interrupted by User")
         logger.exception("A FATAL EXECPTION HAS OCCURED")
         exitcode = 1
-    finally:
+        logger.exception("A FATAL EXCEPTION HAS OCCURRED")
         logger.info(f"Cleaning up with exitcode {exitcode}...")
         if 'camera_process' in locals():
             locals["camera_process"].terminate()
