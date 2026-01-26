@@ -133,7 +133,7 @@ class Server {
                 _serial->println(prefix + "200 OK");
             } else if (command == "SERVO_ANGLE") {
                 _serial->println(prefix + _steering.read());
-            }else if (command == "M_ANGLE") {
+            } else if (command == "M_ANGLE") {
                 _serial->println(prefix + _motor.GetCurrentMotorSpeed());
             } else if (command == "404 ERR") {
                 digitalWrite(10, LOW);
