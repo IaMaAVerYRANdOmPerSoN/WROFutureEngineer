@@ -6750,6 +6750,158 @@
 		(at 105.41 38.1)
 		(uuid "fe588e52-c480-4609-a7bc-3e9f82c5b6cc")
 	)
+	(no_connect
+		(at 153.67 41.91)
+		(uuid "01ba88b5-1864-4a1d-9233-4f276d9052ec")
+	)
+	(no_connect
+		(at 260.35 115.57)
+		(uuid "0e3add5c-a22f-45ed-8004-ec7a2a7afff4")
+	)
+	(no_connect
+		(at 152.4 190.5)
+		(uuid "1bd017e9-f62e-482d-a8b3-0e1ce31743f4")
+	)
+	(no_connect
+		(at 153.67 34.29)
+		(uuid "1bece68e-68bb-41a1-b579-a10491a6de8d")
+	)
+	(no_connect
+		(at 209.55 113.03)
+		(uuid "20afabf7-7da1-4dbb-b085-efeda2784b1a")
+	)
+	(no_connect
+		(at 209.55 102.87)
+		(uuid "27dccc31-f811-447e-b48d-bc130a304ac3")
+	)
+	(no_connect
+		(at 153.67 49.53)
+		(uuid "312c127d-341b-433f-906c-180e2ee09312")
+	)
+	(no_connect
+		(at 153.67 39.37)
+		(uuid "3a24b2a4-df9a-412d-8da5-2135c198cd2d")
+	)
+	(no_connect
+		(at 120.65 52.07)
+		(uuid "3dd7474c-70ec-4fbc-bcad-abc414c745eb")
+	)
+	(no_connect
+		(at 137.16 229.87)
+		(uuid "3e1e60d3-3ef7-4c58-af26-8d811a8cc4dd")
+	)
+	(no_connect
+		(at 153.67 87.63)
+		(uuid "43a3a5e0-80bc-401a-8ae9-aa77ee49c854")
+	)
+	(no_connect
+		(at 209.55 128.27)
+		(uuid "4edee6c3-77b5-4db3-abe4-9dc5ee48638e")
+	)
+	(no_connect
+		(at 120.65 87.63)
+		(uuid "4f0a0baa-1ac2-438e-834f-0ccebd876065")
+	)
+	(no_connect
+		(at 120.65 95.25)
+		(uuid "52c0a777-16f1-4a01-a224-fa3b6f8a63b5")
+	)
+	(no_connect
+		(at 153.67 85.09)
+		(uuid "612e3ab6-312b-40b7-b821-d21f6c5fbeef")
+	)
+	(no_connect
+		(at 120.65 97.79)
+		(uuid "64bbd178-35d3-4511-bece-c24c33a025af")
+	)
+	(no_connect
+		(at 153.67 100.33)
+		(uuid "695dadf1-090f-47e9-aa5c-f66a055f76b5")
+	)
+	(no_connect
+		(at 260.35 118.11)
+		(uuid "707485b8-31db-44d0-bcab-c3799427b7a5")
+	)
+	(no_connect
+		(at 120.65 46.99)
+		(uuid "74243de4-0e69-4cbc-88bc-1d13309903b4")
+	)
+	(no_connect
+		(at 153.67 54.61)
+		(uuid "7ae747b3-f388-4bd4-8b5f-3e9d21870964")
+	)
+	(no_connect
+		(at 153.67 36.83)
+		(uuid "7d460013-4e87-446b-8dea-65bef436e391")
+	)
+	(no_connect
+		(at 153.67 44.45)
+		(uuid "884130f0-888b-415b-8d26-fed8c479f914")
+	)
+	(no_connect
+		(at 260.35 110.49)
+		(uuid "88d11160-0f1f-4456-a71f-de07ce18b8b1")
+	)
+	(no_connect
+		(at 120.65 57.15)
+		(uuid "9024e14e-1c06-4be0-8112-1bcbc4b2badf")
+	)
+	(no_connect
+		(at 153.67 46.99)
+		(uuid "9f7e4853-708c-4103-b514-07ccbf4827e6")
+	)
+	(no_connect
+		(at 120.65 49.53)
+		(uuid "a0604335-d9af-40e5-8103-fb03b6e2b34e")
+	)
+	(no_connect
+		(at 209.55 100.33)
+		(uuid "a0962051-9292-4ae3-bec0-5024383bc382")
+	)
+	(no_connect
+		(at 153.67 52.07)
+		(uuid "a65770ec-bb11-4431-86d3-41868c2d67e6")
+	)
+	(no_connect
+		(at 209.55 110.49)
+		(uuid "a8266c53-2c00-4f30-8d1d-8dd275f378a4")
+	)
+	(no_connect
+		(at 120.65 39.37)
+		(uuid "bba5a674-53f9-4a17-8b1d-6559e29d728c")
+	)
+	(no_connect
+		(at 120.65 54.61)
+		(uuid "bc38ccf7-a920-4eab-ab3f-089fecf2a30f")
+	)
+	(no_connect
+		(at 120.65 92.71)
+		(uuid "c20536b2-42dc-41a9-b9a7-95f8c6779cc4")
+	)
+	(no_connect
+		(at 120.65 90.17)
+		(uuid "c905b54e-9223-4ace-a59b-92012c0cb659")
+	)
+	(no_connect
+		(at 120.65 85.09)
+		(uuid "d13604a8-1468-467a-9215-0407405f92df")
+	)
+	(no_connect
+		(at 153.67 92.71)
+		(uuid "daf5f0a8-0a2b-4cea-b06b-4732b8ece157")
+	)
+	(no_connect
+		(at 153.67 57.15)
+		(uuid "de733b20-f804-421b-8dfd-aa27a378c246")
+	)
+	(no_connect
+		(at 260.35 113.03)
+		(uuid "e2f9938e-d5a7-4083-a219-a57876135a7c")
+	)
+	(no_connect
+		(at 209.55 107.95)
+		(uuid "ed40cc65-035e-407c-80d9-5e66c0307585")
+	)
 	(wire
 		(pts
 			(xy 143.51 248.92) (xy 143.51 240.03)
@@ -8520,7 +8672,7 @@
 	)
 	(symbol
 		(lib_id "power:+7.5V")
-		(at 67.31 86.36 0)
+		(at 83.82 63.5 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -8528,7 +8680,7 @@
 		(dnp no)
 		(uuid "04f813e9-550c-4963-8e13-f280e3440e23")
 		(property "Reference" "#PWR01"
-			(at 67.31 90.17 0)
+			(at 83.82 67.31 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -8545,7 +8697,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 67.31 86.36 0)
+			(at 83.82 63.5 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -8554,7 +8706,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 67.31 86.36 0)
+			(at 83.82 63.5 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -8563,7 +8715,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"+7.5V\""
-			(at 67.31 86.36 0)
+			(at 83.82 63.5 0)
 			(effects
 				(font
 					(size 1.27 1.27)
