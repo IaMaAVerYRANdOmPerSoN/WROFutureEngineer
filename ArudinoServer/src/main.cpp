@@ -18,7 +18,7 @@ struct Request {
 #define MOTOR_B      8   // motor pin b
 #define MOTOR_ENABLE 9   // Enable (also PWM pin)
 
-#define STEERING_PWM 12 // Servo PWM
+#define STEERING_PWM 11 // Servo PWM
 
 L293D motor(MOTOR_A, MOTOR_B, MOTOR_ENABLE);
 Servo steering;
