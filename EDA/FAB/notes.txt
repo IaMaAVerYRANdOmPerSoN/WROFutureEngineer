@@ -1,0 +1,6 @@
+Notes:
+1. I may have made a couple mistakes/picked impossible footprints because this is my first design +
+I am a 9th grader.
+2. All components (except capacitors) should be rated >12V
+3. All capacitors should be rated >16V
+4. I can fix any minnor issues like picking an impossibly small footprint/random unconnected track/ugly silkscreen
