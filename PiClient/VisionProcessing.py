@@ -65,7 +65,7 @@ class VisionProcessor():
         return self.__find_blocks([blue_mask, orange_mask], ["blue", "orange"])
 
     def check_field_bonds(self, frame):
-        logger.info("Fetching drivable field bondaries...")
+        logger.info("Fetching drivable field boundaries...")
 
         y = frame[:, :, 0]
         white_mask = cv2.inRange(y, 200, 255)
@@ -84,7 +84,7 @@ class VisionProcessor():
         y = frame[:, :, 0]
         black_mask = cv2.inRange(y, 0, 100)
 
-        return self.__find_blocks(black_mask)
+        return self.__find_blocks([black_mask], ["black"])
     
     def get_distance(self,  items: Sequence[VisionObject], frame_width = 160):
         center_x = frame_width // 2
@@ -98,7 +98,7 @@ class VisionProcessor():
             if item.x_centroid >= center_x and item.y_centroid > 30: # Wall on the right, get left edge, crop to bottom ROI
                 x, *_ = item.bbox
                 dists.append(x - center_x)
-            if item.x_centroid < center_x and item.y_centroid > 30: # Wall on the left, get right edge, crop to bootom ROI
+            if item.x_centroid < center_x and item.y_centroid > 30: # Wall on the left, get right edge, crop to bottom ROI
                 x, _, w, _ = item.bbox
                 dists.append(center_x - (x + w))
 
@@ -119,7 +119,7 @@ class VisionProcessor():
             if item.x_centroid >= center_x and item.y_centroid > 30: # Wall on the right, get left edge, crop to bottom ROI
                 x, *_ = item.bbox
                 wall_dists["right"] = x - center_x
-            if item.x_centroid < center_x and item.y_centroid > 30: # Wall on the left, get right edge, crop to bootom ROI
+            if item.x_centroid < center_x and item.y_centroid > 30: # Wall on the left, get right edge, crop to bottom ROI
                 x, _, w, _ = item.bbox
                 wall_dists["left"] = center_x - (x + w)
 
@@ -161,6 +161,9 @@ class AsyncVisionProcessor(VisionProcessor):
     async def check_corner_lines(self, frame):
         return await self.loop.run_in_executor(self.executor, super(AsyncVisionProcessor, self).check_corner_lines, frame)
     
+    async def find_walls(self, frame):
+        return await self.loop.run_in_executor(self.executor, super(AsyncVisionProcessor, self).find_walls, frame)
+    
     async def get_distance(self, items: Sequence[VisionObject], frame_width=160):
         return await self.loop.run_in_executor(self.executor, super().get_distance, items, frame_width)
     
@@ -169,9 +172,11 @@ class AsyncVisionProcessor(VisionProcessor):
     
     async def comprehensive_analysis(self, shm, sender, receiver):
         shm = shared_memory.SharedMemory(name=shm)
+        frame_width, frame_height, frame_channels = 512, 384, 3
+        frame_size = frame_width * frame_height * frame_channels
         while True:
             if receiver.recv():
-                frame = np.ndarray((shm.size,), dtype=np.uint8, buffer=shm.buf)
+                frame = np.ndarray((frame_height, frame_width, frame_channels), dtype=np.uint8, buffer=shm.buf[:frame_size])
                 round1 = [
                     self.check_field_bonds(frame),
                     self.find_walls(frame),

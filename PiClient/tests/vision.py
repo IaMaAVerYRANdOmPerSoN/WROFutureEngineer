@@ -7,6 +7,11 @@ import multiprocessing as mp
 from multiprocessing import shared_memory
 import sys
 
+logger.remove()
+logger.add("vision.log", rotation="1 MB", retention="10 days", level="INFO")
+logger.add(sys.stdout, level="INFO", filter=lambda record: record["level"].no < logger.level("ERROR").no)
+logger.add(sys.stderr, level="ERROR")
+
 def camera(shm, sender):
     async def _run():
         async with AsyncCamera() as camera:
@@ -22,7 +27,29 @@ def vision(shm, sender, receiver):
     asyncio.run(_run())
 
 async def main():
-    shm = shared_memory.SharedMemory(name="frameBuffer", create=True, size=384*512*3 + 128) # Frame + 128 bytes margin
+    shm_name = "frameBuffer"
+    shm_size = 384*512*3 + 128  # Frame + 128 bytes margin
+
+    try:
+        shm = shared_memory.SharedMemory(name=shm_name, create=True, size=shm_size)
+    except FileExistsError:
+        # Clean up any stale shared memory segment from a previous run and retry
+        try:
+            existing_shm = shared_memory.SharedMemory(name=shm_name, create=False)
+            existing_shm.close()
+            existing_shm.unlink()
+        except FileNotFoundError:
+            # The shared memory segment disappeared between create and cleanup attempts
+            pass
+        shm = shared_memory.SharedMemory(name=shm_name, create=True, size=shm_size)
+
+    frameReceiver, frameSender = mp.Pipe(duplex=False)
+    dataReceiver, dataSender = mp.Pipe(duplex=False)
+
+    camera_stream = mp.Process(group=None, target=camera, args=(shm_name, frameSender,), daemon=False)
+    camera_stream.start()
+
+    data_stream = mp.Process(group=None, target=vision, args=(shm_name, dataSender, frameReceiver,), daemon=False)
     frameReceiver, frameSender = mp.Pipe(duplex=False)
     dataReceiver, dataSender = mp.Pipe(duplex=False)
 
@@ -35,7 +62,7 @@ async def main():
     try:
         logger.info("Starting Vision Unittest...")
         async for zone, walls, obstacles, corner_lines, wall_dists, obstacle_dists in AsyncVisionProcessor.data_yielder(dataReceiver):
-                logger.error( # Error so I don't have to open a verbose log file to find stuff
+                logger.info(
                     f"Zone {zone}\n" \
                     f"Walls: {walls} \n" \
                     f"Obstacles: {obstacles} \n" \
@@ -43,7 +70,7 @@ async def main():
                     f"Wall distances {wall_dists} \n" \
                     f"Obstacle Distances {obstacle_dists} \n")
     except KeyboardInterrupt:
-        logger.error("Test terminated by user")
+        logger.info("Test terminated by user")
     except Exception:
         logger.critical("A FATAL EXCEPTION HAS OCCURRED")
         logger.exception("Traceback:")
