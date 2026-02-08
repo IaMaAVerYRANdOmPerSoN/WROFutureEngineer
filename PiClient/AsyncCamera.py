@@ -25,10 +25,10 @@ class AsyncCamera():
 
     async def __aenter__(self):
         """
-        Initializes hardware resources defined in __init__ asyncrounously.
+        Initializes hardware resources defined in __init__ asynchronously.
 
         :param self: The instance of `AsyncCamera`.
-        :raises: `ConnectionError` if an execption occurs or the camera times out.
+        :raises: `ConnectionError` if an exception occurs or the camera times out.
 
         :returns: `self`: the instance of `AsyncCamera`
         """
@@ -79,7 +79,7 @@ class AsyncCamera():
         
     async def get_frame_async(self, timeout = 1):
         """
-        Fetch a frame asyncronously from `self._cam`
+        Fetch a frame asynchronously from `self._cam`
         
         :param self: The instance of `AsyncCamera`
         :param timeout: The maximum roundtrip time, in seconds, before raising asyncio.TimeoutError
@@ -107,7 +107,7 @@ class AsyncCamera():
             except asyncio.TimeoutError:
                 self.failures += 1
                 if self.failures >= 10: 
-                    raise MemoryError("Garbage threads have bulit up beyond safe threshold.") from asyncio.TimeoutError
+                    raise MemoryError("Garbage threads have built up beyond safe threshold.") from asyncio.TimeoutError
                 logger.error(f"Timed out awaiting video stream")
 
             except Exception as e:
@@ -144,6 +144,7 @@ class AsyncCamera():
             frame = await self.get_frame_async()
             if frame is not None:
                 array[:] = frame[:]
+
                 sender.send(True)
                 
     @classmethod
