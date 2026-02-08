@@ -79,6 +79,11 @@ def _draw_detections(frame, zone, walls, obstacles, corner_lines, wall_dists, ob
     return frame
 
 
+logger.remove()
+logger.add("vision.log", rotation="1 MB", retention="10 days", level="INFO")
+logger.add(sys.stdout, level="INFO", filter=lambda record: record["level"].no < logger.level("ERROR").no)
+logger.add(sys.stderr, level="ERROR")
+
 def camera(shm, sender):
     async def _run():
         async with AsyncCamera() as camera:
