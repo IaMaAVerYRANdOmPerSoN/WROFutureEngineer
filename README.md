@@ -1,24 +1,313 @@
-### Components
-| Name | Product | Price (CAD)|
-| ----------- | ----------- | ----------- |
-| Step Down | [`Pololu 5V`](https://www.pololu.com/product/2851) | $30 | 
-| Battery | [`7.4V Li-ion Battery 3000mAh 2S`](https://www.amazon.ca/PCEONAMP-7-4V-3000mAh-Deans-Plug/dp/B0CHMH4VDT?th=1) | $40 |
-| Arduino | [``]() | $ |
-| Camera | [`5/Zero Camera Module`](https://www.amazon.ca/dp/B0D324RKRZ?ref=ppx_yo2ov_dt_b_fed_asin_title) | $45 |
-| Servo Motor | [`HS-5055MG`](https://hitecrcd.com/hs-5055mg-economy-metal-gear-feather-servo/?srsltid=AfmBOooq_9U4Nehv90Y-tGWqZeo6_1c0_7imuMD9W_dBJmYS1m0sd2Y_) | $30 |
-| Raspberry Pi | [`Raspberry Pi 5`](https://www.amazon.ca/CanaKit-Raspberry-Basic-Kit-Card/dp/B0CVR1LP7G?source=ps-sl-shoppingads-lpcontext&ref_=fplfs&psc=1&smid=A34IVHW5OUAV7P) | $ 190|
-| Ball Bearing | [`692ZZ Deep Groove Ball Bearings`](https://www.amazon.ca/uxcell-Groove-Bearings-Double-Shielded/dp/B082PR238V/ref=sr_1_5?crid=1TD0UHU4YMXUB&dib=eyJ2IjoiMSJ9.lOaL4503OtUNFSXXNF7xxUOcKO9bIRNdyVJqr3oL4zET8fjUbClM7ZEk4_qpxLWYsptTRMtH-krU3Jrf-PLynNxhaP8CUJmeHo1Bi9SiFVKCEPY_tRBJb9Avz-CSia1gbWiic7Q_GCD9V4m65jC6YY6GYktvapZfi5vmQGfdnubSUpQujPNqSOboV_KFY5e8wrLKYOQ0x_EQ6HjfAGKvvkUVdQV-r5mnJ96DJpGYpaeOnSmPPCDDzWj7c9JzQnf7K1pc_o7fxl4BPtpj2OU04SR6OuqGzZrb7-caVmiB9b0.47roBYe5JKpwkjQgK45PPyekYi7tvhO3OFfWGvH1Jl0&dib_tag=se&keywords=ball%2Bbearings%2Bamazon%2B2mm&qid=1769467928&sprefix=ball%2Bbearings%2Bamazon%2B2mm%2Caps%2C101&sr=8-5&th=1) | $15 |
-| Brass Standoff | [`Hilitchi 360pcs M2 M3 M4 Male Female Brass Spacer`](https://www.amazon.ca/Hilitchi-360pcs-Female-Standoff-Assortment/dp/B013ZWM1F6/ref=asc_df_B013ZWM1F6?mcid=01dc08b31e2d3c6b91e056537637e9f1&tag=googleshopc0c-20&linkCode=df0&hvadid=706840782695&hvpos=&hvnetw=g&hvrand=6740013521994106113&hvpone=&hvptwo=&hvqmt=&hvdev=c&hvdvcmdl=&hvlocint=&hvlocphy=9000758&hvtargid=pla-347986343027&hvocijid=6740013521994106113-B013ZWM1F6-&hvexpln=0&gad_source=1&th=1) | $20 |
-| Universal Drive Joints | [`4Pack Metal CVD Universal Drive Joint`](https://www.amazon.ca/dp/B0DCPQTSYK/ref=sspa_dk_detail_0?psc=1&pd_rd_i=B0DCPQTSYK&pd_rd_w=BceIw&content-id=amzn1.sym.516c2169-755e-413a-a38a-68230f4ab66f&pf_rd_p=516c2169-755e-413a-a38a-68230f4ab66f&pf_rd_r=3ZBN4SH7THY84478SNSC&pd_rd_wg=hwt1w&pd_rd_r=1236a42c-f966-4066-99b7-dd3a87935e0e&s=toys&sp_csd=d2lkZ2V0TmFtZT1zcF9kZXRhaWw) | $15 |
-| Stub Axle | [`DYNWAVE RC Wheel Axle`](https://www.amazon.ca/DYNWAVE-Shafts-Install-Professional-Wltoys/dp/B0G4MKHFNJ/ref=sr_1_1_sspa?crid=2QA04MA606BXY&dib=eyJ2IjoiMSJ9.To_lsfd7BOugQN-Zn6jKxl9ntHXZ73zs4nBTsDniQy5O8VKeFPucAdNDOkY9bbVRecAyp_-SZbIEh-Rcofc7lQMHZpbFutA1exHKrs-q_i2mbcf60vSRQLCbICL_vvXmmxwiPg_O5PO-F4OFPI5wG87e8uLAgzHNtS4Bl6y7lYt7aQ5Q8rk-A8HVT3U45iJ3QMCDnlrsVxrjalup2ld6DI7XKV3-M3kGcrB3yojDvdcJ9eIxvhnPpTkfmflIZzcOrPB6oY90covlEv9V9GcKxTBiIf9xWnXnPEDwBTszY4w.llQuGcVopf4unw1m-puk0jkmShz6oVyGcpetA23qpQI&dib_tag=se&keywords=wheel+stub+axle+1%2F24&qid=1769643676&sprefix=wheel+stub+axle+1%2F24%2Caps%2C171&sr=8-1-spons&sp_csd=d2lkZ2V0TmFtZT1zcF9hdGY&psc=1) | $10 |
-|  | [``]() | $ |
-|  | [``]() | $ |
-|  | [``]() | $ |
-|  | [``]() | $ |
-|  | [``]() | $ |
-|  | [``]() | $ |
-|  | [``]() | $ |
-|  | [``]() | $ |
-|  | [``]() | $ |
-|  | [``]() | $ |
+# WRO 2026 Future Engineers – TEAM APOSTLA
 
+## Project Overview
+This repository contains the complete documentation, code, design files, and test records for our **WRO 2026 Future Engineers** self-driving car project.
+
+This repo is organized to show:
+- how our robot is mechanically designed
+- how power and sensors are arranged
+- how the software is structured
+- how engineering decisions were made
+- how another team could reproduce the robot
+
+---
+
+## Team Information
+- **Team Members:** Elvis Wang, Michael Xie, Ryan Rao
+- **Coach / Mentor:** Huifei Rao
+
+### *add more info about team and stuff*
+
+---
+
+## Robot Summary
+Briefly describe your robot in 3–6 sentences.
+
+Example:
+> Our robot is a self-driving vehicle designed for the WRO 2026 Future Engineers challenge. It uses [camera / LiDAR / ultrasonic / IMU / other sensors] to detect the environment, follow the track, and react to obstacles. The robot is built with [main controller], [drive system], and [steering mechanism]. Our design focuses on [stability / reliability / fast turning / accurate detection / modularity].
+
+### Main Features
+- [Feature 1]
+- [Feature 2]
+- [Feature 3]
+- [Feature 4]
+
+
+---
+
+## Repository Structure
+
+### Main Files
+- `README.md` – main project overview and navigation
+- `LICENSE` – repository license
+- `.gitignore` – ignored local/generated files
+- `requirements.txt` – Python dependencies
+- `CHANGELOG.md` – version history
+
+### Documentation
+- `docs/01_mechanical/` – mobility and mechanical design
+- `docs/02_power_sensors/` – power system and sensor architecture
+- `docs/03_software/` – software design and obstacle strategy
+- `docs/04_systems_engineering/` – engineering decisions, trade-offs, and risks
+- `docs/05_reproducibility/` – build, setup, assembly, and testing workflow
+
+### Other Project Assets
+- `cad/` – CAD models and mechanical design files
+- `wiring/` – wiring diagrams and connector information
+- `src/` – source code
+- `tests/` – testing scripts, procedures, and logs
+- `data/` – calibration data and experiment results
+- `media/` – photos, screenshots, and videos
+- `submissions/` – final competition submission materials
+
+---
+
+# 1. Mechanical Design
+This section explains the physical design of the robot, including chassis layout, steering, drivetrain, torque/speed reasoning, and mechanical improvements over time.
+
+### Files
+- [`docs/01_mechanical/chassis_design.md`](docs/01_mechanical/chassis_design.md)
+- [`docs/01_mechanical/steering_drive.md`](docs/01_mechanical/steering_drive.md)
+- [`docs/01_mechanical/torque_speed_reasoning.md`](docs/01_mechanical/torque_speed_reasoning.md)
+- [`docs/01_mechanical/mechanical_iterations.md`](docs/01_mechanical/mechanical_iterations.md)
+
+### Summary
+Write a short summary here:
+- chassis type:
+- steering type:
+- drivetrain type:
+- major mechanical priorities:
+- key lessons learned:
+
+---
+
+# 2. Power and Sensor Architecture
+This section explains how the robot is powered, what sensors are used, where they are placed, and how they are calibrated.
+
+### Files
+- [`docs/02_power_sensors/power_architecture.md`](docs/02_power_sensors/power_architecture.md)
+- [`docs/02_power_sensors/sensor_selection.md`](docs/02_power_sensors/sensor_selection.md)
+- [`docs/02_power_sensors/sensor_placement.md`](docs/02_power_sensors/sensor_placement.md)
+- [`docs/02_power_sensors/calibration.md`](docs/02_power_sensors/calibration.md)
+- [`docs/02_power_sensors/wiring.md`](docs/02_power_sensors/wiring.md)
+
+### Summary
+Write a short summary here:
+- battery:
+- voltage regulation:
+- main sensors:
+- sensor placement strategy:
+- calibration approach:
+
+---
+
+# 3. Software Architecture and Strategy
+This section explains how the code is structured and how the robot performs lane following, obstacle handling, and control.
+
+### Files
+- [`docs/03_software/software_architecture.md`](docs/03_software/software_architecture.md)
+- [`docs/03_software/state_machine.md`](docs/03_software/state_machine.md)
+- [`docs/03_software/lane_following.md`](docs/03_software/lane_following.md)
+- [`docs/03_software/obstacle_strategy.md`](docs/03_software/obstacle_strategy.md)
+- [`docs/03_software/algorithms.md`](docs/03_software/algorithms.md)
+- [`docs/03_software/edge_cases.md`](docs/03_software/edge_cases.md)
+- [`docs/03_software/tuning_validation.md`](docs/03_software/tuning_validation.md)
+
+### Summary
+Write a short summary here:
+- main programming language:
+- code structure:
+- lane following method:
+- obstacle handling method:
+- important algorithms:
+- tuning process:
+
+---
+
+# 4. Systems Engineering and Design Decisions
+This section explains how the robot was developed as an integrated system and how trade-offs were evaluated.
+
+### Files
+- [`docs/04_systems_engineering/subsystem_interactions.md`](docs/04_systems_engineering/subsystem_interactions.md)
+- [`docs/04_systems_engineering/engineering_decisions.md`](docs/04_systems_engineering/engineering_decisions.md)
+- [`docs/04_systems_engineering/constraints_tradeoffs.md`](docs/04_systems_engineering/constraints_tradeoffs.md)
+- [`docs/04_systems_engineering/risk_analysis.md`](docs/04_systems_engineering/risk_analysis.md)
+- [`docs/04_systems_engineering/iteration_cycles.md`](docs/04_systems_engineering/iteration_cycles.md)
+
+### Summary
+Write a short summary here:
+- biggest engineering constraints:
+- main trade-offs:
+- most important decisions:
+- major risks:
+- how the robot improved through iteration:
+
+---
+
+# 5. Reproducibility
+This section explains how another team could rebuild, set up, and test the robot.
+
+### Files
+- [`docs/05_reproducibility/build_guide.md`](docs/05_reproducibility/build_guide.md)
+- [`docs/05_reproducibility/bill_of_materials.md`](docs/05_reproducibility/bill_of_materials.md)
+- [`docs/05_reproducibility/assembly_steps.md`](docs/05_reproducibility/assembly_steps.md)
+- [`docs/05_reproducibility/setup_guide.md`](docs/05_reproducibility/setup_guide.md)
+- [`docs/05_reproducibility/testing_workflow.md`](docs/05_reproducibility/testing_workflow.md)
+- [`docs/05_reproducibility/release_notes.md`](docs/05_reproducibility/release_notes.md)
+
+### Summary
+Write a short summary here:
+- how to build the robot:
+- how to install software:
+- how to calibrate:
+- how to test:
+- what files are needed to reproduce the system:
+
+---
+
+## Hardware Summary
+Fill in this quick-reference hardware list.
+
+| Component | Model / Part | Purpose |
+|----------|---------------|---------|
+| Main controller |  |  |
+| Secondary controller |  |  |
+| Drive motor |  |  |
+| Steering servo |  |  |
+| Motor driver / ESC |  |  |
+| Camera |  |  |
+| LiDAR / distance sensor |  |  |
+| IMU |  |  |
+| Battery |  |  |
+| Voltage regulator / BEC |  |  |
+
+---
+
+## Software Summary
+Fill in this quick-reference software list.
+
+| Item | Description |
+|------|-------------|
+| Main language |  |
+| Main controller software |  |
+| Secondary controller software |  |
+| Main control loop |  |
+| Perception method |  |
+| Planning method |  |
+| Steering control method |  |
+| Speed control method |  |
+
+---
+
+## Build and Setup Quick Start
+Give a short version here, and keep the detailed steps in `docs/05_reproducibility/`.
+
+1. Build the chassis
+2. Mount electronics
+3. Connect wiring
+4. Install software dependencies
+5. Upload or run code
+6. Calibrate sensors
+7. Run tests
+
+Detailed instructions:
+- [`docs/05_reproducibility/build_guide.md`](docs/05_reproducibility/build_guide.md)
+- [`docs/05_reproducibility/setup_guide.md`](docs/05_reproducibility/setup_guide.md)
+
+---
+
+## Testing and Validation
+Summarize how the robot was tested.
+
+Example points:
+- bench tests for hardware
+- sensor tests
+- steering tests
+- lane following tests
+- obstacle avoidance tests
+- full track tests
+
+Detailed records:
+- `tests/`
+- `data/`
+- [`docs/03_software/tuning_validation.md`](docs/03_software/tuning_validation.md)
+- [`docs/04_systems_engineering/iteration_cycles.md`](docs/04_systems_engineering/iteration_cycles.md)
+
+---
+
+## Media and Visual Documentation
+Use this section to point judges to photos, diagrams, and videos.
+
+### Photos
+- overall robot:
+- front view:
+- top view:
+- sensor placement:
+- wiring overview:
+
+### Diagrams
+- chassis diagram:
+- power diagram:
+- wiring diagram:
+- software flowchart:
+- state machine diagram:
+
+### Videos
+- robot demo:
+- obstacle handling demo:
+- testing clips:
+
+Suggested folders:
+- `media/`
+- `docs/images/`
+- `docs/diagrams/`
+- `docs/videos/`
+
+---
+
+## CAD and Wiring Files
+- `cad/` – CAD files and exports
+- `wiring/` – wiring diagrams and connection references
+
+Brief notes:
+- CAD software used:
+- file format(s):
+- wiring diagram tool used:
+
+---
+
+## Version History
+Briefly summarize major milestones here.
+
+See full details in:
+- [`CHANGELOG.md`](CHANGELOG.md)
+- [`docs/05_reproducibility/release_notes.md`](docs/05_reproducibility/release_notes.md)
+
+Example:
+- **v0.1** – initial repo structure
+- **v0.2** – first rolling prototype
+- **v0.3** – improved steering and sensor placement
+- **v0.4** – implemented lane following and obstacle response
+
+---
+
+## Contribution and Documentation Rules
+Use this section to keep the repo organized.
+
+Example:
+- use clear commit messages
+- add photos when mechanical changes are made
+- document sensor changes in `sensor_placement.md`
+- document tuning changes in `tuning_validation.md`
+- document major engineering decisions in `engineering_decisions.md`
+
+---
+
+## Final Notes
+This repository is intended to document not only the final robot, but also the engineering process behind it:
+- design choices
+- testing evidence
+- failures and improvements
+- reproducibility
+
+The goal is to make the project understandable, traceable, and reproducible.
