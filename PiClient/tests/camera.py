@@ -5,7 +5,7 @@ import numpy as np
 import cv2
 import multiprocessing as mp
 from multiprocessing import shared_memory
-from asyncCamera import AsyncCamera
+from src.asyncCamera import AsyncCamera
 from loguru import logger
 
 def run_stream(shm_name, pipe_sender):
@@ -35,7 +35,7 @@ async def test_streaming_pipe():
     try:
         frame_counter = 0
         start = time.time()
-        async for result in AsyncCamera.frame_yeilder(receiver): # Now a classmethod!
+        async for result in AsyncCamera.frame_yielder(receiver): # Now a classmethod!
             if result == True:
                 frame = shm.buf # simulated computation
                 frame_counter += 1
@@ -49,15 +49,7 @@ async def test_streaming_pipe():
         shm.close()
         shm.unlink()
 
-async def run_all_tests():
-    try:
-        await test_single_frame()
-        await asyncio.sleep(0.5)
-        await test_streaming_pipe()
-        logger.success("ALL CAMERA TESTS PASSED")
-    except Exception as e:
-        logger.exception("Tests failed.")
-
-if __name__ == "__main__":
-    asyncio.run(run_all_tests())
-# Test Passed.
+async def run_tests():
+    logger.info("Starting Camera Unittest...")
+    await test_single_frame()
+    await test_streaming_pipe()

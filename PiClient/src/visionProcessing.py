@@ -2,24 +2,32 @@ import cv2
 import numpy as np
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
-from typing import Sequence
+from typing import Sequence, Tuple
 from loguru import logger
 from multiprocessing import shared_memory
+from dataclasses import dataclass
 
+@dataclass
 class VisionObject():
-    def __init__(self, color, contour):
-        self.contour = contour
-        self.area = cv2.contourArea(contour)
-        self.color = color
-
-        self.bbox = cv2.boundingRect(contour)
+    contour: np.ndarray
+    color: str
+    
+    def __post_init__(self):
+        self.bbox: tuple[float, float, float, float] = cv2.boundingRect(self.contour)
         x, y, w, h = self.bbox
-        self.x_centroid = x + w/2
-        self.y_centroid = y + h/2
-        self.bottom_y = y + h # Use this to find closest object
+        self.x_centroid: float = x + w/2
+        self.y_centroid: float = y + h/2
+        # Bottom y deprecated because perspective transform makes everything top-down
         
 class VisionProcessor(): 
+    PERSPECTIVE_TRANSFORM = ((
+        (0, 0), (0, 0), (0, 0),
+        (0, 0), (0, 0), (0, 0),
+        (0, 0), (0, 0), (0, 0),
+    )) # 3x3 homography matrix use VisionProcessor.get_perspective_transform() to set this up with actual points
+
     def __init__(self):
+        # I will add autotuning soonTM lol so yes these are instance variables, not class variables
         self.lower_orange = np.array([33, 194])
         self.upper_orange = np.array([73, 234])
 
@@ -32,21 +40,29 @@ class VisionProcessor():
         self.lower_red = np.array([100, 140])
         self.upper_red = np.array([130, 255])
 
-    def __find_blocks(self, masks, colors):
-        all_detected = []
+    def _perspective_transform(self, contours: np.ndarray, colors: Sequence[str]) -> np.ndarray[VisionObject]: # Applying cv2.perspectiveTransform is much more effienct then warping whole frame
+        contours = np.array([VisionObject(contour=cv2.perspectiveTransform(contour, self.PERSPECTIVE_TRANSFORM), color=color) for contour, color in zip(contours, colors)])
+        return contours
+
+    def _find_blocks(self, masks, colors):
+        contours = []
+        detected_colors = []
 
         for mask, color in zip(masks, colors):
-            contours, *_ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            
-            all_detected.extend([(color, contour) for contour in contours if cv2.contourArea(contour) > 50])
+            detected_contours, *_ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            if detected_contours:
+                contours.extend(detected_contours)
+                detected_colors.extend([color] * len(detected_contours))
 
-        if not all_detected:
+        if not contours:
             return tuple()
         
-        all_detected.sort(key=lambda i: cv2.contourArea(i[1]), reverse=True)
+        contours.sort(key=lambda i: cv2.contourArea(i), reverse=True)
+        contours = np.array(contours, dtype=np.float32)
         
-        logger.info(f"Detected {len(all_detected)} objects.")
-        return tuple(VisionObject(color, contour) for color, contour in all_detected)
+        logger.info(f"Detected {len(contours)} objects.")
+        return self._perspective_transform(contours, detected_colors)
+        # Okay so I this is a pragmatic solution because I only have to change a single method to apply perspective transforms globally. Also way faster then warping whole frame.
 
     def find_obstacles(self, frame):
         logger.info("Searching for traffic signs...")
@@ -54,7 +70,7 @@ class VisionProcessor():
         green_mask = cv2.inRange(uv, self.lower_green, self.upper_green)
         red_mask = cv2.inRange(uv, self.lower_red, self.upper_red)
 
-        return self.__find_blocks([green_mask, red_mask], ["green", "red"])
+        return self._find_blocks([green_mask, red_mask], ["green", "red"])
 
     def check_corner_lines(self, frame):
         logger.info("Searching for turn aids...")
@@ -62,7 +78,7 @@ class VisionProcessor():
         blue_mask = cv2.inRange(uv, self.lower_blue, self.upper_blue)
         orange_mask = cv2.inRange(uv, self.lower_orange, self.upper_orange)
 
-        return self.__find_blocks([blue_mask, orange_mask], ["blue", "orange"])
+        return self._find_blocks([blue_mask, orange_mask], ["blue", "orange"])
 
     def check_field_bonds(self, frame):
         logger.info("Fetching drivable field boundaries...")
@@ -70,13 +86,8 @@ class VisionProcessor():
         y = frame[:, :, 0]
         white_mask = cv2.inRange(y, 200, 255)
 
-        contours, *_ = cv2.findContours(white_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        if contours:
-            drivable_area = max(contours, key=cv2.contourArea)
-        else:
-            return None
-        
-        return VisionObject("white", drivable_area)
+        zones = self._find_blocks([white_mask], ["white"])
+        return zones[0] if zones else None # Only one zone should be detected, so we can just return the first element of the tuple
     
     def find_walls(self, frame):
         logger.info("Checking for walls")
@@ -84,9 +95,9 @@ class VisionProcessor():
         y = frame[:, :, 0]
         black_mask = cv2.inRange(y, 0, 100)
 
-        return self.__find_blocks([black_mask], ["black"])
+        return self._find_blocks([black_mask], ["black"])
     
-    def get_distance(self,  items: Sequence[VisionObject], frame_width = 160):
+    def get_distance(self, items: Sequence[VisionObject], frame_width = 160):
         center_x = frame_width // 2
 
         dists = []
@@ -197,3 +208,20 @@ class AsyncVisionProcessor(VisionProcessor):
         while True:
             if receiver.poll():
                 yield receiver.recv()
+
+    @staticmethod
+    def get_perspective_transform():
+        src = np.array([
+            [0, 0],
+            [0, 0],
+            [0, 0],
+            [0, 0],
+        ], dtype=np.float32)
+        dst = np.array([
+            [0, 0],
+            [0, 0],
+            [0, 0],
+            [0, 0],
+        ], dtype=np.float32)
+
+        return cv2.getPerspectiveTransform(src, dst)

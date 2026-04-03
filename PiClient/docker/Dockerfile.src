@@ -1,0 +1,16 @@
+FROM n4jm4/raspberry-pi-os:latest
+
+WORKDIR /home/pi/PiClient
+
+COPY ./src .
+COPY ./requirements.txt ./requirements.txt
+
+RUN python -m pip install --no-cache-dir -r requirements.txt
+
+RUN chmod u+rwx -R /home/pi/PiClient
+RUN useradd -m -s /bin/bash WROFutureEngineer
+USER WROFutureEngineer
+
+ENTRYPOINT [ "src_start.sh" ]
+CMD []
+# CMD absorbes cli flags and passes them to the script, which passes them to the src module.
