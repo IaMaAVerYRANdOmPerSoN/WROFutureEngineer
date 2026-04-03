@@ -14,21 +14,18 @@ struct Request {
     int processed;
 };
 
-#define MOTOR_A      7   // motor pin a
-#define MOTOR_B      8   // motor pin b
-#define MOTOR_ENABLE 9   // Enable (also PWM pin)
-
+#define MOTOR 9   // Enable (also PWM pin)
 #define STEERING_PWM 11 // Servo PWM
 
-L293D motor(MOTOR_A, MOTOR_B, MOTOR_ENABLE);
 Servo steering;
+Servo motor;
 
 class Server {
     private:
         Stream* _serial;
         Hashtable<String, Request> CurrentProcesses;
         SimpleVector<String> commands;
-        L293D& _motor;
+        Servo& _motor;
         Servo& _steering;
 
         Request parseRequest() {
@@ -81,7 +78,7 @@ class Server {
                 unsigned long duration = (unsigned long)(fabs(request.arg2) * 1000.0f + 0.5f);
                 request.timeout = millis() + duration;
                 _serial->println(prefix + "WAITMS " + String(duration));
-                _motor.SetMotorSpeed(request.arg1); // Speed passed in percent
+                _motor.writeMicroseconds(1500 + (int)(request.arg1 * 500.0f / 100.0f)); // Speed passed in percent
                 digitalWrite(5, HIGH);
             }
             else if (request.command == "SET_LED") {
@@ -125,7 +122,7 @@ class Server {
                 digitalWrite(4, LOW);
                 _serial->println(prefix + "200 OK");
             } else if (command == "DRIVE_MOTORS") {
-                _motor.Stop();
+                _motor.writeMicroseconds(1500); // Stop the motor
                 digitalWrite(5, LOW);
                 _serial->println(prefix + "200 OK");
             } else if (command == "SET_LED") {
@@ -141,7 +138,7 @@ class Server {
         }
         
     public:
-        Server(Stream& s, L293D& motor, Servo& steering) : _serial(&s), _motor(motor), _steering(steering) {
+        Server(Stream& s, Servo& motor, Servo& steering) : _serial(&s), _motor(motor), _steering(steering) {
             commands.push_back("PING");
             commands.push_back("SET_SERVO");
             commands.push_back("INC_SERVO");
@@ -184,13 +181,11 @@ void setup() {
     pinMode(6, OUTPUT);
     pinMode(10, OUTPUT);
 
-    //L293D
-    pinMode(MOTOR_A, OUTPUT);
-    pinMode(MOTOR_B, OUTPUT);
-
     Serial.begin(115200);
-    motor.begin(true);
     steering.attach(STEERING_PWM);
+    motor.attach(MOTOR);
+    motor.writeMicroseconds(1500); // Stop the motor
+    delay(2000); // give the motor some time to stop before accepting commands
     server = new Server(Serial, motor, steering);
 }
 

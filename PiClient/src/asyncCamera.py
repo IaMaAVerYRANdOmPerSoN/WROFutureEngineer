@@ -2,7 +2,7 @@ import asyncio
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
 from loguru import logger
-import picamera2
+import picamera2 # type: ignore TODO: Get the .pyi file from the picamera2 repo and add it to the project so my stuf gets linted.
 import multiprocessing as mp
 from multiprocessing import shared_memory
 
@@ -21,6 +21,7 @@ class AsyncCamera():
         self.failures = 0
         self.loop = asyncio.get_event_loop()
         self.executor = None
+        self.INITIAL_ROI = 100 # Let's say drop top 100 pixels, will add dynamic runtime tunning hopefully
         
 
     async def __aenter__(self):
@@ -45,13 +46,17 @@ class AsyncCamera():
                 "bit_depth": 10
             }
 
-            # 2. Define Controls to force speed
             controls_config = {
-                # Lock frame rate to 60 FPS (min/max duration = 16.6ms)
-                "FrameDurationLimits": (16666, 16666), 
+                "FrameDurationLimits": (33333, 33333), 
                 "AeEnable": True, 
             }
-            config = self._cam.create_preview_configuration(main=self._config, sensor = sensor_config, controls=controls_config)
+            config = self._cam.create_preview_configuration(
+                main=self._config,
+                sensor=sensor_config,
+                raw=None,
+                controls=controls_config,
+                buffer_count=2,
+            )
 
             await asyncio.wait_for(
                 self.loop.run_in_executor(self.executor, self._cam.configure, config),
@@ -61,6 +66,8 @@ class AsyncCamera():
                 self.loop.run_in_executor(self.executor, self._cam.start),
                 timeout=1.0
             )
+
+            logger.info(f"Camera configuration applied: {self._cam.camera_configuration()}")
 
             return self
     
@@ -77,7 +84,7 @@ class AsyncCamera():
         if hasattr(self, "executor") and self.executor:
             self.executor.shutdown(wait=False)
         
-    async def get_frame_async(self, timeout = 1):
+    async def get_frame_async(self, timeout = 1, shm_name = None):
         """
         Fetch a frame asynchronously from `self._cam`
         
@@ -87,7 +94,7 @@ class AsyncCamera():
         """
         while self.failures <= 10:
             try:
-                frame = await asyncio.wait_for(self.loop.run_in_executor(self.executor, self._cam.capture_array), timeout)
+                frame: np.ndarray = await asyncio.wait_for(self.loop.run_in_executor(self.executor, self._cam.capture_array), timeout)
                 frame = frame.flatten()
                 y_end = 512*384
                 u_end = y_end + (256*192)
@@ -96,13 +103,21 @@ class AsyncCamera():
                 u_plane_raw = frame[y_end:u_end].reshape((192, 256))
                 v_plane_raw = frame[u_end:].reshape((192, 256))
 
-                u_plane = np.broadcast_to(u_plane_raw[:, None, :, None], (192, 2, 256, 2)).reshape((384, 512))
-                v_plane = np.broadcast_to(v_plane_raw[:, None, :, None], (192, 2, 256, 2)).reshape((384, 512))
+                y_plane = y_plane[self.INITIAL_ROI:, :]
+                u_plane_raw = u_plane_raw[self.INITIAL_ROI//2:, :]
+                v_plane_raw = v_plane_raw[self.INITIAL_ROI//2:, :]
+
+                u_plane = u_plane_raw.repeat(2, axis=0).repeat(2, axis=1)
+                v_plane = v_plane_raw.repeat(2, axis=0).repeat(2, axis=1)
 
                 full_yuv = np.dstack((y_plane, u_plane, v_plane))
                 self.failures = 0
-                logger.info(f"Fetched new frame from PiCamera sucessfully")
-                return np.ascontiguousarray(full_yuv)
+
+                shm = shared_memory.SharedMemory(name=shm_name)
+                buffer = np.ndarray((384, 512, 3), dtype=np.uint8, buffer=shm.buf)
+                np.copyto(buffer, full_yuv)
+
+                logger.info(f"Fetched new frame from PiCamera successfully")
             
             except asyncio.TimeoutError:
                 self.failures += 1
@@ -113,7 +128,7 @@ class AsyncCamera():
             except Exception as e:
                 self.failures += 1
                 if self.failures >= 10: 
-                    raise IOError("Unacceptable buildup of IOerrors, last error: '{e}'")
+                    raise IOError(f"Unacceptable buildup of IOerrors, last error: '{e}'")
                 logger.error(f"Caught video stream exception: '{e}'")
             
             return None
@@ -137,15 +152,10 @@ class AsyncCamera():
         :yields: `tuple[tuple[tuple[float, float, float]]]`, an `vres * hres * 3` array representing the image in YUV colorspace.
         :returns: `None`
         """
-        shm = shared_memory.SharedMemory(name=shm)
-        array = np.ndarray((384, 512, 3), dtype=np.uint8, buffer=shm.buf)
 
         while True:
-            frame = await self.get_frame_async()
-            if frame is not None:
-                array[:] = frame[:]
-
-                sender.send(True)
+            await self.get_frame_async(shm_name=shm)
+            sender.send(True) # Signal that a new frame is ready, the frame itself is in shared memory so we dont have to send it through the pipe.
                 
     @staticmethod
     async def frame_yielder(receiver):

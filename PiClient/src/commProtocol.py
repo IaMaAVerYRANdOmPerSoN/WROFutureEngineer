@@ -15,7 +15,7 @@ class Client():
         
         :param self: The instance of Client
         :param port: The serial port passed to `aioserial.AioSerial`.
-        :param baud: The buadrate of the serial protocol.
+        :param baud: The baudrate of the serial protocol.
         :param timeout: Default timeout for granular requests.
 
         :returns self: an instance of `Client`
@@ -37,7 +37,7 @@ class Client():
 
         logger.info(f"======= CLIENT INSTANCE STARTED: Port = {port}, Baud = {baud}, Timeout = {timeout} ======= ")
     
-    async def __serial_listener(self):
+    async def _serial_listener(self):
         """
         A background asynchronous serial listener that resolves serial IO dependent futures.
         
@@ -72,7 +72,7 @@ class Client():
         self.SERIAL = aioserial.AioSerial(self.port, self.baud)
 
         if not hasattr(self, "_listener_task"):
-            self._listener_task = asyncio.create_task(self.__serial_listener())
+            self._listener_task = asyncio.create_task(self._serial_listener())
             logger.info("Serial Listener Started")
         else:
             logger.warning("Serial listener already started in this context")
@@ -86,7 +86,7 @@ class Client():
             logger.warning("No serial listener to cancel")
 
 
-    async def __request(self, command, timeout=2.0):
+    async def _request(self, command, timeout=2.0):
         tid = str(next(self.TIDS))
         
         future = self.loop.create_future()
@@ -164,7 +164,7 @@ class Client():
         logger.info("Establishing Serial interface...")
         
         for attempt in range(1, retries + 1):
-            response = await self.__request("PING", timeout=2.0)
+            response = await self._request("PING", timeout=2.0)
             
             if response == "PONG":
                 logger.success(f"    ⤷ Connection established: Received '{response}'")
@@ -185,27 +185,30 @@ class Client():
             logger.warning(f"Invaild request clamped: 'SET_SERVO {angle}'. {angle} is not in [-180, 180]")
             angle = -180
         command = f'SET_SERVO {angle}'
-        response =  await self.__request(command)
+        response =  await self._request(command)
         return response == '200 OK'
     
     async def increment_servo_angle(self, increment): # 3
         command = f'INC_SERVO {increment}'
-        response = await self.__request(command)
+        response = await self._request(command)
         return response == '200 OK'
     
-    async def drive_motors(self, speed, duration): # 4
-        duration = abs(duration) # No time travel sorry
-        if abs(speed) > self.MAX_SPEED:
-            logger.warning(f"Invalid argument supplied: {speed} > {self.MAX_SPEED}. Clamped to {self.MAX_SPEED}")
-            product = speed * duration
-            speed = self.MAX_SPEED if speed > 0 else -self.MAX_SPEED
-            duration = product / speed
-        command = f'DRIVE_MOTORS {speed} {duration}'
-        response = await self.__request(command)
+    async def set_motor_speed(self, speed, duration): # 4
+        speed = speed * self.MAX_SPEED # changed api to be 0-1 instead of absolute don't think I need refactoring changes though
+        command = f'SET_MOTOR {speed} {duration}'
+        response = await self._request(command)
         return response == '200 OK'
+    
+    async def drive_motors(self, speed: float, angle: float, duration: float): # hybrid, no debug led pin number
+        promises = []
+        promises.append(self.set_motor_speed(speed, duration))
+        promises.append(self.set_servo_angle(angle))
+
+        results = await asyncio.gather(*promises)
+        return all(results)
     
     async def get_servo_angle(self):
-        response = await self.__request("SERVO_ANGLE")
+        response = await self._request("SERVO_ANGLE")
         try:
             self.servo_angle = int(response)
             return True
@@ -215,7 +218,7 @@ class Client():
         return False
     
     async def get_encoder_value(self):
-        response = await self.__request("M_ANGLE")
+        response = await self._request("M_ANGLE")
         try:
             self.encoder_value = int(response)
             return True
@@ -229,7 +232,7 @@ class Client():
         dy = target_y
         l_fw = np.sqrt(dx**2 + dy**2) 
         if l_fw < 1e-6:
-            logger.warning(f'Zero division error encountered in __fast_arc_to_target, with arguments {target_x, target_y, speed, current_heading_rad}')
+            logger.warning(f'Zero division error encountered in fast_arc_to_target, with arguments {target_x, target_y, speed, current_heading_rad}')
             return 'ERR_ZERO_DIVISION'
 
         target_angle_global = np.arctan2(dx, dy) # Abosulte angle
@@ -246,6 +249,6 @@ class Client():
     
     async def set_led_state(self, state): #5
         command = f'SET_LED {state}'
-        response = await self.__request(command)
+        response = await self._request(command)
         return response == '200 OK'
 
