@@ -8868,72 +8868,6 @@
 			(project ""
 				(path "/bc037bf5-48c7-40e9-806c-f5da868e9419"
 					(reference "BYP_SRV1")
-					(reference "BYP_SRV1")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:+3V3")
-		(at 293.37 25.4 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(uuid "3136b339-2bcd-42a2-8a04-885906f6fbe8")
-		(property "Reference" "#PWR011"
-			(at 293.37 29.21 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Value" "+3V3"
-			(at 292.862 21.336 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 293.37 25.4 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" ""
-			(at 293.37 25.4 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"+3V3\""
-			(at 293.37 25.4 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "1"
-			(uuid "83985d8b-be5e-4620-a35e-d9d8d5ff342b")
-		)
-		(instances
-			(project ""
-				(path "/bc037bf5-48c7-40e9-806c-f5da868e9419"
-					(reference "#PWR011")
 					(unit 1)
 				)
 			)
@@ -9083,7 +9017,6 @@
 		(instances
 			(project ""
 				(path "/bc037bf5-48c7-40e9-806c-f5da868e9419"
-					(reference "ARD_C1")
 					(reference "ARD_C1")
 					(unit 1)
 				)
@@ -10398,7 +10331,6 @@
 			(project ""
 				(path "/bc037bf5-48c7-40e9-806c-f5da868e9419"
 					(reference "BLDC_3P1")
-					(reference "BLDC_3P1")
 					(unit 1)
 				)
 			)
@@ -10485,7 +10417,6 @@
 		(instances
 			(project ""
 				(path "/bc037bf5-48c7-40e9-806c-f5da868e9419"
-					(reference "ARD_A1")
 					(reference "ARD_A1")
 					(unit 1)
 				)
@@ -10816,7 +10747,6 @@
 			(project "EDA"
 				(path "/bc037bf5-48c7-40e9-806c-f5da868e9419"
 					(reference "PI_BYP1")
-					(reference "PI_BYP1")
 					(unit 1)
 				)
 			)
@@ -10950,7 +10880,6 @@
 		(instances
 			(project ""
 				(path "/bc037bf5-48c7-40e9-806c-f5da868e9419"
-					(reference "CP_HL1")
 					(reference "CP_HL1")
 					(unit 1)
 				)
@@ -11107,7 +11036,6 @@
 		(instances
 			(project ""
 				(path "/bc037bf5-48c7-40e9-806c-f5da868e9419"
-					(reference "ARD_B1")
 					(reference "ARD_B1")
 					(unit 1)
 				)
@@ -11367,7 +11295,6 @@
 			(effects
 				(font
 					(size 1.27 1.27)
-					(italic yes)
 				)
 				(hide yes)
 			)
@@ -11852,7 +11779,6 @@
 			(project ""
 				(path "/bc037bf5-48c7-40e9-806c-f5da868e9419"
 					(reference "PD_SRV1")
-					(reference "PD_SRV1")
 					(unit 1)
 				)
 			)
@@ -11930,7 +11856,6 @@
 		(instances
 			(project ""
 				(path "/bc037bf5-48c7-40e9-806c-f5da868e9419"
-					(reference "D_FAULT1")
 					(reference "D_FAULT1")
 					(unit 1)
 				)
@@ -12377,7 +12302,6 @@
 			(project ""
 				(path "/bc037bf5-48c7-40e9-806c-f5da868e9419"
 					(reference "DVDD_BYP1")
-					(reference "DVDD_BYP1")
 					(unit 1)
 				)
 			)
@@ -12444,7 +12368,6 @@
 		(instances
 			(project ""
 				(path "/bc037bf5-48c7-40e9-806c-f5da868e9419"
-					(reference "AVDD_BYP1")
 					(reference "AVDD_BYP1")
 					(unit 1)
 				)
