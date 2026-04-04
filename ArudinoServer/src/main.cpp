@@ -185,7 +185,7 @@ void setup() {
     steering.attach(STEERING_PWM);
     motor.attach(MOTOR);
     motor.writeMicroseconds(1500); // Stop the motor
-    delay(2000); // give the motor some time to stop before accepting commands
+    delay(1000); // give the motor some time to stop before accepting commands
     server = new Server(Serial, motor, steering);
 }
 
