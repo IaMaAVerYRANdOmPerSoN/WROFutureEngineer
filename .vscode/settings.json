@@ -1,6 +1,0 @@
-{
-    "C_Cpp.errorSquiggles": "enabledIfIncludesResolve",
-    "python-envs.pythonProjects": [],
-    "python-envs.defaultEnvManager": "ms-python.python:venv",
-    "python-env.workspaceSearchPaths": ["C:\\Users\\wenmi\\OneDrive\\Documents\\GitHub\\WROFutureEngineer\\PiClient\\.WROFutureEngineer", "C:\\Users\\wenmi\\OneDrive\\Documents\\GitHub\\WROFutureEngineer\\PiClient"],
-}

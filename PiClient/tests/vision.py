@@ -3,7 +3,7 @@ import numpy as np
 import cv2
 from src.asyncCamera import AsyncCamera
 from src.visionProcessing import VisionObject
-from src.visionProcessing import AsyncVisionProcessor
+from src.visionProcessing import AsyncMultiprocessingVisionProcessor
 from loguru import logger
 import multiprocessing as mp
 from multiprocessing import shared_memory
@@ -83,7 +83,7 @@ def camera(shm, sender):
 
 def vision(shm, sender, receiver):
     async def _run():
-        async with AsyncVisionProcessor() as vision:
+        async with AsyncMultiprocessingVisionProcessor() as vision:
             await vision.comprehensive_analysis(shm, sender, receiver)
     
     asyncio.run(_run())
@@ -116,7 +116,7 @@ async def run_tests():
     data_stream.start()
         
     try:
-        async for zone, walls, obstacles, corner_lines, wall_dists, obstacle_dists in AsyncVisionProcessor.data_yielder(dataReceiver):
+        async for zone, walls, obstacles, corner_lines, wall_dists, obstacle_dists in AsyncMultiprocessingVisionProcessor.data_yielder(dataReceiver):
             try:
                 assert isinstance(zone, VisionObject) or zone is None, f"Zone is not a VisionObject or None: {type(zone)}"
                 assert isinstance(walls, tuple) and all(isinstance(wall, VisionObject) for wall in walls), f"Walls is not a tuple of VisionObjects: {type(walls)} with elements {[type(wall) for wall in walls]}"

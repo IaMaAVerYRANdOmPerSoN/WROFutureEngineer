@@ -1,8 +1,9 @@
 import asyncio
+from multiprocessing.connection import Connection
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
 from loguru import logger
-import picamera2 # type: ignore TODO: Get the .pyi file from the picamera2 repo and add it to the project so my stuf gets linted.
+import picamera2 # type: ignore TODO: Get the .pyi file from the picamera2 repo and add it to the project so my stuff gets linted.
 import multiprocessing as mp
 from multiprocessing import shared_memory
 
@@ -16,9 +17,7 @@ class AsyncCamera():
         """
         self._config = config
         self._cam = None
-        self.FRAMERATE = 30
 
-        self.failures = 0
         self.loop = asyncio.get_event_loop()
         self.executor = None
         self.INITIAL_ROI = 100 # Let's say drop top 100 pixels, will add dynamic runtime tunning hopefully
@@ -34,6 +33,7 @@ class AsyncCamera():
         :returns: `self`: the instance of `AsyncCamera`
         """
         self.executor = ThreadPoolExecutor(3) 
+        self._capture_semaphore = asyncio.Semaphore(2) # Limit the number of concurrent captures to prevent overwhelming the camera hardware (and the event loop)
         
         try:
             self._cam = await asyncio.wait_for(
@@ -84,7 +84,7 @@ class AsyncCamera():
         if hasattr(self, "executor") and self.executor:
             self.executor.shutdown(wait=False)
         
-    async def get_frame_async(self, timeout = 1, shm_name = None):
+    async def get_frame_async(self, timeout = 0.1, shm_name = None):
         """
         Fetch a frame asynchronously from `self._cam`
         
@@ -92,9 +92,12 @@ class AsyncCamera():
         :param timeout: The maximum roundtrip time, in seconds, before raising asyncio.TimeoutError
         :returns: frame: a 3D array of shape `Vres * Hres * 3` Where each pixel is represented in YUV color space.
         """
-        while self.failures <= 10:
+        
+        while True:
             try:
-                frame: np.ndarray = await asyncio.wait_for(self.loop.run_in_executor(self.executor, self._cam.capture_array), timeout)
+                async with self._capture_semaphore:
+                    frame: np.ndarray = await asyncio.wait_for(self.loop.run_in_executor(self.executor, self._cam.capture_array), timeout=timeout)
+                
                 frame = frame.flatten()
                 y_end = 512*384
                 u_end = y_end + (256*192)
@@ -111,7 +114,6 @@ class AsyncCamera():
                 v_plane = v_plane_raw.repeat(2, axis=0).repeat(2, axis=1)
 
                 full_yuv = np.dstack((y_plane, u_plane, v_plane))
-                self.failures = 0
 
                 shm = shared_memory.SharedMemory(name=shm_name)
                 buffer = np.ndarray((384, 512, 3), dtype=np.uint8, buffer=shm.buf)
@@ -120,18 +122,12 @@ class AsyncCamera():
                 logger.info(f"Fetched new frame from PiCamera successfully")
             
             except asyncio.TimeoutError:
-                self.failures += 1
-                if self.failures >= 10: 
-                    raise MemoryError("Garbage threads have built up beyond safe threshold.") from asyncio.TimeoutError
-                logger.error(f"Timed out awaiting video stream")
+                logger.warning("Camera frame capture timed out, retrying...")
+                await asyncio.sleep(0.03) # Give some grace
 
             except Exception as e:
-                self.failures += 1
-                if self.failures >= 10: 
-                    raise IOError(f"Unacceptable buildup of IOerrors, last error: '{e}'")
-                logger.error(f"Caught video stream exception: '{e}'")
-            
-            return None
+                logger.warning(f"Unexpected error during frame capture: {e}, continuing...")
+                await asyncio.sleep(0.01)
 
     async def buffer_frames_async(self, num_frames = 5, timeout = 1.0):
             """
@@ -144,7 +140,7 @@ class AsyncCamera():
             """
             return [await asyncio.wait_for(self.get_frame_async(), timeout) for _ in range(num_frames)]
         
-    async def stream(self, shm, sender: "mp.connections.Connection"):
+    async def stream(self, shm, sender: Connection):
         """
         asynchronous indefinite yield camera IOstream.
         
@@ -158,7 +154,7 @@ class AsyncCamera():
             sender.send(True) # Signal that a new frame is ready, the frame itself is in shared memory so we dont have to send it through the pipe.
                 
     @staticmethod
-    async def frame_yielder(receiver):
+    async def frame_yielder(receiver: Connection):
         while True:
             if receiver.poll():
                 yield receiver.recv()

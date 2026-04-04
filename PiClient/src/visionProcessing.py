@@ -1,3 +1,4 @@
+from multiprocessing.connection import Connection
 import cv2
 import numpy as np
 import asyncio
@@ -40,7 +41,7 @@ class VisionProcessor():
         self.lower_red = np.array([100, 140])
         self.upper_red = np.array([130, 255])
 
-    def _perspective_transform(self, contours: np.ndarray, colors: Sequence[str]) -> np.ndarray[VisionObject]: # Applying cv2.perspectiveTransform is much more effienct then warping whole frame
+    def _perspective_transform(self, contours: np.ndarray, colors: Sequence[str]) -> np.ndarray[VisionObject]: # Applying cv2.perspectiveTransform is much more efficient than warping whole frame
         contours = np.array([VisionObject(contour=cv2.perspectiveTransform(contour, self.PERSPECTIVE_TRANSFORM), color=color) for contour, color in zip(contours, colors)])
         return contours
 
@@ -97,7 +98,7 @@ class VisionProcessor():
 
         return self._find_blocks([black_mask], ["black"])
     
-    def get_distance(self, items: Sequence[VisionObject], frame_width = 160):
+    def get_distance(self, items: Sequence[VisionObject], frame_width = 512):
         center_x = frame_width // 2
 
         dists = []
@@ -115,7 +116,7 @@ class VisionProcessor():
 
         return dists
 
-    def get_wall_distance(self, items: Sequence[VisionObject], frame_width = 160):
+    def get_wall_distance(self, items: Sequence[VisionObject], frame_width = 512):
         center_x = frame_width // 2
 
         wall_dists = {
@@ -149,9 +150,9 @@ class VisionProcessor():
 
         return zone, walls, obstacles, corner_lines, wall_dists, obstacle_dists
     
-class AsyncVisionProcessor(VisionProcessor):
+class AsyncMultiprocessingVisionProcessor(VisionProcessor):
     def __init__(self, *args):
-        super(AsyncVisionProcessor, self).__init__(*args)
+        super(AsyncMultiprocessingVisionProcessor, self).__init__(*args)
         self.executor = None
         self.loop = asyncio.get_event_loop()
 
@@ -164,27 +165,28 @@ class AsyncVisionProcessor(VisionProcessor):
             self.executor.shutdown(wait=False)
 
     async def find_obstacles(self, frame) -> tuple[VisionObject]:
-        return await self.loop.run_in_executor(self.executor, super(AsyncVisionProcessor, self).find_obstacles, frame)
+        return await self.loop.run_in_executor(self.executor, super(AsyncMultiprocessingVisionProcessor, self).find_obstacles, frame)
     
     async def check_field_bonds(self, frame):
-        return await self.loop.run_in_executor(self.executor, super(AsyncVisionProcessor, self).check_field_bonds, frame)
+        return await self.loop.run_in_executor(self.executor, super(AsyncMultiprocessingVisionProcessor, self).check_field_bonds, frame)
     
     async def check_corner_lines(self, frame):
-        return await self.loop.run_in_executor(self.executor, super(AsyncVisionProcessor, self).check_corner_lines, frame)
+        return await self.loop.run_in_executor(self.executor, super(AsyncMultiprocessingVisionProcessor, self).check_corner_lines, frame)
     
     async def find_walls(self, frame):
-        return await self.loop.run_in_executor(self.executor, super(AsyncVisionProcessor, self).find_walls, frame)
+        return await self.loop.run_in_executor(self.executor, super(AsyncMultiprocessingVisionProcessor, self).find_walls, frame)
     
-    async def get_distance(self, items: Sequence[VisionObject], frame_width=160):
-        return await self.loop.run_in_executor(self.executor, super().get_distance, items, frame_width)
+    async def get_distance(self, items: Sequence[VisionObject], frame_width=384):
+        return await self.loop.run_in_executor(self.executor, super(AsyncMultiprocessingVisionProcessor, self).get_distance, items, frame_width)
     
-    async def get_wall_distance(self, walls: Sequence[VisionObject], frame_width=160):
-        return await self.loop.run_in_executor(self.executor, super(AsyncVisionProcessor, self).get_wall_distance, walls, frame_width)
+    async def get_wall_distance(self, walls: Sequence[VisionObject], frame_width=384):
+        return await self.loop.run_in_executor(self.executor, super(AsyncMultiprocessingVisionProcessor, self).get_wall_distance, walls, frame_width)
     
-    async def comprehensive_analysis(self, shm, sender, receiver):
+    async def comprehensive_analysis(self, shm, sender: Connection, receiver: Connection):
         shm = shared_memory.SharedMemory(name=shm)
         frame_width, frame_height, frame_channels = 512, 384, 3
         frame_size = frame_width * frame_height * frame_channels
+
         while True:
             if receiver.recv():
                 frame = np.ndarray((frame_height, frame_width, frame_channels), dtype=np.uint8, buffer=shm.buf[:frame_size])
@@ -204,7 +206,7 @@ class AsyncVisionProcessor(VisionProcessor):
                 sender.send((zone, walls, obstacles, corner_lines, wall_dists, obstacle_dists,))
 
     @staticmethod
-    async def data_yielder(receiver):
+    async def data_yielder(receiver: Connection):
         while True:
             if receiver.poll():
                 yield receiver.recv()
