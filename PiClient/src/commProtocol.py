@@ -1,15 +1,14 @@
 import aioserial
 import asyncio
-import json
 import numpy as np
 import re
-import sys
 from loguru import logger
 from itertools import cycle
-from typing import Sequence, NoReturn
+from typing import NoReturn
+from config import Config
 
 class Client():
-    def __init__(self, port='/dev/ttyACM0', baud = 115200, timeout=0.3, ):
+    def __init__(self, port=Config.ClientConfig.SERIAL_PORT, baud = Config.ClientConfig.SERIAL_BAUD, timeout=Config.ClientConfig.SERIAL_TIMEOUT, ):
         """
         The constructor for the `Client` class
         
@@ -22,11 +21,11 @@ class Client():
         """
 
         self.SERIAL = None
-        self.port, self.baud = port, baud
+        self.PORT, self.BAUD = port, baud
         self.DEFAULT_TIMEOUT = timeout
         self.TIDS = cycle([i for i in range(1, 501)])
         self.WHEELBASE = 0.1 
-        self.MAX_SPEED = 100
+        self.MAX_SPEED = Config.ClientConfig.MAX_SPEED
         self.WAIT_RE = re.compile(r"WAITMS ([0-9]+)")
         self.is_connected = False
         self.loop = asyncio.get_event_loop()
@@ -35,9 +34,9 @@ class Client():
         self.servo_angle = 0
         self.encoder_value = 0
 
-        logger.info(f"======= CLIENT INSTANCE STARTED: Port = {port}, Baud = {baud}, Timeout = {timeout} ======= ")
+        logger.info(f"======= CLIENT INSTANCE STARTED: Port = {self.PORT}, Baud = {self.BAUD}, Timeout = {self.DEFAULT_TIMEOUT} ======= ")
     
-    async def _serial_listener(self):
+    async def _serial_listener(self) -> NoReturn:
         """
         A background asynchronous serial listener that resolves serial IO dependent futures.
         
@@ -69,7 +68,7 @@ class Client():
         :return: Description
         :rtype: list | list[str]
         """
-        self.SERIAL = aioserial.AioSerial(self.port, self.baud)
+        self.SERIAL = aioserial.AioSerial(self.PORT, self.BAUD, timeout=self.DEFAULT_TIMEOUT)
 
         if not hasattr(self, "_listener_task"):
             self._listener_task = asyncio.create_task(self._serial_listener())
@@ -160,7 +159,7 @@ class Client():
                     self._pending_requests.pop(command[0])"""
         raise NotImplementedError("Batch requests not yet supported sever-side.") # This isn't needed anyway lol
             
-    async def verify_connection(self, retries=5): # 1
+    async def verify_connection(self, retries=5): # 1, debug led pin number
         logger.info("Establishing Serial interface...")
         
         for attempt in range(1, retries + 1):
@@ -244,8 +243,7 @@ class Client():
         steering_angle_rad = np.arctan(self.WHEELBASE * kappa)
         duration = l_fw / speed if abs(kappa) < 1e-6 else (2 * alpha / kappa) / speed
 
-        asyncio.create_task(self.set_servo_angle(steering_angle_rad))
-        await self.drive_motors(speed, duration)
+        await self.drive_motors(speed, np.degrees(steering_angle_rad), duration)
     
     async def set_led_state(self, state): #5
         command = f'SET_LED {state}'

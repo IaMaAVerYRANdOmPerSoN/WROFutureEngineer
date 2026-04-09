@@ -1,5 +1,4 @@
 import asyncio
-import sys
 from typing import Literal
 from loguru import logger
 from src.commProtocol import Client
@@ -8,28 +7,27 @@ from src.asyncCamera import AsyncCamera
 from src.controller import PD
 import multiprocessing as mp
 from multiprocessing import shared_memory
-import cv2
-import numpy as np
+from config import Config
 
 async def run():
     async with Client() as client, AsyncMultiprocessingVisionProcessor() as vision, AsyncCamera() as camera:
-        wall_follow = PD(1, 0.2)
-        corner_turn_controller = PD(1, 0.2)
+        wall_follow = PD(*Config.OpenChallengeConfig.WALL_FOLLOW_KPKD)
+        corner_turn_controller = PD(*Config.OpenChallengeConfig.CORNER_TURN_KPKD)
 
         # Starting code here
         state: Literal["Follow wall", "Turn"] = "Follow wall"
 
         try:
-            shm = shared_memory.SharedMemory(create=True, size=512*384*3, name="camera_frame")
+            shm = shared_memory.SharedMemory(create=True, size=Config.OpenChallengeConfig.SHM_SIZE, name=Config.OpenChallengeConfig.SHM_NAME) # Make sure it has exactly the size we need, and is empty")
         except FileExistsError:
             try:
-                shm = shared_memory.SharedMemory(name="camera_frame")
+                shm = shared_memory.SharedMemory(name=Config.OpenChallengeConfig.SHM_NAME)
                 shm.close()
                 shm.unlink()
-                shm = shared_memory.SharedMemory(create=True, size=512*384*3, name="camera_frame") # Nake sure it has excatly the size we need, and is empty
+                shm = shared_memory.SharedMemory(create=True, size=Config.OpenChallengeConfig.SHM_SIZE, name=Config.OpenChallengeConfig.SHM_NAME) # Make sure it has exactly the size we need, and is empty
             except FileNotFoundError:
                 # The shared memory segment disappeared between create and cleanup attempts, try again
-                shm = shared_memory.SharedMemory(create=True, size=512*384*3, name="camera_frame")
+                shm = shared_memory.SharedMemory(create=True, size=Config.OpenChallengeConfig.SHM_SIZE, name=Config.OpenChallengeConfig.SHM_NAME)
 
 
         try:
@@ -62,12 +60,13 @@ async def run():
                             turn_correction = wall_follow.tick(wall_x_diffs["left"] - wall_x_diffs["right"])
                             asyncio.create_task(client.drive_motors(0.5, turn_correction, 0.1)) # I really hopy my dt is at lot less then 0.1s, this is so it keeps going for a bit
                             # If like something silly happens with the os or some of my other processes
+                            # Also add dynamic speed calculation and dynamic dt calculation
 
                     case "Turn":
                         if not corner_lines:
                             state = "Follow wall"
                         else:
-                            turn_correction = corner_turn_controller.tick(corner_lines[0].x_centroid - 192) # Biggest corner line, 192 is frame center
+                            turn_correction = corner_turn_controller.tick(corner_lines[0].x_centroid - Config.CameraConfig.FORMAT["size"][0] // 2) # Biggest corner line x - frame center
                             asyncio.create_task(client.drive_motors(0.5, turn_correction, 0.1))
 
                     case _:
