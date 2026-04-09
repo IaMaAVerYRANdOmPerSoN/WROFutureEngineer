@@ -14,8 +14,9 @@ struct Request {
     int processed;
 };
 
-#define MOTOR 9   // Enable (also PWM pin)
+#define MOTOR 9   // Motor PWM
 #define STEERING_PWM 11 // Servo PWM
+#define SERIAL_TIMEOUT 10 // Serial read timeout in milliseconds
 
 Servo steering;
 Servo motor;
@@ -33,11 +34,19 @@ class Server {
             
             if (_serial->available()) {
                 String line = _serial->readStringUntil('\n');
+                line.trim();
+                if (line.length() == 0) {
+                    return req;
+                }
                 char serialBuff[32] = {0};
                 char arg1Buff[32] = {0};
                 char arg2Buff[32] = {0};
 
                 req.count = sscanf(line.c_str(), "%d %31s %31s %31s", &req.tid, serialBuff, arg1Buff, arg2Buff);
+                if (req.count < 2) {
+                    req.tid = 0;
+                    return req;
+                }
                 req.command = String(serialBuff);
                 if (req.count >= 3) {
                     req.arg1 = atof(arg1Buff);
@@ -74,7 +83,7 @@ class Server {
                 _steering.write(_steering.read() + request.arg1);
                 digitalWrite(4, HIGH);
             } 
-            else if (request.command == "DRIVE_MOTORS") {
+            else if (request.command == "SET_MOTOR") {
                 unsigned long duration = (unsigned long)(fabs(request.arg2) * 1000.0f + 0.5f);
                 request.timeout = millis() + duration;
                 _serial->println(prefix + "WAITMS " + String(duration));
@@ -96,11 +105,6 @@ class Server {
                 request.processed = 1;
                 end("SERVO_ANGLE");
             }
-            else if (request.command == "M_ANGLE") {
-                request.timeout = 0;
-                request.processed = 1;
-                end("M_ANGLE");
-            }
             else {
                 digitalWrite(10, HIGH);
                 _serial->println(prefix + "404 ERR");
@@ -121,7 +125,7 @@ class Server {
             } else if (command == "INC_SERVO") {
                 digitalWrite(4, LOW);
                 _serial->println(prefix + "200 OK");
-            } else if (command == "DRIVE_MOTORS") {
+            } else if (command == "SET_MOTOR") {
                 _motor.writeMicroseconds(1500); // Stop the motor
                 digitalWrite(5, LOW);
                 _serial->println(prefix + "200 OK");
@@ -142,7 +146,7 @@ class Server {
             commands.push_back("PING");
             commands.push_back("SET_SERVO");
             commands.push_back("INC_SERVO");
-            commands.push_back("DRIVE_MOTORS");
+            commands.push_back("SET_MOTOR");
             commands.push_back("SET_LED");
             commands.push_back("SERVO_ANGLE");
             commands.push_back("M_ANGLE");
@@ -151,9 +155,6 @@ class Server {
     void ProcessRequest() {
         Request incoming = parseRequest();
         if (incoming.tid != 0) {
-            if (CurrentProcesses[incoming.command].processed == 0) {
-                end(incoming.command);
-            }
             CurrentProcesses[incoming.command] = incoming;
             start(CurrentProcesses[incoming.command]);
         }
@@ -182,6 +183,7 @@ void setup() {
     pinMode(10, OUTPUT);
 
     Serial.begin(115200);
+    Serial.setTimeout(SERIAL_TIMEOUT); // Keep parser responsive when lines arrive in chunks.
     steering.attach(STEERING_PWM);
     motor.attach(MOTOR);
     motor.writeMicroseconds(1500); // Stop the motor

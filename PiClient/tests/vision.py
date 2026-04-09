@@ -84,7 +84,7 @@ def camera(shm, sender):
 def vision(shm, sender, receiver):
     async def _run():
         async with AsyncMultiprocessingVisionProcessor() as vision:
-            await vision.comprehensive_analysis(shm, sender, receiver)
+            await vision.comprehensive_analysis(shm, receiver, sender)
     
     asyncio.run(_run())
 
@@ -112,11 +112,11 @@ async def run_tests():
     camera_stream = mp.Process(group=None, target=camera, args=(shm_name, frameSender,), daemon=False)
     camera_stream.start()
 
-    data_stream = mp.Process(group=None, target=vision, args=(shm_name, dataSender, frameReceiver,), daemon=False)
+    data_stream = mp.Process(group=None, target=vision, args=(shm_name, frameReceiver, dataSender,), daemon=False)
     data_stream.start()
         
     try:
-        async for zone, walls, obstacles, corner_lines, wall_dists, obstacle_dists in AsyncMultiprocessingVisionProcessor.data_yielder(dataReceiver):
+        async for zone, walls, obstacles, corner_lines, wall_dists, obstacle_dists in AsyncMultiprocessingVisionProcessor.async_pipe_reader(dataReceiver):
             try:
                 assert isinstance(zone, VisionObject) or zone is None, f"Zone is not a VisionObject or None: {type(zone)}"
                 assert isinstance(walls, tuple) and all(isinstance(wall, VisionObject) for wall in walls), f"Walls is not a tuple of VisionObjects: {type(walls)} with elements {[type(wall) for wall in walls]}"
