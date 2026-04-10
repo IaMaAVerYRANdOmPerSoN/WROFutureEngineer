@@ -7,7 +7,14 @@ from src.asyncCamera import AsyncCamera
 from src.controller import PD
 import multiprocessing as mp
 from multiprocessing import shared_memory
-from config import Config
+from multiprocessing.connection import Connection
+from src.config import Config
+
+def stream_camera_in_subprocess(camera: AsyncCamera, *args, **kwargs):
+    asyncio.run(camera.stream(*args, **kwargs))
+
+def run_analysis_in_subprocess(vision: AsyncMultiprocessingVisionProcessor, *args, **kwargs):
+    asyncio.run(vision.comprehensive_analysis(*args, **kwargs))
 
 async def run():
     async with Client() as client, AsyncMultiprocessingVisionProcessor() as vision, AsyncCamera() as camera:
@@ -31,21 +38,21 @@ async def run():
 
 
         try:
-            _, cam_sender = mp.Pipe(duplex = False)
-            camera_process = mp.Process(target = camera.stream, args=(cam_sender, shm.name,))
+            cam_receiver, cam_sender = mp.Pipe(duplex = False)
+            camera_process = mp.Process(target = stream_camera_in_subprocess, args=(camera, shm.name, cam_sender,))
             camera_process.start()
 
             data_receiver, data_sender = mp.Pipe(duplex = False)
-            vision_process = mp.Process(target = vision.comprehensive_analysis, args=(shm.name, data_sender, data_receiver,))
+            vision_process = mp.Process(target = run_analysis_in_subprocess, args=(vision, shm.name, cam_receiver, data_sender,))
             vision_process.start()
 
             # Camera process dumps frames into shared memory, and sends a signal through cam_sender when a new frame is ready.
-            # Vision process does the same with the analysis results and data_sender.
-            # Saticmethod data_yielder polls the receier for data and yeilds it to to the main loop.
+            # Vision process polls cam_receiver and sends results through data_sender.
+            # Saticmethod data_yielder polls the data_receiver for data and yeilds it to to the main loop.
 
-            async for zone, walls, obstacles, corner_lines, wall_x_diffs, obstacle_dists in AsyncMultiprocessingVisionProcessor.data_yielder(data_receiver):
+            async for zone, walls, obstacles, corner_lines, wall_x_diffs, obstacle_dists in AsyncMultiprocessingVisionProcessor.async_pipe_reader(data_receiver):
 
-                assert isinstance(zone, VisionObject)
+                assert isinstance(zone, VisionObject) or zone is None
                 assert isinstance(walls, tuple) and all(isinstance(wall, VisionObject) for wall in walls)
                 assert isinstance(obstacles, tuple) and all(isinstance(obstacle, VisionObject) for obstacle in obstacles)
                 assert isinstance(corner_lines, tuple) and all(isinstance(line, VisionObject) for line in corner_lines)
@@ -73,13 +80,16 @@ async def run():
                         logger.error(f"Invalid state {state}")
                         state = "Follow wall"
         finally:
-            logger.info("Terminating processes and cleaning up shared memory...")
+            logger.info("Terminating processes and destroying shared memory... ")
             try:
-                camera_process.terminate()
-                vision_process.terminate()
+                await client.drive_motors(0, 0, 0) # Stop the robot
+                camera_process.terminate() if camera_process.is_alive() else None
+                vision_process.terminate() if vision_process.is_alive() else None
+                camera_process.join(timeout = 1) if camera_process.is_alive() else None
+                vision_process.join(timeout = 1) if vision_process.is_alive() else None
                 shm.close()
                 shm.unlink()
-                logger.info("Exited cleanly")
+                logger.info("Done")
             except Exception as e:
                 logger.error(f"Error during cleanup: {e}")
                 logger.warning(f"Leaked memory segments and processes may need to be cleaned up manually. Good luck finding them michael -_-")

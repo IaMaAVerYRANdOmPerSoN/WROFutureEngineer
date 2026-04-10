@@ -3,11 +3,11 @@ import cv2
 import numpy as np
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
-from typing import Sequence, Tuple
+from typing import NoReturn, Sequence, Tuple
 from loguru import logger
 from multiprocessing import shared_memory
 from dataclasses import dataclass
-from config import Config
+from src.config import Config
 
 @dataclass
 class VisionObject():
@@ -184,34 +184,43 @@ class AsyncMultiprocessingVisionProcessor(VisionProcessor):
     async def get_wall_distance(self, walls: Sequence[VisionObject], frame_width=384):
         return await self.loop.run_in_executor(self.executor, super(AsyncMultiprocessingVisionProcessor, self).get_wall_distance, walls, frame_width)
     
-    async def comprehensive_analysis(self, shm, sender: Connection, receiver: Connection):
+    async def comprehensive_analysis(self, shm: str, receiver: Connection, sender: Connection, ) -> NoReturn:
         shm = shared_memory.SharedMemory(name=shm)
         frame_width, frame_height, frame_channels = 512, 384, 3
         frame_size = frame_width * frame_height * frame_channels
 
-        while True:
-            if receiver.recv():
-                frame = np.ndarray((frame_height, frame_width, frame_channels), dtype=np.uint8, buffer=shm.buf[:frame_size])
-                round1 = [
-                    self.check_field_bonds(frame),
-                    self.find_walls(frame),
-                    self.find_obstacles(frame),
-                    self.check_corner_lines(frame)
-                ]
-                zone, walls, obstacles, corner_lines = await asyncio.gather(*round1)
-                round2 = [
-                    self.get_wall_distance(walls),
-                    self.get_distance(obstacles)
-                ]
-                wall_dists, obstacle_dists = await asyncio.gather(*round2)
+        async for _ in AsyncMultiprocessingVisionProcessor.async_pipe_reader(receiver):
+            frame = np.ndarray((frame_height, frame_width, frame_channels), dtype=np.uint8, buffer=shm.buf[:frame_size])
+            round1 = [
+                self.check_field_bonds(frame),
+                self.find_walls(frame),
+                self.find_obstacles(frame),
+                self.check_corner_lines(frame)
+            ]
+            zone, walls, obstacles, corner_lines = await asyncio.gather(*round1)
+            round2 = [
+                self.get_wall_distance(walls),
+                self.get_distance(obstacles)
+            ]
+            wall_dists, obstacle_dists = await asyncio.gather(*round2)
 
-                sender.send((zone, walls, obstacles, corner_lines, wall_dists, obstacle_dists,))
+            sender.send((zone, walls, obstacles, corner_lines, wall_dists, obstacle_dists,))
 
     @staticmethod
-    async def data_yielder(receiver: Connection):
+    async def async_pipe_reader(receiver: Connection):
+        loop = asyncio.get_event_loop()
+        data_event = asyncio.Event()
+
+        yielder = lambda: data_event.set()
+        loop.add_reader(receiver.fileno(), yielder)
+
         while True:
-            if receiver.poll():
+            await data_event.wait()
+
+            while receiver.poll():
                 yield receiver.recv()
+
+            data_event.clear()
 
     @staticmethod
     def get_perspective_transform():

@@ -74,7 +74,7 @@ class Server {
                 _steering.write(_steering.read() + request.arg1);
                 digitalWrite(4, HIGH);
             } 
-            else if (request.command == "DRIVE_MOTORS") {
+            else if (request.command == "SET_MOTOR") {
                 unsigned long duration = (unsigned long)(fabs(request.arg2) * 1000.0f + 0.5f);
                 request.timeout = millis() + duration;
                 _serial->println(prefix + "WAITMS " + String(duration));
@@ -96,11 +96,6 @@ class Server {
                 request.processed = 1;
                 end("SERVO_ANGLE");
             }
-            else if (request.command == "M_ANGLE") {
-                request.timeout = 0;
-                request.processed = 1;
-                end("M_ANGLE");
-            }
             else {
                 digitalWrite(10, HIGH);
                 _serial->println(prefix + "404 ERR");
@@ -121,7 +116,7 @@ class Server {
             } else if (command == "INC_SERVO") {
                 digitalWrite(4, LOW);
                 _serial->println(prefix + "200 OK");
-            } else if (command == "DRIVE_MOTORS") {
+            } else if (command == "SET_MOTOR") {
                 _motor.writeMicroseconds(1500); // Stop the motor
                 digitalWrite(5, LOW);
                 _serial->println(prefix + "200 OK");
@@ -130,8 +125,6 @@ class Server {
                 _serial->println(prefix + "200 OK");
             } else if (command == "SERVO_ANGLE") {
                 _serial->println(prefix + _steering.read());
-            } else if (command == "M_ANGLE") {
-                _serial -> println(prefix + "Not implemented");
             } else if (command == "404 ERR") {
                 digitalWrite(10, LOW);
             }
@@ -142,7 +135,7 @@ class Server {
             commands.push_back("PING");
             commands.push_back("SET_SERVO");
             commands.push_back("INC_SERVO");
-            commands.push_back("DRIVE_MOTORS");
+            commands.push_back("SET_MOTOR");
             commands.push_back("SET_LED");
             commands.push_back("SERVO_ANGLE");
             commands.push_back("M_ANGLE");

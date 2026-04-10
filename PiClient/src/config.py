@@ -5,7 +5,7 @@ class Config():
 
     @dataclass
     class CameraConfig():
-        FORMAT: Dict = {"format": "YUV420", "size": (512, 384)}
+        FORMAT: Dict = {"format": "YUV420", "size": (384, 512)}
         INITIAL_ROI: int = 100
         EXECUTOR_THREADS: int = 3
         MAX_CONCURRENT_CAPTURES: int = 2

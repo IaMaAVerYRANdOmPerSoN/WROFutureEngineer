@@ -5,7 +5,7 @@ import re
 from loguru import logger
 from itertools import cycle
 from typing import NoReturn
-from config import Config
+from src.config import Config
 
 class Client():
     def __init__(self, port=Config.ClientConfig.SERIAL_PORT, baud = Config.ClientConfig.SERIAL_BAUD, timeout=Config.ClientConfig.SERIAL_TIMEOUT, ):
@@ -80,6 +80,7 @@ class Client():
     async def __aexit__(self, *args):
         if hasattr(self, "_listener_task"):
             self._listener_task.cancel()
+            self.SERIAL.close()
             logger.info("Serial listener terminated without errors")
         else:
             logger.warning("No serial listener to cancel")
@@ -213,16 +214,6 @@ class Client():
             return True
         except ValueError:
             logger.warning(f"Received non-integer response '{response}' from request 'SERVO_ANGLE'")
-        
-        return False
-    
-    async def get_encoder_value(self):
-        response = await self._request("M_ANGLE")
-        try:
-            self.encoder_value = int(response)
-            return True
-        except ValueError:
-            logger.warning(f"Received non-integer response '{response}' from request 'M_ANGLE'")
         
         return False
     

@@ -5,7 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 from loguru import logger
 import picamera2 # type: ignore TODO: Get the .pyi file from the picamera2 repo and add it to the project so my stuff gets linted.
 from multiprocessing import shared_memory
-from config import Config
+from src.config import Config
 from typing import Dict
 
 class AsyncCamera():
@@ -88,6 +88,8 @@ class AsyncCamera():
         :param timeout: The maximum roundtrip time, in seconds, before raising asyncio.TimeoutError
         :returns: frame: a 3D array of shape `Vres * Hres * 3` Where each pixel is represented in YUV color space.
         """
+
+        shm = shared_memory.SharedMemory(name=shm_name) if shm_name else None
         
         while True:
             try:
@@ -111,18 +113,19 @@ class AsyncCamera():
 
                 full_yuv = np.dstack((y_plane, u_plane, v_plane))
 
-                shm = shared_memory.SharedMemory(name=shm_name)
-                buffer = np.ndarray((self.FRAME_SIZE[0], self.FRAME_SIZE[1], 3), dtype=np.uint8, buffer=shm.buf)
-                np.copyto(buffer, full_yuv)
+                if shm:
+                    buffer = np.ndarray((self.FRAME_SIZE[0] - self.INITIAL_ROI, self.FRAME_SIZE[1], 3), dtype=np.uint8, buffer=shm.buf)
+                    np.copyto(buffer, full_yuv)
 
                 logger.info(f"Fetched new frame from PiCamera successfully")
+                return full_yuv.astype(np.uint8)
             
-            except asyncio.TimeoutError:
-                logger.warning("Camera frame capture timed out, retrying...")
+            except asyncio.TimeoutError as e:
+                logger.warning(f"Camera frame capture timed out ({e}), retrying...")
                 await asyncio.sleep(0.03) # Give some grace
 
             except Exception as e:
-                logger.warning(f"Unexpected error during frame capture: {e}, continuing...")
+                logger.warning(f"Unexpected error during frame capture ({e}), continuing...")
                 await asyncio.sleep(0.01)
 
     async def buffer_frames_async(self, num_frames = 5, timeout = 1.0):
@@ -148,11 +151,3 @@ class AsyncCamera():
         while True:
             await self.get_frame_async(shm_name=shm)
             sender.send(True) # Signal that a new frame is ready, the frame itself is in shared memory so we dont have to send it through the pipe.
-                
-    @staticmethod
-    async def frame_yielder(receiver: Connection):
-        while True:
-            if receiver.poll():
-                yield receiver.recv()
-            else:
-                await asyncio.sleep(0)

@@ -6,6 +6,7 @@ import cv2
 import multiprocessing as mp
 from multiprocessing import shared_memory
 from src.asyncCamera import AsyncCamera
+from src.visionProcessing import AsyncMultiprocessingVisionProcessor
 from loguru import logger
 
 def run_stream(shm_name, pipe_sender):
@@ -35,7 +36,7 @@ async def test_streaming_pipe():
     try:
         frame_counter = 0
         start = time.time()
-        async for result in AsyncCamera.frame_yielder(receiver): # Now a classmethod!
+        async for result in AsyncMultiprocessingVisionProcessor.async_pipe_reader(receiver):
             if result == True:
                 frame = shm.buf # simulated computation
                 frame_counter += 1

@@ -39,10 +39,11 @@ def test_main(test_target: str):
             from tests.vision import run_tests as vision_tests
             from tests.camera import run_tests as camera_tests
             from tests.RPC import run_tests as rpc_tests
-            # Create a new event loop for maximum isolation, multiprocessing + async + threading all together is not fun
-            asyncio.run(camera_tests())
-            asyncio.run(vision_tests())
-            asyncio.run(rpc_tests())
+            async def run_all_tests():
+                await camera_tests()
+                await vision_tests()
+                await rpc_tests()
+            asyncio.run(run_all_tests())
         else:
             raise ValueError("Invalid test option. Use --test, --test camera, --test vision, --test rpc, or --test all.")
 
@@ -52,6 +53,7 @@ def test_main(test_target: str):
         logger.critical(f"Test failed: {e}")
         logger.info("Test failed with an assertion error, not an runtime exception. Perhaps check your typing or add type annotations michael -_-")
         logger.exception("Traceback:") # Re-raise to be caught by main's exception handler
+        raise RuntimeError("One or more tests failed. See logs for details.") from e
     
 
 def main():

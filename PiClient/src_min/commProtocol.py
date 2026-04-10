@@ -155,33 +155,6 @@ class Client():
             logger.warning(f"Received non-integer response '{response}' from request 'SERVO_ANGLE'")
             return False
 
-    def get_encoder_value(self):
-        response = self._request("M_ANGLE")
-        try:
-            self.encoder_value = int(response)
-            return True
-        except ValueError:
-            logger.warning(f"Received non-integer response '{response}' from request 'M_ANGLE'")
-            return False
-
-    def fast_arc_to_target(self, target_x, target_y, speed, current_heading_rad=0):
-        dx = target_x
-        dy = target_y
-        l_fw = np.sqrt(dx**2 + dy**2)
-        if l_fw < 1e-6:
-            logger.warning(
-                f"Zero division error encountered in fast_arc_to_target, with arguments {(target_x, target_y, speed, current_heading_rad)}"
-            )
-            return 'ERR_ZERO_DIVISION'
-
-        target_angle_global = np.arctan2(dx, dy)
-        alpha = (target_angle_global - current_heading_rad + np.pi) % (2 * np.pi) - np.pi
-        kappa = (2 * np.sin(alpha)) / l_fw
-
-        steering_angle_rad = np.arctan(self.WHEELBASE * kappa)
-        duration = l_fw / speed if abs(kappa) < 1e-6 else (2 * alpha / kappa) / speed
-        return self.drive_motors(speed, np.degrees(steering_angle_rad), duration)
-
     def set_led_state(self, state):
         response = self._request(f'SET_LED {state}')
         return response == '200 OK'
