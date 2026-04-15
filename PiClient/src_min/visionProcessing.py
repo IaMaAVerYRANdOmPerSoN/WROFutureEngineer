@@ -3,42 +3,45 @@ import numpy as np
 from typing import Sequence
 from loguru import logger
 from dataclasses import dataclass
+from .config import Config
+
 
 @dataclass
 class VisionObject():
     contour: np.ndarray
     color: str
-    
+
     def __post_init__(self):
-        self.bbox: tuple[float, float, float, float] = cv2.boundingRect(self.contour)
+        self.bbox: tuple[float, float, float,
+                         float] = cv2.boundingRect(self.contour)
         x, y, w, h = self.bbox
         self.x_centroid: float = x + w/2
         self.y_centroid: float = y + h/2
         # Bottom y deprecated because perspective transform makes everything top-down
-        
-class VisionProcessor(): 
-    PERSPECTIVE_TRANSFORM = ((
-        (0, 0), (0, 0), (0, 0),
-        (0, 0), (0, 0), (0, 0),
-        (0, 0), (0, 0), (0, 0),
-    )) # 3x3 homography matrix use VisionProcessor.get_perspective_transform() to set this up with actual points
+
+
+class VisionProcessor():
+    PERSPECTIVE_TRANSFORM = np.array(
+        Config.VisionConfig.PERSPECTIVE_TRANSFORM, dtype=np.float32)
 
     def __init__(self):
         # I will add autotuning soonTM lol so yes these are instance variables, not class variables
-        self.lower_orange = np.array([33, 194])
-        self.upper_orange = np.array([73, 234])
+        self.lower_orange = np.array(Config.VisionConfig.LOWER_ORANGE)
+        self.upper_orange = np.array(Config.VisionConfig.UPPER_ORANGE)
 
-        self.lower_blue = np.array([216, 63])
-        self.upper_blue = np.array([255, 103])
+        self.lower_blue = np.array(Config.VisionConfig.LOWER_BLUE)
+        self.upper_blue = np.array(Config.VisionConfig.UPPER_BLUE)
 
-        self.lower_green = np.array([0, 0])
-        self.upper_green = np.array([110, 110])
+        self.lower_green = np.array(Config.VisionConfig.LOWER_GREEN)
+        self.upper_green = np.array(Config.VisionConfig.UPPER_GREEN)
 
-        self.lower_red = np.array([100, 140])
-        self.upper_red = np.array([130, 255])
+        self.lower_red = np.array(Config.VisionConfig.LOWER_RED)
+        self.upper_red = np.array(Config.VisionConfig.UPPER_RED)
 
-    def _perspective_transform(self, contours: np.ndarray, colors: Sequence[str]) -> Sequence[VisionObject]: # Applying cv2.perspectiveTransform is much more efficient than warping whole frame
-        contours = np.array([VisionObject(contour=cv2.perspectiveTransform(contour, self.PERSPECTIVE_TRANSFORM), color=color) for contour, color in zip(contours, colors)])
+    # Applying cv2.perspectiveTransform is much more efficient than warping whole frame
+    def _perspective_transform(self, contours: np.ndarray, colors: Sequence[str]) -> Sequence[VisionObject]:
+        contours = np.array([VisionObject(contour=cv2.perspectiveTransform(
+            contour, self.PERSPECTIVE_TRANSFORM), color=color) for contour, color in zip(contours, colors)])
         return contours
 
     def _find_blocks(self, masks, colors):
@@ -46,17 +49,19 @@ class VisionProcessor():
         detected_colors = []
 
         for mask, color in zip(masks, colors):
-            detected_contours, *_ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            detected_contours, * \
+                _ = cv2.findContours(
+                    mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             if detected_contours:
                 contours.extend(detected_contours)
                 detected_colors.extend([color] * len(detected_contours))
 
         if not contours:
             return tuple()
-        
+
         contours.sort(key=lambda i: cv2.contourArea(i), reverse=True)
         contours = np.array(contours, dtype=np.float32)
-        
+
         logger.info(f"Detected {len(contours)} objects.")
         return self._perspective_transform(contours, detected_colors)
         # Okay so I this is a pragmatic solution because I only have to change a single method to apply perspective transforms globally. Also way faster then warping whole frame.
@@ -81,38 +86,43 @@ class VisionProcessor():
         logger.info("Fetching drivable field boundaries...")
 
         y = frame[:, :, 0]
-        white_mask = cv2.inRange(y, 200, 255)
+        white_mask = cv2.inRange(
+            y, Config.VisionConfig.LOWER_WHITE, Config.VisionConfig.UPPER_WHITE)
 
         zones = self._find_blocks([white_mask], ["white"])
-        return zones[0] if zones else None # Only one zone should be detected, so we can just return the first element of the tuple
-    
+        # Only one zone should be detected, so we can just return the first element of the tuple
+        return zones[0] if zones else None
+
     def find_walls(self, frame):
         logger.info("Checking for walls")
 
         y = frame[:, :, 0]
-        black_mask = cv2.inRange(y, 0, 100)
+        black_mask = cv2.inRange(
+            y, Config.VisionConfig.LOWER_BLACK, Config.VisionConfig.UPPER_BLACK)
 
         return self._find_blocks([black_mask], ["black"])
-    
-    def get_distance(self, items: Sequence[VisionObject], frame_width = 512):
+
+    def get_distance(self, items: Sequence[VisionObject], frame_width=Config.VisionConfig.DEFAULT_FRAME_WIDTH):
         center_x = frame_width // 2
 
         dists = []
 
         if not items:
             return len(items) * [float("inf")]
-        
-        for item in items: # Should already be sorted
-            if item.x_centroid >= center_x and item.y_centroid > 30: # Wall on the right, get left edge, crop to bottom ROI
+
+        for item in items:  # Should already be sorted
+            # Wall on the right, get left edge, crop to bottom ROI
+            if item.x_centroid >= center_x and item.y_centroid > Config.VisionConfig.MIN_CENTROID_Y:
                 x, *_ = item.bbox
                 dists.append(x - center_x)
-            if item.x_centroid < center_x and item.y_centroid > 30: # Wall on the left, get right edge, crop to bottom ROI
+            # Wall on the left, get right edge, crop to bottom ROI
+            if item.x_centroid < center_x and item.y_centroid > Config.VisionConfig.MIN_CENTROID_Y:
                 x, _, w, _ = item.bbox
                 dists.append(center_x - (x + w))
 
         return dists
 
-    def get_wall_distance(self, items: Sequence[VisionObject], frame_width = 512):
+    def get_wall_distance(self, items: Sequence[VisionObject], frame_width=Config.VisionConfig.DEFAULT_FRAME_WIDTH):
         center_x = frame_width // 2
 
         wall_dists = {
@@ -124,15 +134,17 @@ class VisionProcessor():
             return wall_dists
 
         for item in items:
-            if item.x_centroid >= center_x and item.y_centroid > 30: # Wall on the right, get left edge, crop to bottom ROI
+            # Wall on the right, get left edge, crop to bottom ROI
+            if item.x_centroid >= center_x and item.y_centroid > Config.VisionConfig.MIN_CENTROID_Y:
                 x, *_ = item.bbox
                 wall_dists["right"] = x - center_x
-            if item.x_centroid < center_x and item.y_centroid > 30: # Wall on the left, get right edge, crop to bottom ROI
+            # Wall on the left, get right edge, crop to bottom ROI
+            if item.x_centroid < center_x and item.y_centroid > Config.VisionConfig.MIN_CENTROID_Y:
                 x, _, w, _ = item.bbox
                 wall_dists["left"] = center_x - (x + w)
 
         return wall_dists
-    
+
     def comprehensive_analysis(self, frame):
         zone, walls, obstacles, corner_lines = (
             self.check_field_bounds(frame),

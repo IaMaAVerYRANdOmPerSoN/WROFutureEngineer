@@ -65,7 +65,13 @@ async def run():
                             state = "Turn"
                         else:
                             turn_correction = wall_follow.tick(wall_x_diffs["left"] - wall_x_diffs["right"])
-                            asyncio.create_task(client.drive_motors(0.5, turn_correction, 0.1)) # I really hopy my dt is at lot less then 0.1s, this is so it keeps going for a bit
+                            asyncio.create_task(
+                                client.drive_motors(
+                                    Config.OpenChallengeConfig.DRIVE_SPEED,
+                                    turn_correction,
+                                    Config.OpenChallengeConfig.DRIVE_COMMAND_DURATION,
+                                )
+                            ) # I really hopy my dt is at lot less then 0.1s, this is so it keeps going for a bit
                             # If like something silly happens with the os or some of my other processes
                             # Also add dynamic speed calculation and dynamic dt calculation
 
@@ -74,7 +80,13 @@ async def run():
                             state = "Follow wall"
                         else:
                             turn_correction = corner_turn_controller.tick(corner_lines[0].x_centroid - Config.CameraConfig.FORMAT["size"][0] // 2) # Biggest corner line x - frame center
-                            asyncio.create_task(client.drive_motors(0.5, turn_correction, 0.1))
+                            asyncio.create_task(
+                                client.drive_motors(
+                                    Config.OpenChallengeConfig.DRIVE_SPEED,
+                                    turn_correction,
+                                    Config.OpenChallengeConfig.DRIVE_COMMAND_DURATION,
+                                )
+                            )
 
                     case _:
                         logger.error(f"Invalid state {state}")

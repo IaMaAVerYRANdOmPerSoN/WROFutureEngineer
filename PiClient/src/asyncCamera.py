@@ -43,7 +43,7 @@ class AsyncCamera():
         try:
             self._cam = await asyncio.wait_for(
                 self.loop.run_in_executor(self.executor, picamera2.Picamera2), 
-                timeout=2.0
+                timeout=Config.CameraConfig.HW_INIT_TIMEOUT
             )
 
             config = self._cam.create_preview_configuration(
@@ -51,16 +51,16 @@ class AsyncCamera():
                 sensor=self._SENSOR_CONFIG,
                 raw=None,
                 controls=self._CONTROLS_CONFIG,
-                buffer_count=2,
+                buffer_count=Config.CameraConfig.BUFFER_COUNT,
             )
 
             await asyncio.wait_for(
                 self.loop.run_in_executor(self.executor, self._cam.configure, config),
-                timeout=1.0
+                timeout=Config.CameraConfig.CONFIGURE_TIMEOUT
             )
             await asyncio.wait_for(
                 self.loop.run_in_executor(self.executor, self._cam.start),
-                timeout=1.0
+                timeout=Config.CameraConfig.START_TIMEOUT
             )
 
             logger.info(f"Camera configuration applied: {self._cam.camera_configuration()}")
@@ -122,11 +122,11 @@ class AsyncCamera():
             
             except asyncio.TimeoutError as e:
                 logger.warning(f"Camera frame capture timed out ({e}), retrying...")
-                await asyncio.sleep(0.03) # Give some grace
+                await asyncio.sleep(Config.CameraConfig.CAPTURE_RETRY_SLEEP_SECONDS) # Give some grace
 
             except Exception as e:
                 logger.warning(f"Unexpected error during frame capture ({e}), continuing...")
-                await asyncio.sleep(0.01)
+                await asyncio.sleep(Config.CameraConfig.CAPTURE_ERROR_SLEEP_SECONDS)
 
     async def buffer_frames_async(self, num_frames = 5, timeout = 1.0):
             """

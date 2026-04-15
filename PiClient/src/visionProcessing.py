@@ -100,7 +100,7 @@ class VisionProcessor():
 
         return self._find_blocks([black_mask], ["black"])
     
-    def get_distance(self, items: Sequence[VisionObject], frame_width = 512):
+    def get_distance(self, items: Sequence[VisionObject], frame_width=Config.VisionConfig.DEFAULT_FRAME_WIDTH):
         center_x = frame_width // 2
 
         dists = []
@@ -109,16 +109,16 @@ class VisionProcessor():
             return len(items) * [float("inf")]
         
         for item in items: # Should already be sorted
-            if item.x_centroid >= center_x and item.y_centroid > 30: # Wall on the right, get left edge, crop to bottom ROI
+            if item.x_centroid >= center_x and item.y_centroid > Config.VisionConfig.MIN_CENTROID_Y: # Wall on the right, get left edge, crop to bottom ROI
                 x, *_ = item.bbox
                 dists.append(x - center_x)
-            if item.x_centroid < center_x and item.y_centroid > 30: # Wall on the left, get right edge, crop to bottom ROI
+            if item.x_centroid < center_x and item.y_centroid > Config.VisionConfig.MIN_CENTROID_Y: # Wall on the left, get right edge, crop to bottom ROI
                 x, _, w, _ = item.bbox
                 dists.append(center_x - (x + w))
 
         return dists
 
-    def get_wall_distance(self, items: Sequence[VisionObject], frame_width = 512):
+    def get_wall_distance(self, items: Sequence[VisionObject], frame_width=Config.VisionConfig.DEFAULT_FRAME_WIDTH):
         center_x = frame_width // 2
 
         wall_dists = {
@@ -130,10 +130,10 @@ class VisionProcessor():
             return wall_dists
 
         for item in items:
-            if item.x_centroid >= center_x and item.y_centroid > 30: # Wall on the right, get left edge, crop to bottom ROI
+            if item.x_centroid >= center_x and item.y_centroid > Config.VisionConfig.MIN_CENTROID_Y: # Wall on the right, get left edge, crop to bottom ROI
                 x, *_ = item.bbox
                 wall_dists["right"] = x - center_x
-            if item.x_centroid < center_x and item.y_centroid > 30: # Wall on the left, get right edge, crop to bottom ROI
+            if item.x_centroid < center_x and item.y_centroid > Config.VisionConfig.MIN_CENTROID_Y: # Wall on the left, get right edge, crop to bottom ROI
                 x, _, w, _ = item.bbox
                 wall_dists["left"] = center_x - (x + w)
 
@@ -178,15 +178,17 @@ class AsyncMultiprocessingVisionProcessor(VisionProcessor):
     async def find_walls(self, frame):
         return await self.loop.run_in_executor(self.executor, super(AsyncMultiprocessingVisionProcessor, self).find_walls, frame)
     
-    async def get_distance(self, items: Sequence[VisionObject], frame_width=384):
+    async def get_distance(self, items: Sequence[VisionObject], frame_width=Config.VisionConfig.DEFAULT_FRAME_WIDTH):
         return await self.loop.run_in_executor(self.executor, super(AsyncMultiprocessingVisionProcessor, self).get_distance, items, frame_width)
     
-    async def get_wall_distance(self, walls: Sequence[VisionObject], frame_width=384):
+    async def get_wall_distance(self, walls: Sequence[VisionObject], frame_width=Config.VisionConfig.DEFAULT_FRAME_WIDTH):
         return await self.loop.run_in_executor(self.executor, super(AsyncMultiprocessingVisionProcessor, self).get_wall_distance, walls, frame_width)
     
     async def comprehensive_analysis(self, shm: str, receiver: Connection, sender: Connection, ) -> NoReturn:
         shm = shared_memory.SharedMemory(name=shm)
-        frame_width, frame_height, frame_channels = 512, 384, 3
+        frame_width = Config.VisionConfig.ANALYSIS_FRAME_WIDTH
+        frame_height = Config.VisionConfig.ANALYSIS_FRAME_HEIGHT
+        frame_channels = Config.VisionConfig.ANALYSIS_FRAME_CHANNELS
         frame_size = frame_width * frame_height * frame_channels
 
         async for _ in AsyncMultiprocessingVisionProcessor.async_pipe_reader(receiver):

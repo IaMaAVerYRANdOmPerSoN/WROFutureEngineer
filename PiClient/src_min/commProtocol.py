@@ -1,13 +1,18 @@
 import aioserial
-import numpy as np
 import re
 import time
 from itertools import cycle
 from loguru import logger
+from .config import Config
 
 
 class Client():
-    def __init__(self, port='/dev/ttyACM0', baud=115200, timeout=0.3):
+    def __init__(
+        self,
+        port=Config.ClientConfig.SERIAL_PORT,
+        baud=Config.ClientConfig.SERIAL_BAUD,
+        timeout=Config.ClientConfig.SERIAL_TIMEOUT,
+    ):
         """
         The constructor for the `Client` class.
 
@@ -19,10 +24,11 @@ class Client():
         self.port = port
         self.baud = baud
         self.DEFAULT_TIMEOUT = timeout
-        self.TIDS = cycle(range(1, 501))
-        self.WHEELBASE = 0.1
-        self.MAX_SPEED = 100
-        self.WAIT_RE = re.compile(r"WAITMS ([0-9]+)")
+        self.TIDS = cycle(range(Config.ClientConfig.TID_START,
+                          Config.ClientConfig.TID_END + 1))
+        self.WHEELBASE = Config.ClientConfig.WHEELBASE
+        self.MAX_SPEED = Config.ClientConfig.MAX_SPEED
+        self.WAIT_RE = re.compile(Config.ClientConfig.WAIT_PATTERN)
         self.is_connected = False
         self.servo_angle = 0
         self.encoder_value = 0
@@ -68,26 +74,31 @@ class Client():
             if response_tid == tid:
                 return message
 
-            logger.warning(f"Ignoring out-of-order response for transaction ID {response_tid}")
+            logger.warning(
+                f"Ignoring out-of-order response for transaction ID {response_tid}")
 
         raise TimeoutError(f"Timed out waiting for transaction ID {tid}")
 
-    def _request(self, command, timeout=2.0):
+    def _request(self, command, timeout=Config.ClientConfig.REQUEST_TIMEOUT):
         tid = str(next(self.TIDS))
 
         try:
             self.SERIAL.write(f"{tid} {command}\n".encode('utf-8'))
             self.SERIAL.flush()
-            logger.info(f"Sending Request: {command} with timeout {timeout} and transaction ID {tid}")
+            logger.info(
+                f"Sending Request: {command} with timeout {timeout} and transaction ID {tid}")
 
             response = self._read_response(tid, timeout)
 
             if matches := self.WAIT_RE.search(response):
-                requested_timeout = int(matches.group(1)) / 1000 + 0.5
-                logger.info(f"    -> Arduino processing task, requires delay of {matches.group(1)}ms")
+                requested_timeout = int(matches.group(
+                    1)) / 1000 + Config.ClientConfig.WAIT_RESPONSE_EXTRA_SECONDS
+                logger.info(
+                    f"    -> Arduino processing task, requires delay of {matches.group(1)}ms")
                 response = self._read_response(tid, requested_timeout)
 
-            logger.success(f"    -> Successfully processed request: '{command}' with response '{response}'")
+            logger.success(
+                f"    -> Successfully processed request: '{command}' with response '{response}'")
             if response.endswith('ERR'):
                 logger.warning(
                     f"        -> Although request was successfully processed client-side, arduino has errored ({response})"
@@ -95,39 +106,47 @@ class Client():
 
             return response
         except TimeoutError:
-            logger.error(f"    -> Timed out awaiting response for: '{command}'")
+            logger.error(
+                f"    -> Timed out awaiting response for: '{command}'")
             return "ERR_TIMED_OUT"
         except Exception as e:
             logger.error(f"    -> Error during request '{command}': '{e}'")
             return f"ERR_{type(e).__name__}"
 
     def run_multiple_requests(self, requests, timeout=2.0):
-        raise NotImplementedError("Batch requests not yet supported server-side.")
+        raise NotImplementedError(
+            "Batch requests not yet supported server-side.")
 
-    def verify_connection(self, retries=5):
+    def verify_connection(self, retries=Config.ClientConfig.CONNECT_RETRIES):
         logger.info("Establishing Serial interface...")
 
         for attempt in range(1, retries + 1):
-            response = self._request("PING", timeout=2.0)
+            response = self._request(
+                "PING", timeout=Config.ClientConfig.REQUEST_TIMEOUT)
 
             if response == "PONG":
-                logger.success(f"    -> Connection established: Received '{response}'")
+                logger.success(
+                    f"    -> Connection established: Received '{response}'")
                 self.is_connected = True
                 return True
 
-            logger.warning(f"    -> Connection attempt {attempt}/{retries} failed ({response})")
-            time.sleep(0.5)
+            logger.warning(
+                f"    -> Connection attempt {attempt}/{retries} failed ({response})")
+            time.sleep(Config.ClientConfig.CONNECT_RETRY_DELAY_SECONDS)
 
-        logger.critical("Failed to establish connection after multiple attempts.")
+        logger.critical(
+            "Failed to establish connection after multiple attempts.")
         return False
 
     def set_servo_angle(self, angle):
-        if angle > 180:
-            logger.warning(f"Invalid request clamped: 'SET_SERVO {angle}'. {angle} is not in [-180, 180]")
-            angle = 180
-        elif angle < -180:
-            logger.warning(f"Invalid request clamped: 'SET_SERVO {angle}'. {angle} is not in [-180, 180]")
-            angle = -180
+        if angle > Config.ClientConfig.SERVO_MAX_ANGLE:
+            logger.warning(
+                f"Invalid request clamped: 'SET_SERVO {angle}'. {angle} is not in [-180, 180]")
+            angle = Config.ClientConfig.SERVO_MAX_ANGLE
+        elif angle < Config.ClientConfig.SERVO_MIN_ANGLE:
+            logger.warning(
+                f"Invalid request clamped: 'SET_SERVO {angle}'. {angle} is not in [-180, 180]")
+            angle = Config.ClientConfig.SERVO_MIN_ANGLE
 
         response = self._request(f'SET_SERVO {angle}')
         return response == '200 OK'
@@ -152,10 +171,10 @@ class Client():
             self.servo_angle = int(response)
             return True
         except ValueError:
-            logger.warning(f"Received non-integer response '{response}' from request 'SERVO_ANGLE'")
+            logger.warning(
+                f"Received non-integer response '{response}' from request 'SERVO_ANGLE'")
             return False
 
     def set_led_state(self, state):
         response = self._request(f'SET_LED {state}')
         return response == '200 OK'
-
