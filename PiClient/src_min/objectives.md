@@ -1,5 +1,6 @@
 # Goals
 
+## Coding Objectives: 
 - Refactor all modules in src_min to drop async and multiprocessing and multithreading, and instead use a single-threaded, synchronous design.
 - KISS, discard two months of work because I am a fucking idiot that overengineered everything and can't stop myself from doing it.
 
@@ -75,3 +76,13 @@ Okay here's the notes from coach :sob: (I liked the fancy stuff):
 > No point fixing plumbing in a building you're redesigning.
 >
 > For obstacle challenge, you may use camera, 2D LiDAR, IMU together. That's where async and multiprocessing start to pay off.
+
+## Mechanical Objectives: 
+
+List of things to improve but not big enough to print a new part for:
+
+> - Add a place to screw in voltage regulator
+> - Make camera angle more downwards
+> - Create a spot to put switch
+> - Create a Lidar holder + make space for it
+> - Fix differential gear issue
