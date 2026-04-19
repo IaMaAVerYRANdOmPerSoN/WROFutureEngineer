@@ -61,7 +61,8 @@ async def run():
 
                 match state:
                     case "Follow wall":
-                        if corner_lines:
+                        if corner_lines or any(np.isinf(x_diff) for x_diff in wall_x_diffs.values()):
+                            corner_turn_controller.previous_error = 0
                             state = "Turn"
                         else:
                             turn_correction = wall_follow.tick(wall_x_diffs["left"] - wall_x_diffs["right"])
@@ -77,6 +78,7 @@ async def run():
 
                     case "Turn":
                         if not corner_lines:
+                            wall_follow.previous_error = 0
                             state = "Follow wall"
                         else:
                             turn_correction = corner_turn_controller.tick(corner_lines[0].x_centroid - Config.CameraConfig.FORMAT["size"][0] // 2) # Biggest corner line x - frame center

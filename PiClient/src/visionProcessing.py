@@ -3,10 +3,13 @@ import cv2
 import numpy as np
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
-from typing import NoReturn, Sequence, Tuple
+from typing import NoReturn, Sequence, Tuple, Literal, List
+from itertools import cycle
 from loguru import logger
 from multiprocessing import shared_memory
 from dataclasses import dataclass
+from statistics import mean
+from scipy.interpolate import CubicSpline
 from src.config import Config
 
 @dataclass
@@ -26,22 +29,22 @@ class VisionProcessor():
 
     def __init__(self):
         # I will add autotuning soonTM lol so yes these are instance variables, not class variables
-        self.LOWER_ORANGE = np.array(Config.VisionConfig.LOWER_ORANGE)
-        self.UPPER_ORANGE = np.array(Config.VisionConfig.UPPER_ORANGE)
+        self.lower_orange = np.array([33, 194])
+        self.upper_orange = np.array([73, 234])
 
-        self.LOWER_BLUE = np.array(Config.VisionConfig.LOWER_BLUE)
-        self.UPPER_BLUE = np.array(Config.VisionConfig.UPPER_BLUE)
+        self.lower_blue = np.array([216, 63])
+        self.upper_blue = np.array([255, 103])
 
-        self.LOWER_GREEN = np.array(Config.VisionConfig.LOWER_GREEN)
-        self.UPPER_GREEN = np.array(Config.VisionConfig.UPPER_GREEN)
+        self.lower_green = np.array([0, 0])
+        self.upper_green = np.array([110, 110])
 
-        self.LOWER_RED = np.array(Config.VisionConfig.LOWER_RED)
-        self.UPPER_RED = np.array(Config.VisionConfig.UPPER_RED)
+        self.lower_red = np.array([100, 140])
+        self.upper_red = np.array([130, 255])
 
-        self.LOWER_BLACK = Config.VisionConfig.LOWER_BLACK
-        self.UPPER_BLACK = Config.VisionConfig.UPPER_BLACK
-        self.LOWER_WHITE = Config.VisionConfig.LOWER_WHITE
-        self.UPPER_WHITE = Config.VisionConfig.UPPER_WHITE
+        # Stateful obstacle trajectory approximation used by obstacle challenge.
+        self._obstacle_path_frame_modulo = cycle(range(5))
+        self._obstacle_path_spline = None
+        self._obstacle_last_y = None
 
     def _perspective_transform(self, contours: np.ndarray, colors: Sequence[str]) -> np.ndarray[VisionObject]: # Applying cv2.perspectiveTransform is much more efficient than warping whole frame
         contours = np.array([VisionObject(contour=cv2.perspectiveTransform(contour, self.PERSPECTIVE_TRANSFORM), color=color) for contour, color in zip(contours, colors)])
@@ -100,23 +103,48 @@ class VisionProcessor():
 
         return self._find_blocks([black_mask], ["black"])
     
-    def get_distance(self, items: Sequence[VisionObject], frame_width=Config.VisionConfig.DEFAULT_FRAME_WIDTH):
+    def get_distance(self, items: Sequence[VisionObject], frame_width=Config.VisionConfig.DEFAULT_FRAME_WIDTH) -> list[tuple[Literal["left", "right"], float]]:
         center_x = frame_width // 2
 
-        dists = []
-
-        if not items:
-            return len(items) * [float("inf")]
+        dists: List[Tuple[Literal["left", "right"], float]] = []
         
         for item in items: # Should already be sorted
-            if item.x_centroid >= center_x and item.y_centroid > Config.VisionConfig.MIN_CENTROID_Y: # Wall on the right, get left edge, crop to bottom ROI
+            if item.x_centroid >= center_x and item.y_centroid > Config.VisionConfig.MIN_CENTROID_Y: # Wall on the right, get left edge
                 x, *_ = item.bbox
                 dists.append(x - center_x)
             if item.x_centroid < center_x and item.y_centroid > Config.VisionConfig.MIN_CENTROID_Y: # Wall on the left, get right edge, crop to bottom ROI
                 x, _, w, _ = item.bbox
-                dists.append(center_x - (x + w))
+                dists.append(("right", frame_width - (x + w))) # x + w is the right edge of the object, so distance from right edge of frame is frame_width - (x + w)
 
         return dists
+
+    def get_obstacle_path_x(self, obstacles: Sequence[VisionObject], wall_dists: dict[str, float], obstacle_dists: Sequence[Tuple[Literal["left", "right"], float]]) -> float:
+        if not obstacles or not obstacle_dists:
+            return 0.0
+
+        obstacle = obstacles[0]
+        obstacle_side, obstacle_dist = obstacle_dists[0]
+        wall_dist = wall_dists.get(obstacle_side, float("inf"))
+
+        if next(self._obstacle_path_frame_modulo) == 0 or self._obstacle_path_spline is None or self._obstacle_last_y is None:
+            if not np.isfinite(obstacle_dist) or not np.isfinite(wall_dist):
+                return 0.0
+
+            point_1 = (0.0, 256.0)
+            point_2 = (mean([obstacle_dist, wall_dist]), float(obstacle.y_centroid))
+
+            if np.isclose(point_2[0], point_1[0]):
+                return 0.0
+
+            self._obstacle_path_spline = CubicSpline(
+                [point_2[0], point_1[0]],
+                [point_2[1], point_1[1]],
+                bc_type=((1, 0), (1, 0)),
+            )
+            self._obstacle_last_y = float(obstacle.y_centroid)
+
+        delta_y = float(self._obstacle_last_y - obstacle.y_centroid)
+        return float(self._obstacle_path_spline(delta_y))
 
     def get_wall_distance(self, items: Sequence[VisionObject], frame_width=Config.VisionConfig.DEFAULT_FRAME_WIDTH):
         center_x = frame_width // 2
@@ -149,8 +177,9 @@ class VisionProcessor():
 
         wall_dists = self.get_wall_distance(walls)
         obstacle_dists = self.get_distance(obstacles)
+        obstacle_path_x = self.get_obstacle_path_x(obstacles, wall_dists, obstacle_dists)
 
-        return zone, walls, obstacles, corner_lines, wall_dists, obstacle_dists
+        return zone, walls, obstacles, corner_lines, wall_dists, obstacle_dists, obstacle_path_x
     
 class AsyncMultiprocessingVisionProcessor(VisionProcessor):
     def __init__(self, *args):
@@ -162,7 +191,7 @@ class AsyncMultiprocessingVisionProcessor(VisionProcessor):
         self.executor = ThreadPoolExecutor(6)
         return self
 
-    async def __aexit__(self, *args): # Error handling in main loop
+    async def __aexit__(self, *args, **kwargs): # Error handling in main loop
         if hasattr(self, "executor") and self.executor:
             self.executor.shutdown(wait=False)
 
@@ -183,6 +212,9 @@ class AsyncMultiprocessingVisionProcessor(VisionProcessor):
     
     async def get_wall_distance(self, walls: Sequence[VisionObject], frame_width=Config.VisionConfig.DEFAULT_FRAME_WIDTH):
         return await self.loop.run_in_executor(self.executor, super(AsyncMultiprocessingVisionProcessor, self).get_wall_distance, walls, frame_width)
+
+    async def get_obstacle_path_x(self, obstacles: Sequence[VisionObject], wall_dists: dict[str, float], obstacle_dists: Sequence[Tuple[Literal["left", "right"], float]]):
+        return await self.loop.run_in_executor(self.executor, super(AsyncMultiprocessingVisionProcessor, self).get_obstacle_path_x, obstacles, wall_dists, obstacle_dists)
     
     async def comprehensive_analysis(self, shm: str, receiver: Connection, sender: Connection, ) -> NoReturn:
         shm = shared_memory.SharedMemory(name=shm)
@@ -205,8 +237,9 @@ class AsyncMultiprocessingVisionProcessor(VisionProcessor):
                 self.get_distance(obstacles)
             ]
             wall_dists, obstacle_dists = await asyncio.gather(*round2)
+            obstacle_path_x = await self.get_obstacle_path_x(obstacles, wall_dists, obstacle_dists)
 
-            sender.send((zone, walls, obstacles, corner_lines, wall_dists, obstacle_dists,))
+            sender.send((zone, walls, obstacles, corner_lines, wall_dists, obstacle_dists, obstacle_path_x,))
 
     @staticmethod
     async def async_pipe_reader(receiver: Connection):
