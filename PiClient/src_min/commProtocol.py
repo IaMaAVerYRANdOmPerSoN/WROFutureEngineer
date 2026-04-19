@@ -1,6 +1,7 @@
 import aioserial
 import re
 import time
+import numpy as np
 from itertools import cycle
 from loguru import logger
 from .config import Config
@@ -28,7 +29,7 @@ class Client():
                           Config.ClientConfig.TID_END + 1))
         self.WHEELBASE = Config.ClientConfig.WHEELBASE
         self.MAX_SPEED = Config.ClientConfig.MAX_SPEED
-        self.WAIT_RE = re.compile(Config.ClientConfig.WAIT_PATTERN)
+        self.WAIT_RE = re.compile(Config.ClientConfig.WAIT_RE_PATTERN)
         self.is_connected = False
         self.servo_angle = 0
         self.encoder_value = 0
@@ -139,13 +140,13 @@ class Client():
         return False
 
     def set_servo_angle(self, angle):
-        if angle > Config.ClientConfig.SERVO_MAX_ANGLE:
+        if angle >= Config.ClientConfig.SERVO_MAX_ANGLE:
             logger.warning(
-                f"Invalid request clamped: 'SET_SERVO {angle}'. {angle} is not in [-180, 180]")
+                f"Invalid request clamped: 'SET_SERVO {angle}'. {angle} is not in [{Config.ClientConfig.SERVO_MIN_ANGLE}, {Config.ClientConfig.SERVO_MAX_ANGLE}]")
             angle = Config.ClientConfig.SERVO_MAX_ANGLE
-        elif angle < Config.ClientConfig.SERVO_MIN_ANGLE:
+        elif angle <= Config.ClientConfig.SERVO_MIN_ANGLE:
             logger.warning(
-                f"Invalid request clamped: 'SET_SERVO {angle}'. {angle} is not in [-180, 180]")
+                f"Invalid request clamped: 'SET_SERVO {angle}'. {angle} is not in [{Config.ClientConfig.SERVO_MIN_ANGLE}, {Config.ClientConfig.SERVO_MAX_ANGLE}]")
             angle = Config.ClientConfig.SERVO_MIN_ANGLE
 
         response = self._request(f'SET_SERVO {angle}')
@@ -157,7 +158,15 @@ class Client():
 
     def set_motor_speed(self, speed, duration):
         scaled_speed = speed * self.MAX_SPEED
-        response = self._request(f'SET_MOTOR {scaled_speed} {duration}')
+        request_timeout = max(
+            Config.ClientConfig.REQUEST_TIMEOUT,
+            abs(float(duration)) +
+            Config.ClientConfig.WAIT_RESPONSE_EXTRA_SECONDS + 1.0,
+        )
+        response = self._request(
+            f'SET_MOTOR {scaled_speed:.2f} {duration:.3f}',
+            timeout=request_timeout,
+        )
         return response == '200 OK'
 
     def drive_motors(self, speed: float, angle: float, duration: float):

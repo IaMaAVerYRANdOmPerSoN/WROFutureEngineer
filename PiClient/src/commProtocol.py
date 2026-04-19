@@ -193,13 +193,13 @@ class Client():
         return False
 
     async def set_servo_angle(self, angle):  # 2
-        if Config.ClientConfig.SERVO_MAX_ANGLE < angle:
+        if Config.ClientConfig.SERVO_MAX_ANGLE <= angle:
             logger.warning(
-                f"Invaild request clamped: 'SET_SERVO {angle}'. {angle} is not in [-180, 180]")
+                f"Invalid request clamped: 'SET_SERVO {angle}'. {angle} is not in [{Config.ClientConfig.SERVO_MIN_ANGLE}, {Config.ClientConfig.SERVO_MAX_ANGLE}]")
             angle = Config.ClientConfig.SERVO_MAX_ANGLE
-        elif Config.ClientConfig.SERVO_MIN_ANGLE > angle:
+        elif Config.ClientConfig.SERVO_MIN_ANGLE >= angle:
             logger.warning(
-                f"Invaild request clamped: 'SET_SERVO {angle}'. {angle} is not in [-180, 180]")
+                f"Invalid request clamped: 'SET_SERVO {angle}'. {angle} is not in [{Config.ClientConfig.SERVO_MIN_ANGLE}, {Config.ClientConfig.SERVO_MAX_ANGLE}]")
             angle = Config.ClientConfig.SERVO_MIN_ANGLE
         command = f'SET_SERVO {angle}'
         response = await self._request(command)
@@ -217,7 +217,8 @@ class Client():
         # Fallback timeout in case WAITMS is delayed or dropped under serial contention.
         request_timeout = max(
             Config.ClientConfig.REQUEST_TIMEOUT,
-            abs(float(duration)) + Config.ClientConfig.WAIT_RESPONSE_EXTRA_SECONDS + 1.0,
+            abs(float(duration)) +
+            Config.ClientConfig.WAIT_RESPONSE_EXTRA_SECONDS + 1.0,
         )
         response = await self._request(command, timeout=request_timeout)
         return response == '200 OK'
@@ -239,31 +240,7 @@ class Client():
         except ValueError:
             logger.warning(
                 f"Received non-integer response '{response}' from request 'SERVO_ANGLE'")
-
-        return False
-
-    async def fast_arc_to_target(self, target_x, target_y, speed, current_heading_rad=0):
-        dx = target_x  # Assume robot is (0,0)
-        dy = target_y
-        l_fw = np.sqrt(dx**2 + dy**2)
-        if l_fw < 1e-6:
-            logger.warning(
-                f'Zero division error encountered in fast_arc_to_target, with arguments {target_x, target_y, speed, current_heading_rad}')
-            return 'ERR_ZERO_DIVISION'
-
-        target_angle_global = np.arctan2(dx, dy)  # Abosulte angle
-
-        alpha = (target_angle_global - current_heading_rad +
-                 # Relative angle with normalisation
-                 np.pi) % (2 * np.pi) - np.pi
-        kappa = (2 * np.sin(alpha)) / l_fw  # Curvature
-
-        # Output commands
-        steering_angle_rad = np.arctan(self.WHEELBASE * kappa)
-        duration = l_fw / \
-            speed if abs(kappa) < 1e-6 else (2 * alpha / kappa) / speed
-
-        await self.drive_motors(speed, np.degrees(steering_angle_rad), duration)
+            return False
 
     async def set_led_state(self, state):  # 5
         command = f'SET_LED {state}'

@@ -82,7 +82,7 @@ class Server {
                 _serial->println(prefix + "WAITMS " + String(duration));
                 _steering.write(_steering.read() + request.arg1);
                 digitalWrite(4, HIGH);
-            } 
+            }
             else if (request.command == "SET_MOTOR") {
                 unsigned long duration = (unsigned long)(fabs(request.arg2) * 1000.0f + 0.5f);
                 request.timeout = millis() + duration;

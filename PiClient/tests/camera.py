@@ -8,47 +8,69 @@ from multiprocessing import shared_memory
 from src.asyncCamera import AsyncCamera
 from src.visionProcessing import AsyncMultiprocessingVisionProcessor
 from loguru import logger
+from src.config import Config
 
-def run_stream(shm_name, pipe_sender):
-        async def _run():
-            async with AsyncCamera() as cam:
-                await cam.stream(shm_name, pipe_sender)
-        asyncio.run(_run())
 
 async def test_single_frame():
     logger.info("Test 1: Single Frame Retrieval")
     async with AsyncCamera() as camera:
+        await asyncio.sleep(2)
         frame = await camera.get_frame_async()
         assert isinstance(frame, np.ndarray), "Frame is not a numpy array"
-        assert frame.shape == (384, 512, 3), f"Incorrect shape: {frame.shape}"
+        assert frame.shape == (Config.CameraConfig().OUTPUT_HEIGHT - Config.CameraConfig().INITIAL_ROI,
+                               Config.CameraConfig().OUTPUT_WIDTH, Config.CameraConfig().OUTPUT_CHANNELS), f"Incorrect shape: {frame.shape}"
         logger.success("Single frame test passed!")
         bgr_frame = cv2.cvtColor(frame, cv2.COLOR_YUV2BGR)
         cv2.imwrite("Image.png", bgr_frame)
 
+
+def stream_camera_in_subprocess(*args, **kwargs):
+    async def run(*args, **kwargs):
+        async with AsyncCamera() as camera:
+            await camera.stream(*args, **kwargs)
+    asyncio.run(run(*args, **kwargs))
+
+
 async def test_streaming_pipe():
     logger.info("Test 2: Multiprocessing Pipe Stream")
 
-    receiver, sender = mp.Pipe(duplex=False)
-    shm = shared_memory.SharedMemory("frameBuffer", create=True, size=384*512*3 + 100)
-    cam_process = mp.Process(None, run_stream, args=("frameBuffer", sender,))
-    cam_process.start()
+    shm = shared_memory.SharedMemory(
+        "frameBuffer",
+        create=True,
+        size=(
+            Config.CameraConfig().OUTPUT_HEIGHT -
+            Config.CameraConfig().INITIAL_ROI)
+        * Config.CameraConfig().OUTPUT_WIDTH
+        * Config.CameraConfig().OUTPUT_CHANNELS
+        + 100
+    )
+
+    cam_receiver, cam_sender = mp.Pipe(duplex=False)
+    camera_process = mp.Process(
+        target=stream_camera_in_subprocess, args=(shm.name, cam_sender,))
+    camera_process.start()
+    await asyncio.sleep(2)  # Give the camera process time to initialize
 
     try:
         frame_counter = 0
-        start = time.time()
-        async for result in AsyncMultiprocessingVisionProcessor.async_pipe_reader(receiver):
+        window_start = time.perf_counter()
+        async for result in AsyncMultiprocessingVisionProcessor.async_pipe_reader(cam_receiver):
             if result == True:
-                frame = shm.buf # simulated computation
+                frame = shm.buf  # simulated computation
                 frame_counter += 1
                 if frame_counter % 30 == 0:
-                    logger.success(f"Successfully fetched 30 frames: Average Framerate {1/(time.time()-start) * 30:.2f}.")
+                    elapsed = (time.perf_counter() - window_start) * 1000
+                    fps = 30 / (elapsed / 1000) if elapsed > 0 else float("inf")
+                    logger.success(
+                        f"Successfully fetched 30 frames: Average Framerate {fps:.2f} fps.")
                     return True
-                
+
     finally:
-        cam_process.terminate()
-        cam_process.join()
+        camera_process.terminate()
+        camera_process.join()
         shm.close()
         shm.unlink()
+
 
 async def run_tests():
     logger.info("Starting Camera Unittest...")
