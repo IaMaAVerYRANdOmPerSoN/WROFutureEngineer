@@ -13,7 +13,7 @@ import numpy as np
 
 # Largely mirrors open challenge, just with different internal logic and states
 
-async def run():
+async def run_obstacle_challenge():
     async with Client() as client, AsyncMultiprocessingVisionProcessor() as vision, AsyncCamera() as camera:
         wall_follow = PD(1, 0.2)
         obstacle_avoid = PD(1, 0.2)

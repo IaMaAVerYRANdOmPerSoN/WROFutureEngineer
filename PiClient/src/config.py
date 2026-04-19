@@ -56,7 +56,7 @@ class Config():
             # 3x3 homography matrix use VisionProcessor.get_perspective_transform() to set this up with actual points
         )
         # Not tunnned, also uv plane only
-        # TODO: Change this to full YUV, and autotuning soonTM (or if I get boared perhaps)
+        # TODO: Change this to full YUV, and autotuning soonTM (or if I get bored perhaps)
         LOWER_BLUE: tuple = (100, 150)
         UPPER_BLUE: tuple = (140, 255)
         LOWER_ORANGE: tuple = (10, 100)
@@ -81,7 +81,11 @@ class Config():
     class OpenChallengeConfig():
         WALL_FOLLOW_KPKD: tuple = (1, 0.2)
         CORNER_TURN_KPKD: tuple = (1.2, 0.2)
-        DRIVE_SPEED: float = 0.5
+        STRAIGHT_SPEED: float = 0.5
+        TURN_SPEED: float = 0.3
+        HYBRID_SPEED: float = 0.4
         DRIVE_COMMAND_DURATION: float = 0.1
         SHM_NAME: str = "camera_frame"
         SHM_SIZE: int = 512*384*3
+        TURN_HYSTERESIS: int = 5
+        LAP_LENGTH_IN_TURNS: int = 4*3 # 4 turns per lap, 3 laps total

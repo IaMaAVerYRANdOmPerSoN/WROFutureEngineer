@@ -239,31 +239,7 @@ class Client():
         except ValueError:
             logger.warning(
                 f"Received non-integer response '{response}' from request 'SERVO_ANGLE'")
-
-        return False
-
-    async def fast_arc_to_target(self, target_x, target_y, speed, current_heading_rad=0):
-        dx = target_x  # Assume robot is (0,0)
-        dy = target_y
-        l_fw = np.sqrt(dx**2 + dy**2)
-        if l_fw < 1e-6:
-            logger.warning(
-                f'Zero division error encountered in fast_arc_to_target, with arguments {target_x, target_y, speed, current_heading_rad}')
-            return 'ERR_ZERO_DIVISION'
-
-        target_angle_global = np.arctan2(dx, dy)  # Abosulte angle
-
-        alpha = (target_angle_global - current_heading_rad +
-                 # Relative angle with normalisation
-                 np.pi) % (2 * np.pi) - np.pi
-        kappa = (2 * np.sin(alpha)) / l_fw  # Curvature
-
-        # Output commands
-        steering_angle_rad = np.arctan(self.WHEELBASE * kappa)
-        duration = l_fw / \
-            speed if abs(kappa) < 1e-6 else (2 * alpha / kappa) / speed
-
-        await self.drive_motors(speed, np.degrees(steering_angle_rad), duration)
+            return False
 
     async def set_led_state(self, state):  # 5
         command = f'SET_LED {state}'

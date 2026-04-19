@@ -5,7 +5,8 @@ from typing import Dict, Tuple
 class Config:
     @dataclass
     class CameraConfig:
-        FORMAT: Dict = field(default_factory=lambda: {"format": "YUV420", "size": (512, 384)})
+        FORMAT: Dict = field(default_factory=lambda: {
+                             "format": "YUV420", "size": (512, 384)})
         INITIAL_ROI: int = 100
         SENSOR_CONFIG: Dict = field(default_factory=lambda: {
             "output_size": (640, 480),
@@ -28,6 +29,7 @@ class Config:
         CONNECT_RETRIES: int = 5
         CONNECT_RETRY_DELAY_SECONDS: float = 0.5
         WAIT_PATTERN: str = r"WAITMS ([0-9]+)"
+        WAIT_RE_PATTERN: str = WAIT_PATTERN
         TID_START: int = 1
         TID_END: int = 500
         WHEELBASE: float = 0.1
@@ -64,6 +66,18 @@ class Config:
     class OpenChallengeConfig:
         WALL_FOLLOW_KPKD: Tuple[float, float] = (1, 0.2)
         CORNER_TURN_KPKD: Tuple[float, float] = (1, 0.2)
+        STRAIGHT_SPEED: float = 0.5
+        TURN_SPEED: float = 0.3
+        HYBRID_SPEED: float = 0.4
         DRIVE_SPEED: float = 0.5
         DRIVE_COMMAND_DURATION: float = 0.1
-        FRAME_CENTER_X: int = 192
+        TURN_HYSTERESIS: int = 5
+        LAP_LENGTH_IN_TURNS: int = 12
+
+    @dataclass
+    class ObstacleChallengeConfig:
+        WALL_FOLLOW_KPKD: Tuple[float, float] = (1, 0.2)
+        OBSTACLE_AVOID_KPKD: Tuple[float, float] = (1, 0.2)
+        CORNER_TURN_KPKD: Tuple[float, float] = (1, 0.2)
+        DRIVE_SPEED: float = 0.5
+        DRIVE_COMMAND_DURATION: float = 0.1

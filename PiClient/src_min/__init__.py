@@ -12,7 +12,6 @@ LOG_FORMAT = (
 def configure_logging(verbose: bool = False, debug: bool = False) -> None:
     """Configure shared logging sinks for the Pi client package."""
     logger.remove()
-    logger.add(sys.stderr, level="WARNING", format=LOG_FORMAT)
     logger.add(
         "logs/log.txt",
         level="WARNING",
@@ -31,6 +30,7 @@ def configure_logging(verbose: bool = False, debug: bool = False) -> None:
             retention="3 days",
             format=LOG_FORMAT,
         )
+        logger.add(sys.stderr, level="DEBUG", format=LOG_FORMAT)
     elif verbose:
         logger.add(
             "logs/verbose.txt",
@@ -40,6 +40,9 @@ def configure_logging(verbose: bool = False, debug: bool = False) -> None:
             retention="3 days",
             format=LOG_FORMAT,
         )
+        logger.add(sys.stderr, level="INFO", format=LOG_FORMAT)
+    else:
+        logger.add(sys.stderr, level="WARNING", format=LOG_FORMAT)
 
 
 __all__ = ["configure_logging", "logger"]

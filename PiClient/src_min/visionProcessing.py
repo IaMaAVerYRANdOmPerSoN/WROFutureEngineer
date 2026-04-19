@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+from math import isinf
 from typing import Sequence
 from loguru import logger
 from dataclasses import dataclass
@@ -41,7 +42,7 @@ class VisionProcessor():
     # Applying cv2.perspectiveTransform is much more efficient than warping whole frame
     def _perspective_transform(self, contours: np.ndarray, colors: Sequence[str]) -> Sequence[VisionObject]:
         contours = np.array([VisionObject(contour=cv2.perspectiveTransform(
-            contour, self.PERSPECTIVE_TRANSFORM), color=color) for contour, color in zip(contours, colors)])
+            contour, VisionProcessor.PERSPECTIVE_TRANSFORM), color=color) for contour, color in zip(contours, colors)])
         return contours
 
     def _find_blocks(self, masks, colors):
@@ -93,6 +94,10 @@ class VisionProcessor():
         # Only one zone should be detected, so we can just return the first element of the tuple
         return zones[0] if zones else None
 
+    def check_field_bonds(self, frame):
+        # Compatibility alias for older call sites.
+        return self.check_field_bounds(frame)
+
     def find_walls(self, frame):
         logger.info("Checking for walls")
 
@@ -121,6 +126,24 @@ class VisionProcessor():
                 dists.append(center_x - (x + w))
 
         return dists
+
+    def get_obstacle_path_x(self, obstacles: Sequence[VisionObject], wall_dists: dict[str, float], frame_width=Config.VisionConfig.DEFAULT_FRAME_WIDTH) -> float:
+        if not obstacles:
+            return 0.0
+
+        center_x = frame_width // 2
+        obstacle = obstacles[0]
+        obstacle_offset = float(obstacle.x_centroid - center_x)
+
+        # Prefer steering around obstacle toward side with more observed clearance.
+        left_clearance = wall_dists.get("left", float("inf"))
+        right_clearance = wall_dists.get("right", float("inf"))
+        if not isinf(left_clearance) and not isinf(right_clearance):
+            if left_clearance > right_clearance:
+                return -abs(obstacle_offset)
+            return abs(obstacle_offset)
+
+        return obstacle_offset
 
     def get_wall_distance(self, items: Sequence[VisionObject], frame_width=Config.VisionConfig.DEFAULT_FRAME_WIDTH):
         center_x = frame_width // 2
@@ -155,8 +178,9 @@ class VisionProcessor():
 
         wall_dists = self.get_wall_distance(walls)
         obstacle_dists = self.get_distance(obstacles)
+        obstacle_path_x = self.get_obstacle_path_x(obstacles, wall_dists)
 
-        return zone, walls, obstacles, corner_lines, wall_dists, obstacle_dists
+        return zone, walls, obstacles, corner_lines, wall_dists, obstacle_dists, obstacle_path_x
 
     @staticmethod
     def get_perspective_transform():

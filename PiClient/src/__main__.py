@@ -1,7 +1,8 @@
 
 import asyncio
 import sys
-from src.open_challenge import run
+from src.open_challenge import run_open_challenge
+from src.obstacle_challenge import run_obstacle_challenge
 import argparse
 from src import configure_logging, logger
 
@@ -19,6 +20,12 @@ def parse_args() -> argparse.Namespace:
         const="all",  # Empty = "all"
         choices=["camera", "vision", "rpc", "all"],
         help="Run specific tests (default: all)",
+    )
+    parser.add_argument(
+        "--challenge",
+        choices=["open", "obstacle"],
+        default="open",
+        help="Select which challenge loop to run (default: open).",
     )
 
     return parser.parse_args()
@@ -63,8 +70,11 @@ def main():
     try:
         if parsed_args.test:
             test_main(parsed_args.test)
+        elif parsed_args.challenge == "obstacle":
+            asyncio.run(run_obstacle_challenge())
         else:
-            asyncio.run(run())
+            asyncio.run(run_open_challenge())
+            
         exitcode = 0
     except KeyboardInterrupt:
         logger.error("Process Interrupted by User")
