@@ -3,8 +3,7 @@ from multiprocessing.connection import Connection
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
 from loguru import logger
-# type: ignore TODO: Get the .pyi file from the picamera2 repo and add it to the project so my stuff gets linted.
-import picamera2
+import picamera2 # type: ignore TODO: Get the .pyi file from the picamera2 repo and add it to the project so my stuff gets linted.
 from multiprocessing import shared_memory
 from src.config import Config
 from typing import Dict
@@ -101,7 +100,7 @@ class AsyncCamera():
         while True:
             try:
                 async with self._capture_semaphore:
-                    frame: np.ndarray = await asyncio.wait_for(self.loop.run_in_executor(self.executor, self._cam.capture_array), timeout=timeout)
+                    frame: np.ndarray = await asyncio.wait_for(self.loop.run_in_executor(self.executor, self._cam.capture_array), timeout=timeout) # type: ignore
 
                 frame = frame.flatten()
                 y_end = self.FRAME_SIZE[0]*self.FRAME_SIZE[1]
@@ -152,7 +151,7 @@ class AsyncCamera():
         """
         return [await asyncio.wait_for(self.get_frame_async(), timeout) for _ in range(num_frames)]
 
-    async def stream(self, shm, sender: Connection):
+    async def stream(self, shm_name, sender: Connection, *args: Connection):
         """
         asynchronous indefinite yield camera IOstream.
 
@@ -162,6 +161,9 @@ class AsyncCamera():
         """
 
         while True:
-            await self.get_frame_async(shm_name=shm)
+            await self.get_frame_async(shm_name=shm_name)
             # Signal that a new frame is ready, the frame itself is in shared memory so we dont have to send it through the pipe.
             sender.send(True)
+            if args:
+                for conn in args:
+                    conn.send(True)

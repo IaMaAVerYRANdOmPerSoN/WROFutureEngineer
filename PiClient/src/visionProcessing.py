@@ -20,8 +20,7 @@ class VisionObject():
     color: str
 
     def __post_init__(self):
-        self.bbox: tuple[float, float, float,
-                         float] = cv2.boundingRect(self.contour)
+        self.bbox: tuple[int, int, int, int] = cv2.boundingRect(self.contour)
         x, y, w, h = self.bbox
         self.x_centroid: float = x + w/2
         self.y_centroid: float = y + h/2
@@ -57,10 +56,10 @@ class VisionProcessor():
         self._obstacle_last_y = None
 
     # Applying cv2.perspectiveTransform is much more efficient than warping whole frame
-    def _perspective_transform(self, contours: Sequence, colors: Sequence[str]) -> Tuple[VisionObject]:
+    def _perspective_transform(self, contours: Sequence, colors: Sequence[str]) -> Tuple[VisionObject, ...]:
         # contours = [VisionObject(contour=cv2.perspectiveTransform(
         #    contour, VisionProcessor.PERSPECTIVE_TRANSFORM), color=color) for contour, color in zip(contours, colors)]
-        return [VisionObject(contour=contour, color=color) for contour, color in zip(contours, colors)]
+        return tuple([VisionObject(contour=contour, color=color) for contour, color in zip(contours, colors)])
 
     def _find_blocks(self, masks, colors):
         contours = []
@@ -85,7 +84,7 @@ class VisionProcessor():
 
     def find_obstacles(self, frame):
         logger.info("Searching for traffic signs...")
-        uv = frame[:, :, 1:3]
+        uv: np.ndarray = frame[:, :, 1:3]
         green_mask = cv2.inRange(uv, self.LOWER_GREEN, self.UPPER_GREEN)
         red_mask = cv2.inRange(uv, self.LOWER_RED, self.UPPER_RED)
 
@@ -93,7 +92,7 @@ class VisionProcessor():
 
     def check_corner_lines(self, frame):
         logger.info("Searching for turn aids...")
-        uv = frame[:, :, 1:3]
+        uv: np.ndarray = frame[:, :, 1:3]
         blue_mask = cv2.inRange(uv, self.LOWER_BLUE, self.UPPER_BLUE)
         orange_mask = cv2.inRange(uv, self.LOWER_ORANGE, self.UPPER_ORANGE)
 
@@ -102,7 +101,7 @@ class VisionProcessor():
     def check_field_bonds(self, frame):
         logger.info("Fetching drivable field boundaries...")
 
-        y = frame[:, :, 0]
+        y: np.ndarray = frame[:, :, 0]
         white_mask = cv2.inRange(y, self.LOWER_WHITE, self.UPPER_WHITE)
 
         zones = self._find_blocks([white_mask], ["white"])
@@ -201,7 +200,6 @@ class VisionProcessor():
 
         return zone, walls, obstacles, corner_lines, wall_dists, obstacle_dists, obstacle_path_x
 
-
 class OpenChallengeVisionProcessor(VisionProcessor):
     def __init__(self, *args, **kwargs):
         super(OpenChallengeVisionProcessor, self).__init__(*args, **kwargs)
@@ -247,8 +245,8 @@ class AsyncMultiprocessingVisionProcessor(VisionProcessor):
     async def get_obstacle_path_x(self, obstacles: Sequence[VisionObject], wall_dists: dict[str, float], obstacle_dists: Sequence[Tuple[Literal["left", "right"], float]]):
         return await self.loop.run_in_executor(self.executor, super(AsyncMultiprocessingVisionProcessor, self).get_obstacle_path_x, obstacles, wall_dists, obstacle_dists)
 
-    async def comprehensive_analysis(self, shm: str, receiver: Connection, sender: Connection, ) -> NoReturn:
-        shm = shared_memory.SharedMemory(name=shm)
+    async def comprehensive_analysis(self, shm_name: str, receiver: Connection, sender: Connection, ) -> NoReturn:
+        shm = shared_memory.SharedMemory(name=shm_name)
         frame_width = Config.VisionConfig.ANALYSIS_FRAME_WIDTH
         frame_height = Config.VisionConfig.ANALYSIS_FRAME_HEIGHT
         frame_channels = Config.VisionConfig.ANALYSIS_FRAME_CHANNELS
@@ -317,8 +315,8 @@ class OpenChallengeAsyncMultiprocessingVisionProcessor(AsyncMultiprocessingVisio
     def _perspective_transform(self, contours: np.ndarray, colors: Sequence[str]) -> np.ndarray[VisionObject]:
         return np.array([VisionObject(contour=contour, color=color) for contour, color in zip(contours, colors)])
 
-    async def comprehensive_analysis(self, shm: str, receiver: Connection, sender: Connection) -> None:
-        shm = shared_memory.SharedMemory(name=shm)
+    async def comprehensive_analysis(self, shm_name: str, receiver: Connection, sender: Connection) -> None:
+        shm = shared_memory.SharedMemory(name=shm_name)
         frame_width = Config.VisionConfig.ANALYSIS_FRAME_WIDTH
         frame_height = Config.VisionConfig.ANALYSIS_FRAME_HEIGHT
         frame_channels = Config.VisionConfig.ANALYSIS_FRAME_CHANNELS
@@ -336,7 +334,7 @@ class OpenChallengeAsyncMultiprocessingVisionProcessor(AsyncMultiprocessingVisio
             round2 = [
                 self.get_wall_distance(walls),
             ]
-            wall_dists = await asyncio.gather(*round2)
+            wall_dists, = await asyncio.gather(*round2)
 
             # Removed obstacle data for open challenge
             sender.send((zone, walls, corner_lines, wall_dists))

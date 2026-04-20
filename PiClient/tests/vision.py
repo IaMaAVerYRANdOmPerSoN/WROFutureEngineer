@@ -61,7 +61,7 @@ def _draw_detections(frame, zone, walls, obstacles, corner_lines, wall_dists, ob
     status_lines = [
         f"WallDist L:{wall_dists['left']:.1f} R:{wall_dists['right']:.1f}",
         "ObstacleDist " +
-        (", ".join(f"{side}:{dist:.1f}" for side, dist in obstacle_dists)
+        (", ".join(f"{side}:{dist:.1f}" for side, dist in obstacle_dists.items())
          if obstacle_dists else "none"),
     ]
     for i, text in enumerate(status_lines):
