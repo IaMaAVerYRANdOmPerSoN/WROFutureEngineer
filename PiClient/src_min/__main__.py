@@ -8,11 +8,14 @@ from .obstacle_challenge import run_obstacle_challenge
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run the main control loop for the robot.")
+    parser = argparse.ArgumentParser(
+        description="Run the main control loop for the robot.")
 
     group = parser.add_mutually_exclusive_group(required=False)
-    group.add_argument("--verbose", action="store_true", help="Enable verbose logging to verbose.txt")
-    group.add_argument("--debug", action="store_true", help="Enable debug logging to verbose.txt (overrides --verbose)")
+    group.add_argument("--verbose", action="store_true",
+                       help="Enable verbose logging to verbose.txt")
+    group.add_argument("--debug", action="store_true",
+                       help="Enable debug logging to verbose.txt (overrides --verbose)")
 
     parser.add_argument(
         "--test",
@@ -31,8 +34,9 @@ def parse_args() -> argparse.Namespace:
 
 def test_main(test_target: str):
     if test_target:
-        logger.warning("Testing mode is not supported in the minimal version. Ignoring --test argument.")
-    
+        logger.warning(
+            "Testing mode is not supported in the minimal version. Ignoring --test argument.")
+
 
 def main():
     parsed_args = parse_args()
@@ -40,7 +44,8 @@ def main():
 
     try:
         if parsed_args.test:
-            logger.warning("Testing mode is not supported in the minimal version. Ignoring --test argument.")
+            logger.warning(
+                "Testing mode is not supported in the minimal version. Ignoring --test argument.")
         if parsed_args.challenge == "obstacle":
             run_obstacle_challenge()
         else:
@@ -57,6 +62,7 @@ def main():
         logger.info(f"Cleaning up with exitcode {exitcode}...")
         logger.remove()
         sys.exit(exitcode)
+
 
 if __name__ == "__main__":
     main()

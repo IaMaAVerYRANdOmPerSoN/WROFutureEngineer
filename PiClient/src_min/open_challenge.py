@@ -1,5 +1,6 @@
-from typing import Literal
+from typing import Literal, Sequence
 from math import isinf
+import numpy as np
 from loguru import logger
 from .camera import Camera
 from .commProtocol import Client
@@ -41,7 +42,8 @@ def run_open_challenge():
                 logger.debug(
                     f"Zone: {zone}, Walls: {walls}, Obstacles: {obstacles}, Corner Lines: {corner_lines}, Wall Dists: {wall_x_diffs}, Obstacle Dists: {obstacle_dists}")
 
-                state_history[1] = (state_history[1] + 1 if state_history[0] == state else 0)
+                state_history[1] = (state_history[1] +
+                                    1 if state_history[0] == state else 0)
                 state_history[0] = state
 
                 if (
@@ -58,9 +60,11 @@ def run_open_challenge():
                         if any(isinf(x_diff) for x_diff in wall_x_diffs.values()):
                             corner_turn_controller.previous_error = 0
                             state = "Turn"
+
                         elif corner_lines:
                             corner_turn_controller.previous_error = 0
                             state = "Hybrid"
+
                         else:
                             turn_correction = wall_follow.tick(
                                 wall_x_diffs["left"] - wall_x_diffs["right"])
@@ -74,9 +78,11 @@ def run_open_challenge():
                         if not corner_lines:
                             wall_follow.previous_error = 0
                             state = "Follow wall"
+
                         elif not any(isinf(x_diff) for x_diff in wall_x_diffs.values()):
                             wall_follow.previous_error = 0
                             state = "Hybrid"
+
                         else:
                             turn_correction = corner_turn_controller.tick(
                                 corner_lines[0].x_centroid
@@ -92,36 +98,44 @@ def run_open_challenge():
                         if not corner_lines:
                             wall_follow.previous_error = 0
                             state = "Follow wall"
-                            continue
+
                         if any(isinf(x_diff) for x_diff in wall_x_diffs.values()):
                             corner_turn_controller.previous_error = 0
                             state = "Turn"
-                            continue
 
-                        turn_correction = (
-                            wall_follow.tick(wall_x_diffs["left"] - wall_x_diffs["right"])
-                            + corner_turn_controller.tick(
-                                corner_lines[0].x_centroid
-                                - Config.CameraConfig.FORMAT["size"][0] // 2
+                        else:
+                            turn_correction = (
+                                wall_follow.tick(
+                                    wall_x_diffs["left"] - wall_x_diffs["right"])
+                                + corner_turn_controller.tick(
+                                    corner_lines[0].x_centroid
+                                    - Config.CameraConfig.FORMAT["size"][0] // 2
+                                )
+                            ) // 2
+                            client.drive_motors(
+                                Config.OpenChallengeConfig.HYBRID_SPEED,
+                                turn_correction,
+                                Config.OpenChallengeConfig.DRIVE_COMMAND_DURATION,
                             )
-                        ) // 2
-                        client.drive_motors(
-                            Config.OpenChallengeConfig.HYBRID_SPEED,
-                            turn_correction,
-                            Config.OpenChallengeConfig.DRIVE_COMMAND_DURATION,
-                        )
 
                     case _:
                         logger.error(f"Invalid state {state}")
                         if not corner_lines and not any(isinf(x_diff) for x_diff in wall_x_diffs.values()):
                             wall_follow.previous_error = 0
                             state = "Follow wall"
-                            continue
 
                         corner_turn_controller.previous_error = 0
                         state = "Turn"
-                        continue
         finally:
             logger.info("Stopping...")
             client.drive_motors(0, 0, 0)  # Stop the robot
             logger.success("Done")
+
+
+class OpenChallengeVisionProcessor(VisionProcessor):
+    def __init__(self, *args, **kwargs):
+        super(OpenChallengeVisionProcessor, self).__init__(*args, **kwargs)
+
+    # Bogus overwrite to disable perspective transforms on basic version
+    def _perspective_transform(self, contours: Sequence[VisionObject], colors: Sequence[str]) -> Sequence[VisionObject]:
+        return np.array([VisionObject(contour=contour, color=color) for contour, color in zip(contours, colors)])

@@ -12,8 +12,11 @@ fmt = (
     "<level>{level: <8}</level> │ "
     "<level>{message}</level>")
 logger.add(sys.stderr, level="WARNING", format=fmt)
-logger.add("log.txt", level="WARNING", enqueue=True, rotation="5 MB", retention="10 days", format=fmt)
-logger.add("verbose.txt", level="DEBUG", enqueue=True, rotation="1 MB", retention="3 days", format=fmt, backtrace=True, diagnose=True)
+logger.add("log.txt", level="WARNING", enqueue=True,
+           rotation="5 MB", retention="10 days", format=fmt)
+logger.add("verbose.txt", level="DEBUG", enqueue=True, rotation="1 MB",
+           retention="3 days", format=fmt, backtrace=True, diagnose=True)
+
 
 async def run_tests():
     async with Client() as client, AsyncMultiprocessingVisionProcessor() as vision, AsyncCamera() as camera:

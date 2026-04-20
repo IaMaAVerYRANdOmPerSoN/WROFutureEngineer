@@ -193,13 +193,13 @@ class Client():
         return False
 
     async def set_servo_angle(self, angle):  # 2
-        if Config.ClientConfig.SERVO_MAX_ANGLE < angle:
+        if Config.ClientConfig.SERVO_MAX_ANGLE <= angle:
             logger.warning(
-                f"Invaild request clamped: 'SET_SERVO {angle}'. {angle} is not in [-180, 180]")
+                f"Invalid request clamped: 'SET_SERVO {angle}'. {angle} is not in [{Config.ClientConfig.SERVO_MIN_ANGLE}, {Config.ClientConfig.SERVO_MAX_ANGLE}]")
             angle = Config.ClientConfig.SERVO_MAX_ANGLE
-        elif Config.ClientConfig.SERVO_MIN_ANGLE > angle:
+        elif Config.ClientConfig.SERVO_MIN_ANGLE >= angle:
             logger.warning(
-                f"Invaild request clamped: 'SET_SERVO {angle}'. {angle} is not in [-180, 180]")
+                f"Invalid request clamped: 'SET_SERVO {angle}'. {angle} is not in [{Config.ClientConfig.SERVO_MIN_ANGLE}, {Config.ClientConfig.SERVO_MAX_ANGLE}]")
             angle = Config.ClientConfig.SERVO_MIN_ANGLE
         command = f'SET_SERVO {angle}'
         response = await self._request(command)
@@ -217,7 +217,8 @@ class Client():
         # Fallback timeout in case WAITMS is delayed or dropped under serial contention.
         request_timeout = max(
             Config.ClientConfig.REQUEST_TIMEOUT,
-            abs(float(duration)) + Config.ClientConfig.WAIT_RESPONSE_EXTRA_SECONDS + 1.0,
+            abs(float(duration)) +
+            Config.ClientConfig.WAIT_RESPONSE_EXTRA_SECONDS + 1.0,
         )
         response = await self._request(command, timeout=request_timeout)
         return response == '200 OK'

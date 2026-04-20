@@ -1,6 +1,7 @@
 from loguru import logger
 
-class PD(): # No i needed, works fine in past seasons
+
+class PD():  # No i needed, works fine in past seasons
     def __init__(self, kp, kd):
         self.kp = kp
         self.kd = kd
@@ -12,5 +13,6 @@ class PD(): # No i needed, works fine in past seasons
         derivative = self.kd * (error - self.previous_error)
 
         self.previous_error = error
-        logger.info(f"PD output: Proportional {proportional}, Derivative {derivative}, Total {proportional + derivative}")
+        logger.info(
+            f"PD output: Proportional {proportional}, Derivative {derivative}, Total {proportional + derivative}")
         return proportional + derivative

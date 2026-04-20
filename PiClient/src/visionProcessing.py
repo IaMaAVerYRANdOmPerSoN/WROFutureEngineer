@@ -34,17 +34,22 @@ class VisionProcessor():
 
     def __init__(self):
         # I will add autotuning soonTM lol so yes these are instance variables, not class variables
-        self.lower_orange = Config.VisionConfig.LOWER_ORANGE
-        self.upper_orange = Config.VisionConfig.UPPER_ORANGE
+        self.LOWER_ORANGE = Config.VisionConfig.LOWER_ORANGE
+        self.UPPER_ORANGE = Config.VisionConfig.UPPER_ORANGE
 
-        self.lower_blue = Config.VisionConfig.LOWER_BLUE
-        self.upper_blue = Config.VisionConfig.UPPER_BLUE
+        self.LOWER_BLUE = Config.VisionConfig.LOWER_BLUE
+        self.UPPER_BLUE = Config.VisionConfig.UPPER_BLUE
 
-        self.lower_green = Config.VisionConfig.LOWER_GREEN
-        self.upper_green = Config.VisionConfig.UPPER_GREEN
+        self.LOWER_GREEN = Config.VisionConfig.LOWER_GREEN
+        self.UPPER_GREEN = Config.VisionConfig.UPPER_GREEN
 
-        self.lower_red = Config.VisionConfig.LOWER_RED
-        self.upper_red = Config.VisionConfig.UPPER_RED
+        self.LOWER_RED = Config.VisionConfig.LOWER_RED
+        self.UPPER_RED = Config.VisionConfig.UPPER_RED
+
+        self.LOWER_BLACK = Config.VisionConfig.LOWER_BLACK
+        self.UPPER_BLACK = Config.VisionConfig.UPPER_BLACK
+        self.LOWER_WHITE = Config.VisionConfig.LOWER_WHITE
+        self.UPPER_WHITE = Config.VisionConfig.UPPER_WHITE
 
         # Stateful obstacle trajectory approximation used by obstacle challenge.
         self._obstacle_path_frame_modulo = cycle(range(5))
@@ -52,10 +57,10 @@ class VisionProcessor():
         self._obstacle_last_y = None
 
     # Applying cv2.perspectiveTransform is much more efficient than warping whole frame
-    def _perspective_transform(self, contours: np.ndarray, colors: Sequence[str]) -> np.ndarray[VisionObject]:
-        contours = np.array([VisionObject(contour=cv2.perspectiveTransform(
-            contour, VisionProcessor.PERSPECTIVE_TRANSFORM), color=color) for contour, color in zip(contours, colors)])
-        return contours
+    def _perspective_transform(self, contours: Sequence, colors: Sequence[str]) -> Tuple[VisionObject]:
+        # contours = [VisionObject(contour=cv2.perspectiveTransform(
+        #    contour, VisionProcessor.PERSPECTIVE_TRANSFORM), color=color) for contour, color in zip(contours, colors)]
+        return [VisionObject(contour=contour, color=color) for contour, color in zip(contours, colors)]
 
     def _find_blocks(self, masks, colors):
         contours = []
@@ -73,7 +78,6 @@ class VisionProcessor():
             return tuple()
 
         contours.sort(key=lambda i: cv2.contourArea(i), reverse=True)
-        contours = np.array(contours, dtype=np.float32)
 
         logger.info(f"Detected {len(contours)} objects.")
         return self._perspective_transform(contours, detected_colors)
@@ -119,14 +123,14 @@ class VisionProcessor():
         dists: List[Tuple[Literal["left", "right"], float]] = []
 
         for item in items:  # Should already be sorted
-            if item.x_centroid >= center_x and item.y_centroid > Config.VisionConfig.MIN_CENTROID_Y:  # Wall on the right, get left edge
+            # Obstacle on the right, get distance from center to left edge
+            if item.x_centroid >= center_x and item.y_centroid > Config.VisionConfig.MIN_CENTROID_Y:
                 x, *_ = item.bbox
-                dists.append(x - center_x)
-            # Wall on the left, get right edge, crop to bottom ROI
+                dists.append(("right", x - center_x))
+            # Obstacle on the left, get distance from center to right edge
             if item.x_centroid < center_x and item.y_centroid > Config.VisionConfig.MIN_CENTROID_Y:
                 x, _, w, _ = item.bbox
-                # x + w is the right edge of the object, so distance from right edge of frame is frame_width - (x + w)
-                dists.append(("right", frame_width - (x + w)))
+                dists.append(("left", center_x - (x + w)))
 
         return dists
 
@@ -204,7 +208,7 @@ class OpenChallengeVisionProcessor(VisionProcessor):
 
     # Bogus overwrite to disable perspective transforms on basic version
     def _perspective_transform(self, contours: Sequence[VisionObject], colors: Sequence[str]) -> Sequence[VisionObject]:
-       return np.array([VisionObject(contour=contour, color=color) for contour, color in zip(contours, colors)])
+        return np.array([VisionObject(contour=contour, color=color) for contour, color in zip(contours, colors)])
 
 
 class AsyncMultiprocessingVisionProcessor(VisionProcessor):
@@ -265,10 +269,10 @@ class AsyncMultiprocessingVisionProcessor(VisionProcessor):
                 self.get_distance(obstacles)
             ]
             wall_dists, obstacle_dists = await asyncio.gather(*round2)
-            obstacle_path_x = await self.get_obstacle_path_x(obstacles, wall_dists, obstacle_dists)
+            # obstacle_path_x = await self.get_obstacle_path_x(obstacles, wall_dists, obstacle_dists)
 
             sender.send((zone, walls, obstacles, corner_lines,
-                        wall_dists, obstacle_dists, obstacle_path_x,))
+                        wall_dists, obstacle_dists,))
 
     @staticmethod
     async def async_pipe_reader(receiver: Connection):
@@ -313,7 +317,7 @@ class OpenChallengeAsyncMultiprocessingVisionProcessor(AsyncMultiprocessingVisio
     def _perspective_transform(self, contours: np.ndarray, colors: Sequence[str]) -> np.ndarray[VisionObject]:
         return np.array([VisionObject(contour=contour, color=color) for contour, color in zip(contours, colors)])
 
-    async def comprehensive_analysis(self, shm: str, receiver: Connection[Any, Any], sender: Connection[Any, Any]) -> NoReturn:
+    async def comprehensive_analysis(self, shm: str, receiver: Connection, sender: Connection) -> None:
         shm = shared_memory.SharedMemory(name=shm)
         frame_width = Config.VisionConfig.ANALYSIS_FRAME_WIDTH
         frame_height = Config.VisionConfig.ANALYSIS_FRAME_HEIGHT

@@ -10,6 +10,9 @@ class Config():
             "format": "YUV420",
             "size": (384, 512)
         })
+        OUTPUT_WIDTH: int = 512
+        OUTPUT_HEIGHT: int = 384
+        OUTPUT_CHANNELS: int = 3
         INITIAL_ROI: int = 100
         EXECUTOR_THREADS: int = 3
         MAX_CONCURRENT_CAPTURES: int = 2
@@ -44,7 +47,7 @@ class Config():
         MAX_SPEED: int = 100
         CONNECT_RETRIES: int = 5
         CONNECT_RETRY_SLEEP_SECONDS: float = 0.5
-        SERVO_MIN_ANGLE: int = -180
+        SERVO_MIN_ANGLE: int = 0
         SERVO_MAX_ANGLE: int = 180
 
     @dataclass
@@ -88,4 +91,4 @@ class Config():
         SHM_NAME: str = "camera_frame"
         SHM_SIZE: int = 512*384*3
         TURN_HYSTERESIS: int = 5
-        LAP_LENGTH_IN_TURNS: int = 4*3 # 4 turns per lap, 3 laps total
+        LAP_LENGTH_IN_TURNS: int = 4*3  # 4 turns per lap, 3 laps total
