@@ -1,7 +1,7 @@
 
 import asyncio
 import sys
-from src.open_challenge import run_open_challenge
+from src.modules.open_challenge import run_open_challenge
 from src.obstacle_challenge import run_obstacle_challenge
 import argparse
 from src import configure_logging, logger

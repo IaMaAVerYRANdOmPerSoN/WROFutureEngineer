@@ -2,10 +2,10 @@ import asyncio
 from multiprocessing.connection import Connection
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
-from loguru import logger
-import picamera2 # type: ignore TODO: Get the .pyi file from the picamera2 repo and add it to the project so my stuff gets linted.
+from src import logger
+import picamera2 # pyright: ignore[reportMissingImports] TODO: Get the .pyi file from the picamera2 repo and add it to the project so my stuff gets linted.
 from multiprocessing import shared_memory
-from src.config import Config
+from src.modules.config import Config
 from typing import Dict
 
 
@@ -84,7 +84,7 @@ class AsyncCamera():
             self._cam = None
 
         if hasattr(self, "executor") and self.executor:
-            self.executor.shutdown(wait=False)
+            self.executor.shutdown()
 
     async def get_frame_async(self, timeout=0.1, shm_name=None):
         """
@@ -100,7 +100,8 @@ class AsyncCamera():
         while True:
             try:
                 async with self._capture_semaphore:
-                    frame: np.ndarray = await asyncio.wait_for(self.loop.run_in_executor(self.executor, self._cam.capture_array), timeout=timeout) # type: ignore
+                    # type: ignore
+                    frame: np.ndarray = await asyncio.wait_for(self.loop.run_in_executor(self.executor, self._cam.capture_array), timeout=timeout)
 
                 frame = frame.flatten()
                 y_end = self.FRAME_SIZE[0]*self.FRAME_SIZE[1]

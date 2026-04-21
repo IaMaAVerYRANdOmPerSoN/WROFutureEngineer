@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 from math import isinf
 from typing import Sequence
-from loguru import logger
+from src_min import logger
 from dataclasses import dataclass
 from .config import Config
 
@@ -40,7 +40,7 @@ class VisionProcessor():
         self.upper_red = np.array(Config.VisionConfig.UPPER_RED)
 
     # Applying cv2.perspectiveTransform is much more efficient than warping whole frame
-    def _perspective_transform(self, contours: np.ndarray, colors: Sequence[str]) -> Sequence[VisionObject]:
+    def _perspective_transform(self, contours: np.ndarray, colors: Sequence[str]) -> np.ndarray:
         contours = np.array([VisionObject(contour=cv2.perspectiveTransform(
             contour, VisionProcessor.PERSPECTIVE_TRANSFORM), color=color) for contour, color in zip(contours, colors)])
         return contours

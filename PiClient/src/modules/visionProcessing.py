@@ -4,14 +4,14 @@ import cv2
 import numpy as np
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, NoReturn, Sequence, Tuple, Literal, List
+from typing import Sequence, Tuple, Literal, List
 from itertools import cycle
-from loguru import logger
+from src import logger
 from multiprocessing import shared_memory
 from dataclasses import dataclass
 from statistics import mean
 from scipy.interpolate import CubicSpline
-from src.config import Config
+from src.modules.config import Config
 
 
 @dataclass
@@ -20,7 +20,7 @@ class VisionObject():
     color: str
 
     def __post_init__(self):
-        self.bbox: tuple[int, int, int, int] = cv2.boundingRect(self.contour)
+        self.bbox: Tuple[int, int, int, int] = cv2.boundingRect(self.contour) # Added custom type stub, default type stubs use Sequence[int]
         x, y, w, h = self.bbox
         self.x_centroid: float = x + w/2
         self.y_centroid: float = y + h/2
@@ -33,22 +33,22 @@ class VisionProcessor():
 
     def __init__(self):
         # I will add autotuning soonTM lol so yes these are instance variables, not class variables
-        self.LOWER_ORANGE = Config.VisionConfig.LOWER_ORANGE
-        self.UPPER_ORANGE = Config.VisionConfig.UPPER_ORANGE
+        self.LOWER_ORANGE = np.array(Config.VisionConfig.LOWER_ORANGE, dtype=np.uint8)
+        self.UPPER_ORANGE = np.array(Config.VisionConfig.UPPER_ORANGE, dtype=np.uint8)
 
-        self.LOWER_BLUE = Config.VisionConfig.LOWER_BLUE
-        self.UPPER_BLUE = Config.VisionConfig.UPPER_BLUE
+        self.LOWER_BLUE = np.array(Config.VisionConfig.LOWER_BLUE, dtype=np.uint8)
+        self.UPPER_BLUE = np.array(Config.VisionConfig.UPPER_BLUE, dtype=np.uint8)
 
-        self.LOWER_GREEN = Config.VisionConfig.LOWER_GREEN
-        self.UPPER_GREEN = Config.VisionConfig.UPPER_GREEN
+        self.LOWER_GREEN = np.array(Config.VisionConfig.LOWER_GREEN, dtype=np.uint8)
+        self.UPPER_GREEN = np.array(Config.VisionConfig.UPPER_GREEN, dtype=np.uint8)
 
-        self.LOWER_RED = Config.VisionConfig.LOWER_RED
-        self.UPPER_RED = Config.VisionConfig.UPPER_RED
+        self.LOWER_RED = np.array(Config.VisionConfig.LOWER_RED, dtype=np.uint8)
+        self.UPPER_RED = np.array(Config.VisionConfig.UPPER_RED, dtype=np.uint8)
 
-        self.LOWER_BLACK = Config.VisionConfig.LOWER_BLACK
-        self.UPPER_BLACK = Config.VisionConfig.UPPER_BLACK
-        self.LOWER_WHITE = Config.VisionConfig.LOWER_WHITE
-        self.UPPER_WHITE = Config.VisionConfig.UPPER_WHITE
+        self.LOWER_BLACK = np.array(Config.VisionConfig.LOWER_BLACK, dtype=np.uint8)
+        self.UPPER_BLACK = np.array(Config.VisionConfig.UPPER_BLACK, dtype=np.uint8)
+        self.LOWER_WHITE = np.array(Config.VisionConfig.LOWER_WHITE, dtype=np.uint8)
+        self.UPPER_WHITE = np.array(Config.VisionConfig.UPPER_WHITE, dtype=np.uint8)
 
         # Stateful obstacle trajectory approximation used by obstacle challenge.
         self._obstacle_path_frame_modulo = cycle(range(5))
@@ -56,13 +56,13 @@ class VisionProcessor():
         self._obstacle_last_y = None
 
     # Applying cv2.perspectiveTransform is much more efficient than warping whole frame
-    def _perspective_transform(self, contours: Sequence, colors: Sequence[str]) -> Tuple[VisionObject, ...]:
+    def _perspective_transform(self, contours: np.ndarray, colors: Sequence[str]) -> np.ndarray:
         # contours = [VisionObject(contour=cv2.perspectiveTransform(
-        #    contour, VisionProcessor.PERSPECTIVE_TRANSFORM), color=color) for contour, color in zip(contours, colors)]
-        return tuple([VisionObject(contour=contour, color=color) for contour, color in zip(contours, colors)])
+        # contour, VisionProcessor.PERSPECTIVE_TRANSFORM), color=color) for contour, color in zip(contours, colors)]
+        return np.array([VisionObject(contour=contour, color=color) for contour, color in zip(contours, colors)], dtype=object)
 
     def _find_blocks(self, masks, colors):
-        contours = []
+        contours = np.array([], dtype=object)
         detected_colors = []
 
         for mask, color in zip(masks, colors):
@@ -70,13 +70,13 @@ class VisionProcessor():
                 _ = cv2.findContours(
                     mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             if detected_contours:
-                contours.extend(detected_contours)
+                contours = np.append(contours, detected_contours)
                 detected_colors.extend([color] * len(detected_contours))
 
-        if not contours:
-            return tuple()
+        if not contours.size:
+            return np.array([], dtype=object)
 
-        contours.sort(key=lambda i: cv2.contourArea(i), reverse=True)
+        contours = np.array(sorted(contours, key=lambda i: cv2.contourArea(i), reverse=True), dtype=object)
 
         logger.info(f"Detected {len(contours)} objects.")
         return self._perspective_transform(contours, detected_colors)
@@ -116,7 +116,7 @@ class VisionProcessor():
 
         return self._find_blocks([black_mask], ["black"])
 
-    def get_distance(self, items: Sequence[VisionObject], frame_width=Config.VisionConfig.DEFAULT_FRAME_WIDTH) -> list[tuple[Literal["left", "right"], float]]:
+    def get_distance(self, items: Sequence[VisionObject] | np.ndarray, frame_width=Config.VisionConfig.DEFAULT_FRAME_WIDTH) -> list[tuple[Literal["left", "right"], float]]:
         center_x = frame_width // 2
 
         dists: List[Tuple[Literal["left", "right"], float]] = []
@@ -133,7 +133,7 @@ class VisionProcessor():
 
         return dists
 
-    def get_obstacle_path_x(self, obstacles: Sequence[VisionObject], wall_dists: dict[str, float], obstacle_dists: Sequence[Tuple[Literal["left", "right"], float]]) -> float:
+    def get_obstacle_path_x(self, obstacles: Sequence[VisionObject] | np.ndarray, wall_dists: dict[str, float], obstacle_dists: Sequence[Tuple[Literal["left", "right"], float]]) -> float:
         if not obstacles or not obstacle_dists:
             return 0.0
 
@@ -155,14 +155,14 @@ class VisionProcessor():
             self._obstacle_path_spline = CubicSpline(
                 [point_2[0], point_1[0]],
                 [point_2[1], point_1[1]],
-                bc_type=((1, 0), (1, 0)),
+                bc_type="(1, 0), (1, 0)",
             )
             self._obstacle_last_y = float(obstacle.y_centroid)
 
         delta_y = float(self._obstacle_last_y - obstacle.y_centroid)
         return float(self._obstacle_path_spline(delta_y))
 
-    def get_wall_distance(self, items: Sequence[VisionObject], frame_width=Config.VisionConfig.DEFAULT_FRAME_WIDTH):
+    def get_wall_distance(self, items: Sequence[VisionObject] | np.ndarray, frame_width=Config.VisionConfig.DEFAULT_FRAME_WIDTH):
         center_x = frame_width // 2
 
         wall_dists = {
@@ -205,8 +205,8 @@ class OpenChallengeVisionProcessor(VisionProcessor):
         super(OpenChallengeVisionProcessor, self).__init__(*args, **kwargs)
 
     # Bogus overwrite to disable perspective transforms on basic version
-    def _perspective_transform(self, contours: Sequence[VisionObject], colors: Sequence[str]) -> Sequence[VisionObject]:
-        return np.array([VisionObject(contour=contour, color=color) for contour, color in zip(contours, colors)])
+    def _perspective_transform(self, contours: Sequence | np.ndarray, colors: Sequence[str]) -> np.ndarray:
+        return np.array([VisionObject(contour=contour, color=color) for contour, color in zip(contours, colors)], dtype=object)
 
 
 class AsyncMultiprocessingVisionProcessor(VisionProcessor):
@@ -222,71 +222,99 @@ class AsyncMultiprocessingVisionProcessor(VisionProcessor):
 
     async def __aexit__(self, *args, **kwargs):  # Error handling in main loop
         if hasattr(self, "executor") and self.executor:
-            self.executor.shutdown(wait=False)
+            self.executor.shutdown()
 
-    async def find_obstacles(self, frame) -> tuple[VisionObject]:
+    async def find_obstacles(self, frame): # pyright: ignore[reportIncompatibleMethodOverride]
         return await self.loop.run_in_executor(self.executor, super(AsyncMultiprocessingVisionProcessor, self).find_obstacles, frame)
 
-    async def check_field_bonds(self, frame):
+    async def check_field_bonds(self, frame): # pyright: ignore[reportIncompatibleMethodOverride]
         return await self.loop.run_in_executor(self.executor, super(AsyncMultiprocessingVisionProcessor, self).check_field_bonds, frame)
 
-    async def check_corner_lines(self, frame):
+    async def check_corner_lines(self, frame): # pyright: ignore[reportIncompatibleMethodOverride]
         return await self.loop.run_in_executor(self.executor, super(AsyncMultiprocessingVisionProcessor, self).check_corner_lines, frame)
 
-    async def find_walls(self, frame):
+    async def find_walls(self, frame): # pyright: ignore[reportIncompatibleMethodOverride]
         return await self.loop.run_in_executor(self.executor, super(AsyncMultiprocessingVisionProcessor, self).find_walls, frame)
 
-    async def get_distance(self, items: Sequence[VisionObject], frame_width=Config.VisionConfig.DEFAULT_FRAME_WIDTH):
+    async def get_distance(self, items: Sequence[VisionObject], frame_width=Config.VisionConfig.DEFAULT_FRAME_WIDTH): # pyright: ignore[reportIncompatibleMethodOverride]
         return await self.loop.run_in_executor(self.executor, super(AsyncMultiprocessingVisionProcessor, self).get_distance, items, frame_width)
 
-    async def get_wall_distance(self, walls: Sequence[VisionObject], frame_width=Config.VisionConfig.DEFAULT_FRAME_WIDTH):
+    async def get_wall_distance(self, walls: Sequence[VisionObject], frame_width=Config.VisionConfig.DEFAULT_FRAME_WIDTH): # pyright: ignore[reportIncompatibleMethodOverride]
         return await self.loop.run_in_executor(self.executor, super(AsyncMultiprocessingVisionProcessor, self).get_wall_distance, walls, frame_width)
 
-    async def get_obstacle_path_x(self, obstacles: Sequence[VisionObject], wall_dists: dict[str, float], obstacle_dists: Sequence[Tuple[Literal["left", "right"], float]]):
+    async def get_obstacle_path_x(self, obstacles: Sequence[VisionObject], wall_dists: dict[str, float], obstacle_dists: Sequence[Tuple[Literal["left", "right"], float]]): # pyright: ignore[reportIncompatibleMethodOverride]
         return await self.loop.run_in_executor(self.executor, super(AsyncMultiprocessingVisionProcessor, self).get_obstacle_path_x, obstacles, wall_dists, obstacle_dists)
 
-    async def comprehensive_analysis(self, shm_name: str, receiver: Connection, sender: Connection, ) -> NoReturn:
-        shm = shared_memory.SharedMemory(name=shm_name)
-        frame_width = Config.VisionConfig.ANALYSIS_FRAME_WIDTH
-        frame_height = Config.VisionConfig.ANALYSIS_FRAME_HEIGHT
-        frame_channels = Config.VisionConfig.ANALYSIS_FRAME_CHANNELS
-        frame_size = frame_width * frame_height * frame_channels
+    async def comprehensive_analysis(self, shm_name: str, receiver: Connection, sender: Connection, ) -> None: # pyright: ignore[reportIncompatibleMethodOverride]
 
-        async for _ in AsyncMultiprocessingVisionProcessor.async_pipe_reader(receiver):
-            frame = np.ndarray((frame_height, frame_width, frame_channels),
-                               dtype=np.uint8, buffer=shm.buf[:frame_size])
-            round1 = [
-                self.check_field_bonds(frame),
-                self.find_walls(frame),
-                self.find_obstacles(frame),
-                self.check_corner_lines(frame)
-            ]
-            zone, walls, obstacles, corner_lines = await asyncio.gather(*round1)
-            round2 = [
-                self.get_wall_distance(walls),
-                self.get_distance(obstacles)
-            ]
-            wall_dists, obstacle_dists = await asyncio.gather(*round2)
-            # obstacle_path_x = await self.get_obstacle_path_x(obstacles, wall_dists, obstacle_dists)
+        shm = None
 
-            sender.send((zone, walls, obstacles, corner_lines,
-                        wall_dists, obstacle_dists,))
+        try:
+            shm = shared_memory.SharedMemory(name=shm_name)
+            frame_width = Config.CameraConfig.OUTPUT_WIDTH
+            frame_height = Config.CameraConfig.OUTPUT_HEIGHT - Config.CameraConfig.INITIAL_ROI
+            frame_channels = Config.CameraConfig.OUTPUT_CHANNELS
+            frame_size = frame_width * frame_height * frame_channels
+
+            assert shm is not None, "Why didn't shm raise?" # Mostly just because pyright keeps thinking
+            # that shm can be none in the loop when that is impossible because if shm init fails it just goes
+            # to the except or finally block, and if it succeeds then shm is not None, so this assert is just to shut pyright up
+            async for _ in AsyncMultiprocessingVisionProcessor.async_pipe_reader(receiver):
+                frame = np.ndarray((frame_height, frame_width, frame_channels),
+                                dtype=np.uint8, buffer=shm.buf[:frame_size]) # pyright: ignore[reportOptionalSubscript]
+                round1 = [
+                    self.check_field_bonds(frame),
+                    self.find_walls(frame),
+                    self.find_obstacles(frame),
+                    self.check_corner_lines(frame)
+                ]
+                zone, walls, obstacles, corner_lines = await asyncio.gather(*round1)
+                round2 = [
+                    self.get_wall_distance(walls),
+                    self.get_distance(obstacles)
+                ]
+                wall_dists, obstacle_dists = await asyncio.gather(*round2)
+                # obstacle_path_x = await self.get_obstacle_path_x(obstacles, wall_dists, obstacle_dists)
+
+                sender.send((zone, walls, obstacles, corner_lines,
+                            wall_dists, obstacle_dists,))
+        except (OSError, EOFError) as e:
+            logger.info(f"Pipe broken or shared memory closed, shutting down vision processor: {e}")
+        except Exception as e:
+            logger.exception(f"Vision processor crashed unexpectedly: {e}")
+        finally:
+            shm.close() if shm else None
+
 
     @staticmethod
     async def async_pipe_reader(receiver: Connection):
-        loop = asyncio.get_event_loop()
-        data_event = asyncio.Event()
+        loop = asyncio.get_running_loop()
 
-        def yielder(): return data_event.set()
-        loop.add_reader(receiver.fileno(), yielder)
+        try:
+            data_event = asyncio.Event()
 
-        while True:
-            await data_event.wait()
+            def yielder():
+                data_event.set()
 
-            while receiver.poll():
-                yield receiver.recv()
+            loop.add_reader(receiver.fileno(), yielder)
 
-            data_event.clear()
+            try:
+                while True:
+                    await data_event.wait()
+
+                    while receiver.poll():
+                        yield receiver.recv()
+
+                    data_event.clear()
+            finally:
+                loop.remove_reader(receiver.fileno())
+        except NotImplementedError:
+            while True:
+                try:
+                    data = await loop.run_in_executor(None, receiver.recv)
+                except (EOFError, OSError):
+                    break
+                yield data
 
     @staticmethod
     def get_perspective_transform():
@@ -312,29 +340,39 @@ class OpenChallengeAsyncMultiprocessingVisionProcessor(AsyncMultiprocessingVisio
         super(OpenChallengeAsyncMultiprocessingVisionProcessor,
               self).__init__(*args, **kwargs)
 
-    def _perspective_transform(self, contours: np.ndarray, colors: Sequence[str]) -> np.ndarray[VisionObject]:
+    def _perspective_transform(self, contours: np.ndarray, colors: Sequence[str]) -> np.ndarray:
         return np.array([VisionObject(contour=contour, color=color) for contour, color in zip(contours, colors)])
 
     async def comprehensive_analysis(self, shm_name: str, receiver: Connection, sender: Connection) -> None:
-        shm = shared_memory.SharedMemory(name=shm_name)
-        frame_width = Config.VisionConfig.ANALYSIS_FRAME_WIDTH
-        frame_height = Config.VisionConfig.ANALYSIS_FRAME_HEIGHT
-        frame_channels = Config.VisionConfig.ANALYSIS_FRAME_CHANNELS
-        frame_size = frame_width * frame_height * frame_channels
+        shm = None
 
-        async for _ in AsyncMultiprocessingVisionProcessor.async_pipe_reader(receiver):
-            frame = np.ndarray((frame_height, frame_width, frame_channels),
-                               dtype=np.uint8, buffer=shm.buf[:frame_size])
-            round1 = [
-                self.check_field_bonds(frame),
-                self.find_walls(frame),
-                self.check_corner_lines(frame)
-            ]
-            zone, walls, corner_lines = await asyncio.gather(*round1)
-            round2 = [
-                self.get_wall_distance(walls),
-            ]
-            wall_dists, = await asyncio.gather(*round2)
+        try:
+            shm = shared_memory.SharedMemory(name=shm_name)
+            frame_width = Config.CameraConfig.OUTPUT_WIDTH
+            frame_height = Config.CameraConfig.OUTPUT_HEIGHT - Config.CameraConfig.INITIAL_ROI
+            frame_channels = Config.CameraConfig.OUTPUT_CHANNELS
+            frame_size = frame_width * frame_height * frame_channels
 
-            # Removed obstacle data for open challenge
-            sender.send((zone, walls, corner_lines, wall_dists))
+            assert shm is not None, "Why didn't shm raise?" # Fuck you pyright
+            async for _ in AsyncMultiprocessingVisionProcessor.async_pipe_reader(receiver):
+                frame = np.ndarray((frame_height, frame_width, frame_channels),
+                                dtype=np.uint8, buffer=shm.buf[:frame_size]) # pyright: ignore[reportOptionalSubscript]
+                round1 = [
+                    self.check_field_bonds(frame),
+                    self.find_walls(frame),
+                    self.check_corner_lines(frame)
+                ]
+                zone, walls, corner_lines = await asyncio.gather(*round1)
+                round2 = [
+                    self.get_wall_distance(walls),
+                ]
+                wall_dists, = await asyncio.gather(*round2)
+
+                # Removed obstacle data for open challenge
+                sender.send((zone, walls, corner_lines, wall_dists))
+        except (OSError, EOFError) as e:
+            logger.info(f"Pipe broken or shared memory closed, shutting down no-perspective processor: {e}")
+        except Exception as e:
+            logger.exception(f"No-perspective vision processor crashed unexpectedly: {e}")
+        finally:
+            shm.close() if shm else None

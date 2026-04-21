@@ -1,14 +1,14 @@
 import asyncio
 from typing import Literal
-from loguru import logger
-from src.commProtocol import Client
-from src.visionProcessing import OpenChallengeAsyncMultiprocessingVisionProcessor, VisionObject
-from src.asyncCamera import AsyncCamera
-from src.controller import PD
+from src import logger
+from src.modules.commProtocol import Client
+from src.modules.visionProcessing import OpenChallengeAsyncMultiprocessingVisionProcessor, VisionObject
+from src.modules.asyncCamera import AsyncCamera
+from src.modules.controller import PD
 import multiprocessing as mp
 from multiprocessing import shared_memory
 from multiprocessing.connection import Connection
-from src.config import Config
+from src.modules.config import Config
 from numpy import isinf
 
 
@@ -36,6 +36,8 @@ async def run_open_challenge():
         state: Literal["Follow wall", "Turn", "Hybrid"] = "Follow wall"
         state_history = [state, 0]  # tracks how long we've been in a state
         turn_counter = 0
+
+        camera_process, vision_process, shm = None, None, None
 
         try:
             # Make sure it has exactly the size we need, and is empty")
@@ -68,7 +70,7 @@ async def run_open_challenge():
 
             # Camera process dumps frames into shared memory, and sends a signal through cam_sender when a new frame is ready.
             # Vision process polls cam_receiver and sends results through data_sender.
-            # Saticmethod data_yielder polls the data_receiver for data and yeilds it to to the main loop.
+            # Saticmethod data_yielder polls the data_receiver for data and yields it to to the main loop.
 
             async for zone, walls, corner_lines, wall_x_diffs in OpenChallengeAsyncMultiprocessingVisionProcessor.async_pipe_reader(data_receiver):
 
@@ -109,7 +111,7 @@ async def run_open_challenge():
                                     turn_correction,
                                     Config.OpenChallengeConfig.DRIVE_COMMAND_DURATION,
                                 )
-                            )  # I really hopy my dt is at lot less then 0.1s, this is so it keeps going for a bit
+                            )  # I really hope my dt is a lot less than 0.1s; this is so it keeps going for a bit
                             # If like something silly happens with the os or some of my other processes
                             # Also add dynamic speed calculation and dynamic dt calculation
 
@@ -121,7 +123,7 @@ async def run_open_challenge():
                         # We know that the corner lines are still good from the previous condition, so we can use hybrid mode
                         elif not any(isinf(x_diff) for x_diff in wall_x_diffs.values()):
                             wall_follow.previous_error = 0
-                            state = "hybrid"
+                            state = "Hybrid"
 
                         else:
                             turn_correction = corner_turn_controller.tick(
@@ -175,14 +177,14 @@ async def run_open_challenge():
                 "Terminating processes and destroying shared memory... ")
             try:
                 await client.drive_motors(0, 0, 0)  # Stop the robot
-                camera_process.terminate() if camera_process.is_alive() else None
-                vision_process.terminate() if vision_process.is_alive() else None
+                camera_process.terminate() if camera_process and camera_process.is_alive() else None
+                vision_process.terminate() if vision_process and vision_process.is_alive() else None
                 camera_process.join(
-                    timeout=1) if camera_process.is_alive() else None
+                    timeout=1) if camera_process and camera_process.is_alive() else None
                 vision_process.join(
-                    timeout=1) if vision_process.is_alive() else None
-                shm.close()
-                shm.unlink()
+                    timeout=1) if vision_process and vision_process.is_alive() else None
+                shm.close() if shm else None
+                shm.unlink() if shm else None
                 logger.info("Done")
             except Exception as e:
                 logger.error(f"Error during cleanup: {e}")

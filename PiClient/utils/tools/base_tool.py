@@ -4,9 +4,9 @@ import multiprocessing as mp
 from multiprocessing import shared_memory
 import cv2
 from utils import logger
-from src.visionProcessing import VisionObject, AsyncMultiprocessingVisionProcessor, OpenChallengeAsyncMultiprocessingVisionProcessor
-from src.asyncCamera import AsyncCamera
-from src.config import Config
+from src.modules.visionProcessing import VisionObject, AsyncMultiprocessingVisionProcessor, OpenChallengeAsyncMultiprocessingVisionProcessor
+from src.modules.camera_factory import get_camera_class
+from src.modules.config import Config
 import numpy as np
 
 
@@ -14,12 +14,22 @@ class BaseTool:
     def __init__(self, name, description):
         self.name = name
         self.description = description
+        self._created_windows: set[str] = set()
         self.frame = np.zeros((Config.CameraConfig.OUTPUT_HEIGHT - Config.CameraConfig.INITIAL_ROI,
                               Config.CameraConfig.OUTPUT_WIDTH, Config.CameraConfig.OUTPUT_CHANNELS), dtype=np.uint8)
 
+    def _ensure_windows(self, *names):
+        for name in names:
+            cv2.namedWindow(name, cv2.WINDOW_NORMAL)
+
+        placeholder = np.zeros_like(self.frame)
+        for name in names:
+            cv2.imshow(name, placeholder)
+
     def _draw_vision_object(self, object: VisionObject, color: tuple, frame):
         if not isinstance(frame, np.ndarray) or frame.shape != (Config.CameraConfig.OUTPUT_HEIGHT - Config.CameraConfig.INITIAL_ROI, Config.CameraConfig.OUTPUT_WIDTH, Config.CameraConfig.OUTPUT_CHANNELS,):
-            logger.warning("Frame may have been mishaped due to race condition on shared memory, skipping draw to avoid crash")
+            logger.warning(
+                "Frame may have been mishaped due to race condition on shared memory, skipping draw to avoid crash")
             return
         contour = object.contour
         if contour is not None:
@@ -43,7 +53,8 @@ class BaseTool:
 
     def _camera_process_manager(self, shm_name: str, sender: Connection, *args, **kwargs):
         async def _run(*args, **kwargs):
-            async with AsyncCamera() as camera:
+            CameraClass = get_camera_class()
+            async with CameraClass() as camera:
                 await camera.stream(shm_name, sender, *args, **kwargs)
 
         asyncio.run(_run())
@@ -57,11 +68,42 @@ class BaseTool:
 
     async def run(self, *args, **kwargs):
         shm, camera_process, vision_process, no_perspective_vision_process = None, None, None, None
+        shm_frame_bytes = (
+            Config.CameraConfig.OUTPUT_WIDTH
+            * (Config.CameraConfig.OUTPUT_HEIGHT - Config.CameraConfig.INITIAL_ROI)
+            * Config.CameraConfig.OUTPUT_CHANNELS
+        )
 
         try:
             logger.info(f"Running {self.name} tool...")
-            shm = shared_memory.SharedMemory(name=f"{self.name}_shm", create=True, size=Config.CameraConfig.OUTPUT_WIDTH * (
-                Config.CameraConfig.OUTPUT_HEIGHT - Config.CameraConfig.INITIAL_ROI) * Config.CameraConfig.OUTPUT_CHANNELS + 128)
+
+            try:
+                shm = shared_memory.SharedMemory(
+                    name=f"{self.name}_shm",
+                    create=True,
+                    size=shm_frame_bytes,
+                )
+            except FileExistsError:
+                logger.warning(
+                    f"Shared memory segment {self.name}_shm already exists, attempting to clean up and recreate...")
+                try:
+                    existing_shm = shared_memory.SharedMemory(
+                        name=f"{self.name}_shm")
+                    existing_shm.close()
+                    existing_shm.unlink()
+                    logger.info(
+                        f"Cleaned up existing shared memory segment, retrying creation...")
+                except Exception as e:
+                    logger.error(
+                        f"Failed to clean up existing shared memory segment: {e}")
+                    raise RuntimeError(
+                        f"Could not create shared memory segment for tool {self.name} and failed to clean up existing segment. Manual cleanup may be required. Original error: {e}")
+                shm = shared_memory.SharedMemory(
+                    name=f"{self.name}_shm",
+                    create=True,
+                    size=shm_frame_bytes,
+                )
+
             camera_sender, camera_receiver = mp.Pipe()
             vision_sender, vision_receiver = mp.Pipe()
             no_perspective_camera_sender, no_perspective_camera_receiver = mp.Pipe()
@@ -78,20 +120,74 @@ class BaseTool:
             vision_process.start()
             no_perspective_vision_process.start()
 
+            if not camera_process.is_alive() or not vision_process.is_alive() or not no_perspective_vision_process.is_alive():
+                logger.error(
+                    "One or more processes failed to start correctly.")
+                return
+
             vision_reader = AsyncMultiprocessingVisionProcessor.async_pipe_reader(
                 vision_receiver)
             no_perspective_reader = AsyncMultiprocessingVisionProcessor.async_pipe_reader(
                 no_perspective_vision_receiver)
             vision_iter = vision_reader.__aiter__()
             no_perspective_iter = no_perspective_reader.__aiter__()
+            read_timeout = 1.0
+            latest_data = None
+            latest_no_perspective_data = None
+            vision_task = asyncio.create_task(anext(vision_iter))
+            no_perspective_task = asyncio.create_task(
+                anext(no_perspective_iter))
 
             while True:
                 try:
-                    data, perspectivless_data = await asyncio.gather( # It's okay if the data is one or two frames older or newer, or if a frame is chopped occasionally, humans eyes don't care about that
-                        anext(vision_iter),
-                        anext(no_perspective_iter),
+                    done, _ = await asyncio.wait(
+                        {vision_task, no_perspective_task},
+                        timeout=read_timeout,
+                        return_when=asyncio.FIRST_COMPLETED,
                     )
+
+                    if not done:
+                        if cv2.waitKey(1) & 0xFF in (ord("q"), 27):
+                            logger.info(
+                                f"Tool {self.name} received close key, shutting down...")
+                            break
+                        raise asyncio.TimeoutError
+
+                    for completed in done:
+                        if completed is vision_task:
+                            latest_data = completed.result()
+                            vision_task = asyncio.create_task(
+                                anext(vision_iter))
+                        elif completed is no_perspective_task:
+                            latest_no_perspective_data = completed.result()
+                            no_perspective_task = asyncio.create_task(
+                                anext(no_perspective_iter))
+
+                    if latest_data is None or latest_no_perspective_data is None:
+                        if cv2.waitKey(1) & 0xFF in (ord("q"), 27):
+                            logger.info(
+                                f"Tool {self.name} received close key, shutting down...")
+                            break
+                        continue
+                except asyncio.TimeoutError:
+                    process_states = {
+                        "camera": camera_process.is_alive() if camera_process else False,
+                        "vision": vision_process.is_alive() if vision_process else False,
+                        "no_perspective_vision": no_perspective_vision_process.is_alive() if no_perspective_vision_process else False,
+                    }
+                    if not all(process_states.values()):
+                        logger.error(
+                            f"Tool {self.name} stalled and one or more child processes died: "
+                            f"alive={process_states}, exitcodes="
+                            f"camera={camera_process.exitcode if camera_process else None}, "
+                            f"vision={vision_process.exitcode if vision_process else None}, "
+                            f"no_perspective_vision={no_perspective_vision_process.exitcode if no_perspective_vision_process else None}"
+                        )
+                        break
+                    continue
                 except StopAsyncIteration:
+                    logger.info(
+                        f"No more data, terminating tool {self.name}...")
                     break
                 self.frame = cv2.cvtColor(np.frombuffer(shm.buf, dtype=np.uint8)
                                           .reshape((
@@ -101,10 +197,20 @@ class BaseTool:
                                               Config.CameraConfig.OUTPUT_CHANNELS,
                                               # Copy to avoid shared memory issues
                                           )), cv2.COLOR_BGR2RGB).copy()
-                self._draw(data, *args, **kwargs)
-                self._draw_no_perspective(perspectivless_data, *args, **kwargs)
+                self._draw(latest_data, *args, **kwargs)
+                self._draw_no_perspective(
+                    latest_no_perspective_data, *args, **kwargs)
+                if cv2.waitKey(1) & 0xFF in (ord("q"), 27):
+                    logger.info(
+                        f"Tool {self.name} received close key, shutting down...")
+                    break
+            for pending in (vision_task, no_perspective_task):
+                if pending and not pending.done():
+                    pending.cancel()
+            await asyncio.gather(vision_task, no_perspective_task, return_exceptions=True)
         except asyncio.CancelledError:
-            logger.info(f"Tool {self.name} shutting down. Press Ctrl+C again to skip graceful shutdown")
+            logger.info(
+                f"Tool {self.name} shutting down. Press Ctrl+C again to skip graceful shutdown")
             raise
         finally:
             logger.info(
@@ -116,11 +222,11 @@ class BaseTool:
                 no_perspective_vision_process.terminate(
                 ) if no_perspective_vision_process and no_perspective_vision_process.is_alive() else None
                 camera_process.join(
-                    timeout=1) if camera_process and camera_process.is_alive() else None
+                    timeout=1) if camera_process else None
                 vision_process.join(
-                    timeout=1) if vision_process and vision_process.is_alive() else None
+                    timeout=1) if vision_process else None
                 no_perspective_vision_process.join(
-                    timeout=1) if no_perspective_vision_process and no_perspective_vision_process.is_alive() else None
+                    timeout=1) if no_perspective_vision_process else None
                 shm.close()
                 shm.unlink()
                 logger.info("Done")

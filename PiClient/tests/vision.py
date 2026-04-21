@@ -1,21 +1,16 @@
 import asyncio
 import numpy as np
 import cv2
-from src.asyncCamera import AsyncCamera
-from src.visionProcessing import VisionObject
-from src.visionProcessing import AsyncMultiprocessingVisionProcessor
-from loguru import logger
+from src.modules.asyncCamera import AsyncCamera
+from src.modules.config import Config
+
+from src.modules.visionProcessing import VisionObject
+from src.modules.visionProcessing import AsyncMultiprocessingVisionProcessor
+from src import logger
 import multiprocessing as mp
 from multiprocessing import shared_memory
 import sys
 import time
-
-logger.remove()
-logger.add("vision.log", rotation="1 MB", retention="10 days", level="INFO")
-logger.add(sys.stdout, level="INFO",
-           filter=lambda record: record["level"].no < logger.level("ERROR").no)
-logger.add(sys.stderr, level="ERROR")
-
 
 def _draw_detections(frame, zone, walls, obstacles, corner_lines, wall_dists, obstacle_dists):
     color_map = {
@@ -81,8 +76,10 @@ def _draw_detections(frame, zone, walls, obstacles, corner_lines, wall_dists, ob
 
 logger.remove()
 logger.add("vision.log", rotation="1 MB", retention="10 days", level="INFO")
-logger.add(sys.stdout, level="INFO", filter=lambda record: record["level"].no < logger.level("ERROR").no)
+logger.add(sys.stdout, level="INFO",
+           filter=lambda record: record["level"].no < logger.level("ERROR").no)
 logger.add(sys.stderr, level="ERROR")
+
 
 def camera(shm, sender):
     async def _run():
@@ -103,7 +100,8 @@ def vision(shm, frameReceiver, data_sender):
 async def run_tests():
     logger.info("Starting Vision Unittest...")
     shm_name = "frameBuffer"
-    shm_size = 384*512*3 + 128  # Frame + 128 bytes margin
+    shm_size = (Config.CameraConfig.OUTPUT_HEIGHT - Config.CameraConfig.INITIAL_ROI) * \
+        Config.CameraConfig.OUTPUT_WIDTH * Config.CameraConfig.OUTPUT_CHANNELS + 128
 
     try:
         shm = shared_memory.SharedMemory(
@@ -140,7 +138,8 @@ async def run_tests():
                 frame_counter += 1
                 if frame_counter % 30 == 0:
                     elapsed = (time.perf_counter() - window_start) * 1000
-                    fps = 30 / (elapsed / 1000) if elapsed > 0 else float("inf")
+                    fps = 30 / \
+                        (elapsed / 1000) if elapsed > 0 else float("inf")
                     logger.success(
                         f"Successfully processed 30 frames: Average Framerate {fps:.2f} fps.")
                     window_start = time.perf_counter()  # reset timer after each batch of 30 frames
@@ -174,7 +173,7 @@ async def run_tests():
                 f"Corner Lines: {corner_lines} \n"
                 f"Wall distances {wall_dists} \n"
                 f"Obstacle Distances {obstacle_dists} \n")
-                # f"Obstacle Path X {obstacle_path_x} \n")
+            # f"Obstacle Path X {obstacle_path_x} \n")
 
             frame = np.ndarray((384, 512, 3), dtype=np.uint8,
                                buffer=shm.buf[:384 * 512 * 3]).copy()

@@ -1,5 +1,5 @@
 import cv2
-from src.config import Config
+from src.modules.config import Config
 from utils.tools.base_tool import BaseTool
 
 class ContoursTool(BaseTool):

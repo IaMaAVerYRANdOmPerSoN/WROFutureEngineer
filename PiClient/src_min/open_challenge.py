@@ -1,12 +1,11 @@
-from typing import Literal, Sequence
+from typing import Literal
 from math import isinf
-import numpy as np
-from loguru import logger
-from .camera import Camera
-from .commProtocol import Client
-from .controller import PD
-from .visionProcessing import VisionObject, VisionProcessor
-from .config import Config
+from src_min import logger
+from src_min.camera import Camera
+from src_min.commProtocol import Client
+from src_min.controller import PD
+from src_min.visionProcessing import VisionObject, VisionProcessor
+from src_min.config import Config
 
 
 def run_open_challenge():
@@ -130,12 +129,3 @@ def run_open_challenge():
             logger.info("Stopping...")
             client.drive_motors(0, 0, 0)  # Stop the robot
             logger.success("Done")
-
-
-class OpenChallengeVisionProcessor(VisionProcessor):
-    def __init__(self, *args, **kwargs):
-        super(OpenChallengeVisionProcessor, self).__init__(*args, **kwargs)
-
-    # Bogus overwrite to disable perspective transforms on basic version
-    def _perspective_transform(self, contours: Sequence[VisionObject], colors: Sequence[str]) -> Sequence[VisionObject]:
-        return np.array([VisionObject(contour=contour, color=color) for contour, color in zip(contours, colors)])

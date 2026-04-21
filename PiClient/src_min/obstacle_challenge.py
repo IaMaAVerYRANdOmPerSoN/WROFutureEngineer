@@ -1,5 +1,5 @@
 from typing import Literal
-from loguru import logger
+from src_min import logger
 from .camera import Camera
 from .commProtocol import Client
 from .controller import PD

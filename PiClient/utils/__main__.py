@@ -81,7 +81,7 @@ async def main():
             # OS cleans up shared memory on process termination (apparently?!)
             # ftr I don't belive that so
             try:
-                shared_memory._cleanup()
+                shared_memory._cleanup() # type: ignore Please don't file 67 issues saying that i'm calling a private method
             except Exception:
                 pass
 

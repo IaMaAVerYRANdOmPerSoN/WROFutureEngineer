@@ -1,8 +1,8 @@
 # Test Passed.
 import asyncio
 import sys
-from loguru import logger
-from src.commProtocol import Client
+from src import logger
+from src.modules.commProtocol import Client
 
 
 async def blink_led_test_pattern(client: Client):

@@ -3,7 +3,7 @@ import re
 import time
 import numpy as np
 from itertools import cycle
-from loguru import logger
+from src_min import logger
 from .config import Config
 
 

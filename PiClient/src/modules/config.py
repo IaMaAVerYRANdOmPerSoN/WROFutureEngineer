@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
-from typing import Dict
+from typing import ClassVar, Dict, Tuple
+import numpy as np
 
 
 class Config():
@@ -17,7 +18,7 @@ class Config():
         EXECUTOR_THREADS: int = 3
         MAX_CONCURRENT_CAPTURES: int = 2
         BUFFER_COUNT: int = 2
-        HW_INIT_TIMEOUT: float = 2.0
+        HW_INIT_TIMEOUT: float = 5.0
         CONFIGURE_TIMEOUT: float = 1.0
         START_TIMEOUT: float = 1.0
         CAPTURE_RETRY_SLEEP_SECONDS: float = 0.03
@@ -52,22 +53,21 @@ class Config():
 
     @dataclass
     class VisionConfig():
-        PERSPECTIVE_TRANSFORM: tuple = (
-            (0, 0, 0),
-            (0, 0, 0),
-            (0, 0, 0)
-            # 3x3 homography matrix use VisionProcessor.get_perspective_transform() to set this up with actual points
-        )
+        PERSPECTIVE_TRANSFORM: ClassVar[np.ndarray] = np.array([
+            [1, 0, 0],
+            [0, 1, 0],
+            [0, 0, 1]
+        ], dtype=np.float32)
         # Not tunnned, also uv plane only
         # TODO: Change this to full YUV, and autotuning soonTM (or if I get bored perhaps)
-        LOWER_BLUE: tuple = (100, 150)
-        UPPER_BLUE: tuple = (140, 255)
-        LOWER_ORANGE: tuple = (10, 100)
-        UPPER_ORANGE: tuple = (25, 255)
-        LOWER_GREEN: tuple = (40, 50)
-        UPPER_GREEN: tuple = (80, 255)
-        LOWER_RED: tuple = (0, 100)
-        UPPER_RED: tuple = (10, 255)
+        LOWER_BLUE: Tuple[int, int] = (100, 150)
+        UPPER_BLUE: Tuple[int, int] = (140, 255)
+        LOWER_ORANGE: Tuple[int, int] = (10, 100)
+        UPPER_ORANGE: Tuple[int, int] = (25, 255)
+        LOWER_GREEN: Tuple[int, int] = (40, 50)
+        UPPER_GREEN: Tuple[int, int] = (80, 255)
+        LOWER_RED: Tuple[int, int] = (0, 100)
+        UPPER_RED: Tuple[int, int] = (10, 255)
 
         # Only check y plane for black/white since we don't give a damn about color
         LOWER_BLACK: int = 0
@@ -82,8 +82,8 @@ class Config():
 
     @dataclass
     class OpenChallengeConfig():
-        WALL_FOLLOW_KPKD: tuple = (1, 0.2)
-        CORNER_TURN_KPKD: tuple = (1.2, 0.2)
+        WALL_FOLLOW_KPKD: Tuple[float, float] = (1, 0.2)
+        CORNER_TURN_KPKD: Tuple[float, float] = (1.2, 0.2)
         STRAIGHT_SPEED: float = 0.5
         TURN_SPEED: float = 0.3
         HYBRID_SPEED: float = 0.4
@@ -91,4 +91,17 @@ class Config():
         SHM_NAME: str = "camera_frame"
         SHM_SIZE: int = 512*384*3
         TURN_HYSTERESIS: int = 5
+        LAP_LENGTH_IN_TURNS: int = 4*3  # 4 turns per lap, 3 laps total
+
+    @dataclass
+    class ObstacleChallengeConfig():
+        WALL_FOLLOW_KPKD: Tuple[float, float] = (1, 0.2)
+        CORNER_TURN_KPKD: Tuple[float, float] = (1.2, 0.2)
+        OBSTACLE_AVOID_KPKD: Tuple[float, float] = (0.8, 0.1)
+        STRAIGHT_SPEED: float = 0.5
+        TURN_SPEED: float = 0.3
+        HYBRID_SPEED: float = 0.4
+        DRIVE_COMMAND_DURATION: float = 0.1
+        SHM_NAME: str = "camera_frame"
+        SHM_SIZE: int = 512*384*3
         LAP_LENGTH_IN_TURNS: int = 4*3  # 4 turns per lap, 3 laps total

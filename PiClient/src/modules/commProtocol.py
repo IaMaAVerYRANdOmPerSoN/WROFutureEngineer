@@ -2,10 +2,10 @@ import aioserial
 import asyncio
 import numpy as np
 import re
-from loguru import logger
+from src import logger
 from itertools import cycle
 from typing import NoReturn
-from src.config import Config
+from src.modules.config import Config
 
 
 class Client():
@@ -46,6 +46,8 @@ class Client():
         :param self: The instance of `Client`
         :return: `NoReturn`
         """
+        assert self.SERIAL is not None, "Serial interface not initialized. Did you forget to use the async context manager?"
+
         while True:
             line = await self.SERIAL.readline_async()
             response = line.decode('utf-8').strip()
@@ -65,12 +67,12 @@ class Client():
 
     async def __aenter__(self):
         """
-        Reserved function, automatically called on entering an `async with` or `async for` block. Intializes hardware resources
-        asyncronously.
+        Async context manager entry point that initializes the serial interface
+        and starts the background serial listener task.
 
-        :param self: The instance of
-        :return: Description
-        :rtype: list | list[str]
+        :param self: The instance of `Client`
+        :return: The current `Client` instance.
+        :rtype: Client
         """
         self.SERIAL = aioserial.AioSerial(
             self.PORT, self.BAUD, timeout=self.DEFAULT_TIMEOUT)

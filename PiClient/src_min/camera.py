@@ -1,7 +1,6 @@
 import numpy as np
-from loguru import logger
-# type: ignore TODO: Get the .pyi file from the picamera2 repo and add it to the project so my stuff gets linted.
-import picamera2
+from src_min import logger
+import picamera2 # type: ignore TODO: Get the .pyi file from the picamera2 repo and add it to the project so my stuff gets linted.
 from .config import Config
 
 

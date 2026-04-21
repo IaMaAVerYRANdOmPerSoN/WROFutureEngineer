@@ -5,10 +5,10 @@ import numpy as np
 import cv2
 import multiprocessing as mp
 from multiprocessing import shared_memory
-from src.asyncCamera import AsyncCamera
-from src.visionProcessing import AsyncMultiprocessingVisionProcessor
-from loguru import logger
-from src.config import Config
+from src.modules.asyncCamera import AsyncCamera
+from src.modules.visionProcessing import AsyncMultiprocessingVisionProcessor
+from src import logger
+from src.modules.config import Config
 
 
 async def test_single_frame():
@@ -42,7 +42,7 @@ async def test_streaming_pipe():
             Config.CameraConfig().INITIAL_ROI)
         * Config.CameraConfig().OUTPUT_WIDTH
         * Config.CameraConfig().OUTPUT_CHANNELS
-        + 100
+        + 128
     )
 
     cam_receiver, cam_sender = mp.Pipe(duplex=False)

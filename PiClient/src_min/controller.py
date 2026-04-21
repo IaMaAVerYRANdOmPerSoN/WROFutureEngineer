@@ -1,4 +1,4 @@
-from loguru import logger
+from src_min import logger
 
 
 class PD():  # No i needed, works fine in past seasons
