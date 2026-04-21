@@ -8,7 +8,6 @@ LOG_FORMAT = (
     "<level>{message}</level>"
 )
 
-
 def configure_logging(verbose: bool = False, debug: bool = False) -> None:
     """Configure shared logging sinks for the Pi client package."""
     logger.remove()
