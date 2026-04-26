@@ -1,22 +1,18 @@
 import asyncio
-import sys
 from typing import Literal
 from src import logger
-from src.modules.commProtocol import Client
-from src.modules.visionProcessing import AsyncMultiprocessingVisionProcessor, VisionObject
-from src.modules.asyncCamera import AsyncCamera
+from src.modules.comm_protocol import Client
+from src.modules.vision_processing import AsyncMultiprocessingVisionProcessor, VisionObject
 from src.modules.controller import PD
 from src.modules.config import Config
+from src.modules.subprocess_context_managers import camera_process_context_manager, vision_process_context_manager
 import multiprocessing as mp
 from multiprocessing import shared_memory
-import cv2
-import numpy as np
-
 
 async def run_obstacle_challenge():
     # Largely mirrors open challenge, just with different internal logic and states
 
-    async with Client() as client, AsyncMultiprocessingVisionProcessor() as vision, AsyncCamera() as camera:
+    async with Client() as client:
         wall_follow = PD(1, 0.2)
         obstacle_avoid = PD(1, 0.2)
         corner_turn_controller = PD(1, 0.2)
@@ -47,12 +43,12 @@ async def run_obstacle_challenge():
 
             cam_receiver, cam_sender = mp.Pipe(duplex=False)
             camera_process = mp.Process(
-                target=camera.stream, args=(cam_sender, shm.name,))
+                target=camera_process_context_manager, args=(shm.name, cam_sender,))
             camera_process.start()
 
             data_receiver, data_sender = mp.Pipe(duplex=False)
-            vision_process = mp.Process(target=vision.comprehensive_analysis, args=(
-                shm.name, data_sender, cam_receiver,))
+            vision_process = mp.Process(target=vision_process_context_manager, args=(
+                shm.name, cam_receiver, data_sender,))
             vision_process.start()
 
             # Camera process dumps frames into shared memory, and sends a signal through cam_sender when a new frame is ready.

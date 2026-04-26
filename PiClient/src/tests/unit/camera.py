@@ -5,8 +5,8 @@ import numpy as np
 import cv2
 import multiprocessing as mp
 from multiprocessing import shared_memory
-from src.modules.asyncCamera import AsyncCamera
-from src.modules.visionProcessing import AsyncMultiprocessingVisionProcessor
+from src.modules.async_camera import AsyncCamera
+from src.modules.vision_processing import AsyncMultiprocessingVisionProcessor
 from src import logger
 from src.modules.config import Config
 
@@ -42,7 +42,7 @@ async def test_streaming_pipe():
             Config.CameraConfig().INITIAL_ROI)
         * Config.CameraConfig().OUTPUT_WIDTH
         * Config.CameraConfig().OUTPUT_CHANNELS
-        + 128
+        + 100
     )
 
     cam_receiver, cam_sender = mp.Pipe(duplex=False)
@@ -55,7 +55,7 @@ async def test_streaming_pipe():
         frame_counter = 0
         window_start = time.perf_counter()
         async for result in AsyncMultiprocessingVisionProcessor.async_pipe_reader(cam_receiver):
-            if result == True:
+            if result:
                 frame = shm.buf  # simulated computation
                 frame_counter += 1
                 if frame_counter % 30 == 0:
@@ -64,7 +64,7 @@ async def test_streaming_pipe():
                     logger.success(
                         f"Successfully fetched 30 frames: Average Framerate {fps:.2f} fps.")
                     return True
-                
+
     finally:
         camera_process.terminate()
         camera_process.join()

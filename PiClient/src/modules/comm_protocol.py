@@ -4,7 +4,7 @@ import numpy as np
 import re
 from src import logger
 from itertools import cycle
-from typing import NoReturn
+from typing import Literal, NoReturn
 from src.modules.config import Config
 
 
@@ -244,7 +244,7 @@ class Client():
                 f"Received non-integer response '{response}' from request 'SERVO_ANGLE'")
             return False
 
-    async def set_led_state(self, state):  # 5
+    async def set_led_state(self, state: Literal[1, 0]):  # 5
         command = f'SET_LED {state}'
         response = await self._request(command)
         return response == '200 OK'

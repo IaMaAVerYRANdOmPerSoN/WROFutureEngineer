@@ -2,7 +2,7 @@
 import asyncio
 import sys
 from src.modules.open_challenge import run_open_challenge
-from src.obstacle_challenge import run_obstacle_challenge
+from src.modules.obstacle_challenge import run_obstacle_challenge
 import argparse
 from src import configure_logging, logger
 
@@ -21,7 +21,7 @@ def parse_args() -> argparse.Namespace:
         "--test",
         nargs="?",  # Optional
         const="all",  # Empty = "all"
-        choices=["camera", "vision", "rpc", "all"],
+        choices=["camera", "vision", "rpc", "vision_rpc", "all"],
         help="Run specific tests (default: all)",
     )
     parser.add_argument(
@@ -37,23 +37,28 @@ def parse_args() -> argparse.Namespace:
 def test_main(test_target: str):
     try:
         if test_target == "camera":
-            from tests.camera import run_tests as camera_tests
+            from src.tests.unit.camera import run_tests as camera_tests
             asyncio.run(camera_tests())
         elif test_target == "vision":
-            from tests.vision import run_tests as vision_tests
+            from src.tests.unit.vision import run_tests as vision_tests
             asyncio.run(vision_tests())
         elif test_target == "rpc":
-            from tests.RPC import run_tests as rpc_tests
+            from src.tests.unit.rpc import run_tests as rpc_tests
             asyncio.run(rpc_tests())
+        elif test_target == "vision_rpc":
+            from src.tests.integration.vision_rpc import run_tests as vision_rpc_tests
+            asyncio.run(vision_rpc_tests())
         elif test_target == "all":
-            from tests.vision import run_tests as vision_tests
-            from tests.camera import run_tests as camera_tests
-            from tests.RPC import run_tests as rpc_tests
+            from src.tests.unit.vision import run_tests as vision_tests
+            from src.tests.unit.camera import run_tests as camera_tests
+            from src.tests.unit.rpc import run_tests as rpc_tests
+            from src.tests.integration.vision_rpc import run_tests as vision_rpc_tests
 
             async def run_all_tests():
                 await camera_tests()
                 await vision_tests()
                 await rpc_tests()
+                await vision_rpc_tests()
             asyncio.run(run_all_tests())
         else:
             raise ValueError(

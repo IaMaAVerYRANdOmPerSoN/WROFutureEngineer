@@ -1,16 +1,19 @@
-import asyncio
 import numpy as np
 import cv2
-from src.modules.asyncCamera import AsyncCamera
-from src.modules.config import Config
-
-from src.modules.visionProcessing import VisionObject
-from src.modules.visionProcessing import AsyncMultiprocessingVisionProcessor
+from src.modules.vision_processing import VisionObject, AsyncMultiprocessingVisionProcessor
+from src.modules.subprocess_context_managers import camera_process_context_manager, vision_process_context_manager
 from src import logger
 import multiprocessing as mp
 from multiprocessing import shared_memory
 import sys
 import time
+
+logger.remove()
+logger.add("vision.log", rotation="1 MB", retention="10 days", level="INFO")
+logger.add(sys.stdout, level="INFO",
+           filter=lambda record: record["level"].no < logger.level("ERROR").no)
+logger.add(sys.stderr, level="ERROR")
+
 
 def _draw_detections(frame, zone, walls, obstacles, corner_lines, wall_dists, obstacle_dists):
     color_map = {
@@ -56,7 +59,7 @@ def _draw_detections(frame, zone, walls, obstacles, corner_lines, wall_dists, ob
     status_lines = [
         f"WallDist L:{wall_dists['left']:.1f} R:{wall_dists['right']:.1f}",
         "ObstacleDist " +
-        (", ".join(f"{side}:{dist:.1f}" for side, dist in obstacle_dists.items())
+        (", ".join(f"{side}:{dist:.1f}" for side, dist in obstacle_dists)
          if obstacle_dists else "none"),
     ]
     for i, text in enumerate(status_lines):
@@ -74,34 +77,10 @@ def _draw_detections(frame, zone, walls, obstacles, corner_lines, wall_dists, ob
     return frame
 
 
-logger.remove()
-logger.add("vision.log", rotation="1 MB", retention="10 days", level="INFO")
-logger.add(sys.stdout, level="INFO",
-           filter=lambda record: record["level"].no < logger.level("ERROR").no)
-logger.add(sys.stderr, level="ERROR")
-
-
-def camera(shm, sender):
-    async def _run():
-        async with AsyncCamera() as camera:
-            await camera.stream(shm, sender)
-
-    asyncio.run(_run())
-
-
-def vision(shm, frameReceiver, data_sender):
-    async def _run():
-        async with AsyncMultiprocessingVisionProcessor() as vision:
-            await vision.comprehensive_analysis(shm, frameReceiver, data_sender)
-
-    asyncio.run(_run())
-
-
 async def run_tests():
     logger.info("Starting Vision Unittest...")
     shm_name = "frameBuffer"
-    shm_size = (Config.CameraConfig.OUTPUT_HEIGHT - Config.CameraConfig.INITIAL_ROI) * \
-        Config.CameraConfig.OUTPUT_WIDTH * Config.CameraConfig.OUTPUT_CHANNELS + 128
+    shm_size = 384*512*3 + 128  # Frame + 128 bytes margin
 
     try:
         shm = shared_memory.SharedMemory(
@@ -122,11 +101,11 @@ async def run_tests():
     frameReceiver, frameSender = mp.Pipe(duplex=False)
     dataReceiver, dataSender = mp.Pipe(duplex=False)
 
-    camera_stream = mp.Process(group=None, target=camera, args=(
+    camera_stream = mp.Process(group=None, target=camera_process_context_manager, args=(
         shm_name, frameSender,), daemon=False)
     camera_stream.start()
 
-    data_stream = mp.Process(group=None, target=vision, args=(
+    data_stream = mp.Process(group=None, target=vision_process_context_manager, args=(
         shm_name, frameReceiver, dataSender,), daemon=False)
     data_stream.start()
 
@@ -146,14 +125,19 @@ async def run_tests():
 
                 assert isinstance(
                     zone, VisionObject) or zone is None, f"Zone is not a VisionObject or None: {type(zone)}"
+
                 assert isinstance(walls, tuple) and all(isinstance(wall, VisionObject)
                                                         for wall in walls), f"Walls is not a tuple of VisionObjects: {type(walls)} with elements {[type(wall) for wall in walls]}"
+
                 assert isinstance(obstacles, tuple) and all(isinstance(obstacle, VisionObject)
                                                             for obstacle in obstacles), f"Obstacles is not a tuple of VisionObjects: {type(obstacles)} with elements {[type(obstacle) for obstacle in obstacles]}"
+
                 assert isinstance(corner_lines, tuple) and all(isinstance(line, VisionObject)
                                                                for line in corner_lines), f"Corner lines is not a tuple of VisionObjects: {type(corner_lines)} with elements {[type(line) for line in corner_lines]}"
+
                 assert isinstance(wall_dists, dict) and all(isinstance(dist, (int, float)) for dist in wall_dists.values(
                 )), f"Wall distances is not a dict of numbers: {type(wall_dists)} with values {[type(dist) for dist in wall_dists.values()]}"
+
                 assert isinstance(obstacle_dists, list) and all(
                     isinstance(item, tuple)
                     and len(item) == 2
@@ -161,7 +145,9 @@ async def run_tests():
                     and isinstance(item[1], (int, float))
                     for item in obstacle_dists
                 ), f"Obstacle distances is not a list of (side, distance) tuples: {type(obstacle_dists)} with values {obstacle_dists}"
+
                 # assert isinstance(obstacle_path_x, (int, float)), f"Obstacle path x is not numeric: {type(obstacle_path_x)}"
+            
             except AssertionError as e:
                 logger.error(f"Data validation error: {e}")
                 continue  # Skip this frame but keep processing future frames

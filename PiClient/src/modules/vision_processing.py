@@ -155,7 +155,7 @@ class VisionProcessor():
             self._obstacle_path_spline = CubicSpline(
                 [point_2[0], point_1[0]],
                 [point_2[1], point_1[1]],
-                bc_type="(1, 0), (1, 0)",
+                bc_type=((1, 0), (1, 0)),
             )
             self._obstacle_last_y = float(obstacle.y_centroid)
 

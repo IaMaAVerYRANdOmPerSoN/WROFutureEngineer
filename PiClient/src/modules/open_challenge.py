@@ -1,27 +1,17 @@
 import asyncio
 from typing import Literal
 from src import logger
-from src.modules.commProtocol import Client
-from src.modules.visionProcessing import OpenChallengeAsyncMultiprocessingVisionProcessor, VisionObject
-from src.modules.asyncCamera import AsyncCamera
+from src.modules.comm_protocol import Client
+from src.modules.vision_processing import OpenChallengeAsyncMultiprocessingVisionProcessor, VisionObject
 from src.modules.controller import PD
+from src.modules.config import Config
+from src.modules.subprocess_context_managers import camera_process_context_manager, vision_process_context_manager
 import multiprocessing as mp
 from multiprocessing import shared_memory
-from multiprocessing.connection import Connection
-from src.modules.config import Config
 from numpy import isinf
 
-
-def stream_camera_in_subprocess(camera: AsyncCamera, *args, **kwargs):
-    asyncio.run(camera.stream(*args, **kwargs))
-
-
-def run_analysis_in_subprocess(vision: OpenChallengeAsyncMultiprocessingVisionProcessor, *args, **kwargs):
-    asyncio.run(vision.comprehensive_analysis(*args, **kwargs))
-
-
 async def run_open_challenge():
-    async with Client() as client, OpenChallengeAsyncMultiprocessingVisionProcessor() as vision, AsyncCamera() as camera:
+    async with Client() as client:
         wall_follow = PD(*Config.OpenChallengeConfig.WALL_FOLLOW_KPKD)
         corner_turn_controller = PD(
             *Config.OpenChallengeConfig.CORNER_TURN_KPKD)
@@ -60,12 +50,12 @@ async def run_open_challenge():
         try:
             cam_receiver, cam_sender = mp.Pipe(duplex=False)
             camera_process = mp.Process(
-                target=stream_camera_in_subprocess, args=(camera, shm.name, cam_sender,))
+                target=camera_process_context_manager, args=(shm.name, cam_sender,))
             camera_process.start()
 
             data_receiver, data_sender = mp.Pipe(duplex=False)
-            vision_process = mp.Process(target=run_analysis_in_subprocess, args=(
-                vision, shm.name, cam_receiver, data_sender,))
+            vision_process = mp.Process(target=vision_process_context_manager, args=(
+                shm.name, cam_receiver, data_sender,))
             vision_process.start()
 
             # Camera process dumps frames into shared memory, and sends a signal through cam_sender when a new frame is ready.

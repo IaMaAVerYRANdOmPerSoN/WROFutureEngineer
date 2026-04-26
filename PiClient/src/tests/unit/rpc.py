@@ -2,7 +2,7 @@
 import asyncio
 import sys
 from src import logger
-from src.modules.commProtocol import Client
+from src.modules.comm_protocol import Client
 
 
 async def blink_led_test_pattern(client: Client):
