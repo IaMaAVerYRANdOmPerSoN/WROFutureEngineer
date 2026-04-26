@@ -3,7 +3,8 @@ from multiprocessing.connection import Connection
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
 from src import logger
-import picamera2 # pyright: ignore[reportMissingImports] TODO: Get the .pyi file from the picamera2 repo and add it to the project so my stuff gets linted.
+# pyright: ignore[reportMissingImports] TODO: Get the .pyi file from the picamera2 repo and add it to the project so my stuff gets linted.
+import picamera2
 from multiprocessing import shared_memory
 from src.modules.config import Config
 from typing import Dict
@@ -102,7 +103,8 @@ class AsyncCamera():
                 async with self._capture_semaphore:
                     # type: ignore
                     frame: np.ndarray = await asyncio.wait_for(
-                        self.loop.run_in_executor(self.executor, self._cam.capture_array),
+                        self.loop.run_in_executor(
+                            self.executor, self._cam.capture_array),
                         timeout=timeout,
                     )
 
@@ -113,7 +115,8 @@ class AsyncCamera():
                         f"Unexpected YUV420 frame shape {frame.shape}; expected at least ({expected_rows}, {self.FRAME_WIDTH})"
                     )
 
-                packed = np.ascontiguousarray(frame[:expected_rows, :self.FRAME_WIDTH]).ravel()
+                packed = np.ascontiguousarray(
+                    frame[:expected_rows, :self.FRAME_WIDTH]).ravel()
                 y_size = self.FRAME_HEIGHT * self.FRAME_WIDTH
                 uv_size = (self.FRAME_HEIGHT // 2) * (self.FRAME_WIDTH // 2)
                 expected_size = y_size + (2 * uv_size)
@@ -122,9 +125,12 @@ class AsyncCamera():
                         f"Truncated YUV420 buffer size {packed.size}; expected at least {expected_size}"
                     )
 
-                y_plane = packed[:y_size].reshape((self.FRAME_HEIGHT, self.FRAME_WIDTH))
-                u_plane_raw = packed[y_size:y_size + uv_size].reshape((self.FRAME_HEIGHT // 2, self.FRAME_WIDTH // 2))
-                v_plane_raw = packed[y_size + uv_size:y_size + (2 * uv_size)].reshape((self.FRAME_HEIGHT // 2, self.FRAME_WIDTH // 2))
+                y_plane = packed[:y_size].reshape(
+                    (self.FRAME_HEIGHT, self.FRAME_WIDTH))
+                u_plane_raw = packed[y_size:y_size + uv_size].reshape(
+                    (self.FRAME_HEIGHT // 2, self.FRAME_WIDTH // 2))
+                v_plane_raw = packed[y_size + uv_size:y_size + (2 * uv_size)].reshape(
+                    (self.FRAME_HEIGHT // 2, self.FRAME_WIDTH // 2))
 
                 y_plane = y_plane[self.INITIAL_ROI:, :]
                 u_plane_raw = u_plane_raw[self.INITIAL_ROI // 2:, :]
@@ -181,3 +187,11 @@ class AsyncCamera():
             if args:
                 for conn in args:
                     conn.send(True)
+
+    @staticmethod
+    def camera_process_context_manager(shm, sender):
+        async def _run(shm, sender):
+            async with AsyncCamera() as camera:
+                await camera.stream(shm, sender)
+
+        asyncio.run(_run(shm, sender))

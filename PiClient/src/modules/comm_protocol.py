@@ -87,7 +87,7 @@ class Client():
     async def __aexit__(self, *args):
         if hasattr(self, "_listener_task"):
             self._listener_task.cancel()
-            self.SERIAL.close()
+            self.SERIAL.close() if self.SERIAL else None
             logger.info("Serial listener terminated without errors")
         else:
             logger.warning("No serial listener to cancel")

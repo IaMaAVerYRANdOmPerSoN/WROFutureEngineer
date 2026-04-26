@@ -9,7 +9,8 @@ class Config():
     class CameraConfig():
         FORMAT: Dict = field(default_factory=lambda: {
             "format": "YUV420",
-            "size": (512, 384)  # Camera API expects (width, height); NumPy/OpenCV arrays usually use (height, width).
+            # Camera API expects (width, height); NumPy/OpenCV arrays usually use (height, width).
+            "size": (512, 384)
         })
         OUTPUT_WIDTH: int = 512
         OUTPUT_HEIGHT: int = 384
@@ -58,7 +59,7 @@ class Config():
             [0, 1, 0],
             [0, 0, 1]
         ], dtype=np.float32)
-        # Not tunnned, also uv plane only
+        # Not tuned, also uv plane only
         # TODO: Change this to full YUV, and autotuning soonTM (or if I get bored perhaps)
         LOWER_BLUE: Tuple[int, int, int] = (35, 140, 70)
         UPPER_BLUE: Tuple[int, int, int] = (255, 200, 130)
@@ -105,3 +106,12 @@ class Config():
         SHM_NAME: str = "camera_frame"
         SHM_SIZE: int = 512*384*3
         LAP_LENGTH_IN_TURNS: int = 4*3  # 4 turns per lap, 3 laps total
+
+    @dataclass
+    class LiDARConfig():
+        SERIAL_PORT: str = '/dev/ttyAMA0'
+        SERIAL_BAUD: int = 230400
+        SERIAL_TIMEOUT: float = 0.1
+        PACKET_HEADER: int = 0x54
+        PACKET_VER_LEN: int = 0x2C
+        PACKET_LEN: int = 47

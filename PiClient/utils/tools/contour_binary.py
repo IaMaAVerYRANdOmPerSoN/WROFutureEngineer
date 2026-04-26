@@ -1,7 +1,7 @@
 from utils import cv2, logger
 from utils.tools.base_tool import BaseTool
 import numpy as np
-from src.modules.visionProcessing import VisionObject
+from src.modules.vision_processing import VisionObject
 
 class ContourBinaryTool(BaseTool):
     def __init__(self):

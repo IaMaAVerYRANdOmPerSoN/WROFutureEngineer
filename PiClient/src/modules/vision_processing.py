@@ -20,7 +20,8 @@ class VisionObject():
     color: str
 
     def __post_init__(self):
-        self.bbox: Tuple[int, int, int, int] = cv2.boundingRect(self.contour) # Added custom type stub, default type stubs use Sequence[int]
+        # Added custom type stub, default type stubs use Sequence[int]
+        self.bbox: Tuple[int, int, int, int] = cv2.boundingRect(self.contour)
         x, y, w, h = self.bbox
         self.x_centroid: float = x + w/2
         self.y_centroid: float = y + h/2
@@ -33,22 +34,34 @@ class VisionProcessor():
 
     def __init__(self):
         # I will add autotuning soonTM lol so yes these are instance variables, not class variables
-        self.LOWER_ORANGE = np.array(Config.VisionConfig.LOWER_ORANGE, dtype=np.uint8)
-        self.UPPER_ORANGE = np.array(Config.VisionConfig.UPPER_ORANGE, dtype=np.uint8)
+        self.LOWER_ORANGE = np.array(
+            Config.VisionConfig.LOWER_ORANGE, dtype=np.uint8)
+        self.UPPER_ORANGE = np.array(
+            Config.VisionConfig.UPPER_ORANGE, dtype=np.uint8)
 
-        self.LOWER_BLUE = np.array(Config.VisionConfig.LOWER_BLUE, dtype=np.uint8)
-        self.UPPER_BLUE = np.array(Config.VisionConfig.UPPER_BLUE, dtype=np.uint8)
+        self.LOWER_BLUE = np.array(
+            Config.VisionConfig.LOWER_BLUE, dtype=np.uint8)
+        self.UPPER_BLUE = np.array(
+            Config.VisionConfig.UPPER_BLUE, dtype=np.uint8)
 
-        self.LOWER_GREEN = np.array(Config.VisionConfig.LOWER_GREEN, dtype=np.uint8)
-        self.UPPER_GREEN = np.array(Config.VisionConfig.UPPER_GREEN, dtype=np.uint8)
+        self.LOWER_GREEN = np.array(
+            Config.VisionConfig.LOWER_GREEN, dtype=np.uint8)
+        self.UPPER_GREEN = np.array(
+            Config.VisionConfig.UPPER_GREEN, dtype=np.uint8)
 
-        self.LOWER_RED = np.array(Config.VisionConfig.LOWER_RED, dtype=np.uint8)
-        self.UPPER_RED = np.array(Config.VisionConfig.UPPER_RED, dtype=np.uint8)
+        self.LOWER_RED = np.array(
+            Config.VisionConfig.LOWER_RED, dtype=np.uint8)
+        self.UPPER_RED = np.array(
+            Config.VisionConfig.UPPER_RED, dtype=np.uint8)
 
-        self.LOWER_BLACK = np.array(Config.VisionConfig.LOWER_BLACK, dtype=np.uint8)
-        self.UPPER_BLACK = np.array(Config.VisionConfig.UPPER_BLACK, dtype=np.uint8)
-        self.LOWER_WHITE = np.array(Config.VisionConfig.LOWER_WHITE, dtype=np.uint8)
-        self.UPPER_WHITE = np.array(Config.VisionConfig.UPPER_WHITE, dtype=np.uint8)
+        self.LOWER_BLACK = np.array(
+            Config.VisionConfig.LOWER_BLACK, dtype=np.uint8)
+        self.UPPER_BLACK = np.array(
+            Config.VisionConfig.UPPER_BLACK, dtype=np.uint8)
+        self.LOWER_WHITE = np.array(
+            Config.VisionConfig.LOWER_WHITE, dtype=np.uint8)
+        self.UPPER_WHITE = np.array(
+            Config.VisionConfig.UPPER_WHITE, dtype=np.uint8)
 
         # Stateful obstacle trajectory approximation used by obstacle challenge.
         self._obstacle_path_frame_modulo = cycle(range(5))
@@ -155,7 +168,7 @@ class VisionProcessor():
             self._obstacle_path_spline = CubicSpline(
                 [point_2[0], point_1[0]],
                 [point_2[1], point_1[1]],
-                bc_type=((1, 0), (1, 0)),
+                bc_type="clamped",
             )
             self._obstacle_last_y = float(obstacle.y_centroid)
 
@@ -200,6 +213,7 @@ class VisionProcessor():
 
         return zone, walls, obstacles, corner_lines, wall_dists, obstacle_dists, obstacle_path_x
 
+
 class OpenChallengeVisionProcessor(VisionProcessor):
     def __init__(self, *args, **kwargs):
         super(OpenChallengeVisionProcessor, self).__init__(*args, **kwargs)
@@ -224,28 +238,36 @@ class AsyncMultiprocessingVisionProcessor(VisionProcessor):
         if hasattr(self, "executor") and self.executor:
             self.executor.shutdown()
 
-    async def find_obstacles(self, frame): # pyright: ignore[reportIncompatibleMethodOverride]
+    # pyright: ignore[reportIncompatibleMethodOverride]
+    async def find_obstacles(self, frame):
         return await self.loop.run_in_executor(self.executor, super(AsyncMultiprocessingVisionProcessor, self).find_obstacles, frame)
 
-    async def check_field_bonds(self, frame): # pyright: ignore[reportIncompatibleMethodOverride]
+    # pyright: ignore[reportIncompatibleMethodOverride]
+    async def check_field_bonds(self, frame):
         return await self.loop.run_in_executor(self.executor, super(AsyncMultiprocessingVisionProcessor, self).check_field_bonds, frame)
 
-    async def check_corner_lines(self, frame): # pyright: ignore[reportIncompatibleMethodOverride]
+    # pyright: ignore[reportIncompatibleMethodOverride]
+    async def check_corner_lines(self, frame):
         return await self.loop.run_in_executor(self.executor, super(AsyncMultiprocessingVisionProcessor, self).check_corner_lines, frame)
 
-    async def find_walls(self, frame): # pyright: ignore[reportIncompatibleMethodOverride]
+    # pyright: ignore[reportIncompatibleMethodOverride]
+    async def find_walls(self, frame):
         return await self.loop.run_in_executor(self.executor, super(AsyncMultiprocessingVisionProcessor, self).find_walls, frame)
 
-    async def get_distance(self, items: Sequence[VisionObject], frame_width=Config.VisionConfig.DEFAULT_FRAME_WIDTH): # pyright: ignore[reportIncompatibleMethodOverride]
+    # pyright: ignore[reportIncompatibleMethodOverride]
+    async def get_distance(self, items: Sequence[VisionObject], frame_width=Config.VisionConfig.DEFAULT_FRAME_WIDTH):
         return await self.loop.run_in_executor(self.executor, super(AsyncMultiprocessingVisionProcessor, self).get_distance, items, frame_width)
 
-    async def get_wall_distance(self, walls: Sequence[VisionObject], frame_width=Config.VisionConfig.DEFAULT_FRAME_WIDTH): # pyright: ignore[reportIncompatibleMethodOverride]
+    # pyright: ignore[reportIncompatibleMethodOverride]
+    async def get_wall_distance(self, walls: Sequence[VisionObject], frame_width=Config.VisionConfig.DEFAULT_FRAME_WIDTH):
         return await self.loop.run_in_executor(self.executor, super(AsyncMultiprocessingVisionProcessor, self).get_wall_distance, walls, frame_width)
 
-    async def get_obstacle_path_x(self, obstacles: Sequence[VisionObject], wall_dists: dict[str, float], obstacle_dists: Sequence[Tuple[Literal["left", "right"], float]]): # pyright: ignore[reportIncompatibleMethodOverride]
+    # pyright: ignore[reportIncompatibleMethodOverride]
+    async def get_obstacle_path_x(self, obstacles: Sequence[VisionObject], wall_dists: dict[str, float], obstacle_dists: Sequence[Tuple[Literal["left", "right"], float]]):
         return await self.loop.run_in_executor(self.executor, super(AsyncMultiprocessingVisionProcessor, self).get_obstacle_path_x, obstacles, wall_dists, obstacle_dists)
 
-    async def comprehensive_analysis(self, shm_name: str, receiver: Connection, sender: Connection, ) -> None: # pyright: ignore[reportIncompatibleMethodOverride]
+    # pyright: ignore[reportIncompatibleMethodOverride]
+    async def comprehensive_analysis(self, shm_name: str, receiver: Connection, sender: Connection, ) -> None:
 
         shm = None
 
@@ -256,12 +278,14 @@ class AsyncMultiprocessingVisionProcessor(VisionProcessor):
             frame_channels = Config.CameraConfig.OUTPUT_CHANNELS
             frame_size = frame_width * frame_height * frame_channels
 
-            assert shm is not None, "Why didn't shm raise?" # Mostly just because pyright keeps thinking
+            # Mostly just because pyright keeps thinking
+            assert shm is not None, "Why didn't shm raise?"
             # that shm can be none in the loop when that is impossible because if shm init fails it just goes
             # to the except or finally block, and if it succeeds then shm is not None, so this assert is just to shut pyright up
             async for _ in AsyncMultiprocessingVisionProcessor.async_pipe_reader(receiver):
                 frame = np.ndarray((frame_height, frame_width, frame_channels),
-                                dtype=np.uint8, buffer=shm.buf[:frame_size]) # pyright: ignore[reportOptionalSubscript]
+                                   # pyright: ignore[reportOptionalSubscript]
+                                   dtype=np.uint8, buffer=shm.buf[:frame_size])
                 round1 = [
                     self.check_field_bonds(frame),
                     self.find_walls(frame),
@@ -279,12 +303,12 @@ class AsyncMultiprocessingVisionProcessor(VisionProcessor):
                 await self.loop.run_in_executor(None, sender.send,
                     (zone, walls, obstacles, corner_lines, wall_dists, obstacle_dists,))
         except (OSError, EOFError) as e:
-            logger.info(f"Pipe broken or shared memory closed, shutting down vision processor: {e}")
+            logger.info(
+                f"Pipe broken or shared memory closed, shutting down vision processor: {e}")
         except Exception as e:
             logger.exception(f"Vision processor crashed unexpectedly: {e}")
         finally:
             shm.close() if shm else None
-
 
     @staticmethod
     async def async_pipe_reader(receiver: Connection):
@@ -333,6 +357,13 @@ class AsyncMultiprocessingVisionProcessor(VisionProcessor):
 
         return cv2.getPerspectiveTransform(src, dst)
 
+    @staticmethod
+    def vision_process_context_manager(shm, frameReceiver, data_sender):
+        async def _run():
+            async with AsyncMultiprocessingVisionProcessor() as vision:
+                await vision.comprehensive_analysis(shm, frameReceiver, data_sender)
+        asyncio.run(_run())
+
 
 # This feel like java "FeatureAbstractFactoryProviderFactory" xd
 class OpenChallengeAsyncMultiprocessingVisionProcessor(AsyncMultiprocessingVisionProcessor):
@@ -353,10 +384,11 @@ class OpenChallengeAsyncMultiprocessingVisionProcessor(AsyncMultiprocessingVisio
             frame_channels = Config.CameraConfig.OUTPUT_CHANNELS
             frame_size = frame_width * frame_height * frame_channels
 
-            assert shm is not None, "Why didn't shm raise?" # Fuck you pyright
+            assert shm is not None, "Why didn't shm raise?"  # Fuck you pyright
             async for _ in AsyncMultiprocessingVisionProcessor.async_pipe_reader(receiver):
                 frame = np.ndarray((frame_height, frame_width, frame_channels),
-                                dtype=np.uint8, buffer=shm.buf[:frame_size]) # pyright: ignore[reportOptionalSubscript]
+                                   # pyright: ignore[reportOptionalSubscript]
+                                   dtype=np.uint8, buffer=shm.buf[:frame_size])
                 round1 = [
                     self.check_field_bonds(frame),
                     self.find_walls(frame),
@@ -371,8 +403,10 @@ class OpenChallengeAsyncMultiprocessingVisionProcessor(AsyncMultiprocessingVisio
                 # Removed obstacle data for open challenge
                 sender.send((zone, walls, corner_lines, wall_dists))
         except (OSError, EOFError) as e:
-            logger.info(f"Pipe broken or shared memory closed, shutting down no-perspective processor: {e}")
+            logger.info(
+                f"Pipe broken or shared memory closed, shutting down no-perspective processor: {e}")
         except Exception as e:
-            logger.exception(f"No-perspective vision processor crashed unexpectedly: {e}")
+            logger.exception(
+                f"No-perspective vision processor crashed unexpectedly: {e}")
         finally:
             shm.close() if shm else None
