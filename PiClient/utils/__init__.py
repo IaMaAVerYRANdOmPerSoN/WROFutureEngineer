@@ -1,5 +1,6 @@
 import sys
 from loguru import logger
+import cv2
 
 LOG_FORMAT = (
     "<blue>[{time:HH:mm:ss:SSS}]</blue> | "
@@ -43,5 +44,4 @@ def configure_logging(verbose: bool = False, debug: bool = False) -> None:
     else:
         logger.add(sys.stderr, level="WARNING", format=LOG_FORMAT)
 
-
-__all__ = ["configure_logging", "logger"]
+__all__ = ["configure_logging", "logger", "cv2"]

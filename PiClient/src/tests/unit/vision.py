@@ -2,18 +2,12 @@ import numpy as np
 import cv2
 from src.modules.vision_processing import VisionObject, AsyncMultiprocessingVisionProcessor
 from src.modules.subprocess_context_managers import camera_process_context_manager, vision_process_context_manager
+from src.modules.config import Config
 from src import logger
 import multiprocessing as mp
 from multiprocessing import shared_memory
 import sys
 import time
-
-logger.remove()
-logger.add("vision.log", rotation="1 MB", retention="10 days", level="INFO")
-logger.add(sys.stdout, level="INFO",
-           filter=lambda record: record["level"].no < logger.level("ERROR").no)
-logger.add(sys.stderr, level="ERROR")
-
 
 def _draw_detections(frame, zone, walls, obstacles, corner_lines, wall_dists, obstacle_dists):
     color_map = {
@@ -25,16 +19,15 @@ def _draw_detections(frame, zone, walls, obstacles, corner_lines, wall_dists, ob
         "orange": (0, 165, 255),
     }
 
-    def draw_object(obj, label, thickness=2):
+    def draw_object(obj, label, thickness=1):
         color = color_map.get(getattr(obj, "color", ""), (255, 255, 0))
         cv2.drawContours(frame, [obj.contour], -1, color, thickness)
         x, y, w, h = obj.bbox
-        cv2.rectangle(frame, (x, y), (x + w, y + h), color, 1)
         cv2.putText(
             frame,
             label,
             (x, max(12, y - 5)),
-            cv2.FONT_HERSHEY_SIMPLEX,
+            cv2.FONT_HERSHEY_PLAIN,
             0.45,
             color,
             1,
@@ -81,6 +74,8 @@ async def run_tests():
     logger.info("Starting Vision Unittest...")
     shm_name = "frameBuffer"
     shm_size = 384*512*3 + 128  # Frame + 128 bytes margin
+
+    shm, camera_stream, data_stream = None, None, None
 
     try:
         shm = shared_memory.SharedMemory(
@@ -152,17 +147,8 @@ async def run_tests():
                 logger.error(f"Data validation error: {e}")
                 continue  # Skip this frame but keep processing future frames
 
-            logger.info(
-                f"Zone {zone}\n"
-                f"Walls: {walls} \n"
-                f"Obstacles: {obstacles} \n"
-                f"Corner Lines: {corner_lines} \n"
-                f"Wall distances {wall_dists} \n"
-                f"Obstacle Distances {obstacle_dists} \n")
-            # f"Obstacle Path X {obstacle_path_x} \n")
-
-            frame = np.ndarray((384, 512, 3), dtype=np.uint8,
-                               buffer=shm.buf[:384 * 512 * 3]).copy()
+            frame = np.ndarray((Config.CameraConfig.OUTPUT_HEIGHT - Config.CameraConfig.INITIAL_ROI,
+                            Config.CameraConfig.OUTPUT_WIDTH, Config.CameraConfig.OUTPUT_CHANNELS), dtype=np.uint8, buffer=shm.buf)
             display = cv2.cvtColor(frame, cv2.COLOR_YUV2BGR)
             display = _draw_detections(
                 display, zone, walls, obstacles, corner_lines, wall_dists, obstacle_dists)
@@ -171,10 +157,15 @@ async def run_tests():
                 break
 
     finally:
-        camera_stream.terminate()
-        data_stream.terminate()
-        camera_stream.join()
-        data_stream.join()
-        shm.close()
-        shm.unlink()
+        if camera_stream is not None:
+            camera_stream.terminate() if camera_stream.is_alive() else None
+            camera_stream.join(timeout=1)
+        if data_stream is not None:
+            data_stream.terminate() if data_stream.is_alive() else None
+            data_stream.join(timeout=1)        
+        if shm is not None:
+            shm.close()
+            shm.unlink()
+        camera_stream.kill() if camera_stream.is_alive() else None
+        data_stream.kill() if data_stream.is_alive() else None
         cv2.destroyAllWindows()

@@ -56,13 +56,13 @@ class VisionProcessor():
         self._obstacle_last_y = None
 
     # Applying cv2.perspectiveTransform is much more efficient than warping whole frame
-    def _perspective_transform(self, contours: np.ndarray, colors: Sequence[str]) -> np.ndarray:
+    def _perspective_transform(self, contours: Sequence, colors: Sequence[str]) -> Tuple[VisionObject, ...]:
         # contours = [VisionObject(contour=cv2.perspectiveTransform(
         # contour, VisionProcessor.PERSPECTIVE_TRANSFORM), color=color) for contour, color in zip(contours, colors)]
-        return np.array([VisionObject(contour=contour, color=color) for contour, color in zip(contours, colors)], dtype=object)
+        return tuple(VisionObject(contour=contour, color=color) for contour, color in zip(contours, colors))
 
     def _find_blocks(self, masks, colors):
-        contours = np.array([], dtype=object)
+        contours = []
         detected_colors = []
 
         for mask, color in zip(masks, colors):
@@ -70,13 +70,15 @@ class VisionProcessor():
                 _ = cv2.findContours(
                     mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             if detected_contours:
-                contours = np.append(contours, detected_contours)
+                contours.extend(detected_contours)
                 detected_colors.extend([color] * len(detected_contours))
 
-        if not contours.size:
-            return np.array([], dtype=object)
+        if not contours:
+            return tuple()
 
-        contours = np.array(sorted(contours, key=lambda i: cv2.contourArea(i), reverse=True), dtype=object)
+        contours = [contour for contour in contours if cv2.contourArea(contour) > 120 ] # Filter out small contours that are likely noise, tuned for 512x384 resolution
+        contours.sort(key=lambda contour: cv2.contourArea(contour), reverse=True) # Biggest object first
+        contours = contours[:10] # Limit to 10 largest contours to reduce noise
 
         logger.info(f"Detected {len(contours)} objects.")
         return self._perspective_transform(contours, detected_colors)
@@ -92,9 +94,9 @@ class VisionProcessor():
 
     def check_corner_lines(self, frame):
         logger.info("Searching for turn aids...")
-        uv: np.ndarray = frame[:, :, 1:3]
-        blue_mask = cv2.inRange(uv, self.LOWER_BLUE, self.UPPER_BLUE)
-        orange_mask = cv2.inRange(uv, self.LOWER_ORANGE, self.UPPER_ORANGE)
+
+        blue_mask = cv2.inRange(frame, self.LOWER_BLUE, self.UPPER_BLUE)
+        orange_mask = cv2.inRange(frame, self.LOWER_ORANGE, self.UPPER_ORANGE)
 
         return self._find_blocks([blue_mask, orange_mask], ["blue", "orange"])
 
@@ -110,9 +112,7 @@ class VisionProcessor():
 
     def find_walls(self, frame):
         logger.info("Checking for walls")
-
-        y = frame[:, :, 0]
-        black_mask = cv2.inRange(y, self.LOWER_BLACK, self.UPPER_BLACK)
+        black_mask = cv2.inRange(frame, self.LOWER_BLACK, self.UPPER_BLACK)
 
         return self._find_blocks([black_mask], ["black"])
 
@@ -205,8 +205,8 @@ class OpenChallengeVisionProcessor(VisionProcessor):
         super(OpenChallengeVisionProcessor, self).__init__(*args, **kwargs)
 
     # Bogus overwrite to disable perspective transforms on basic version
-    def _perspective_transform(self, contours: Sequence | np.ndarray, colors: Sequence[str]) -> np.ndarray:
-        return np.array([VisionObject(contour=contour, color=color) for contour, color in zip(contours, colors)], dtype=object)
+    def _perspective_transform(self, contours: Sequence | np.ndarray, colors: Sequence[str]) -> Tuple[VisionObject, ...]:
+        return tuple(VisionObject(contour=contour, color=color) for contour, color in zip(contours, colors))
 
 
 class AsyncMultiprocessingVisionProcessor(VisionProcessor):
@@ -276,8 +276,8 @@ class AsyncMultiprocessingVisionProcessor(VisionProcessor):
                 wall_dists, obstacle_dists = await asyncio.gather(*round2)
                 # obstacle_path_x = await self.get_obstacle_path_x(obstacles, wall_dists, obstacle_dists)
 
-                sender.send((zone, walls, obstacles, corner_lines,
-                            wall_dists, obstacle_dists,))
+                await self.loop.run_in_executor(None, sender.send,
+                    (zone, walls, obstacles, corner_lines, wall_dists, obstacle_dists,))
         except (OSError, EOFError) as e:
             logger.info(f"Pipe broken or shared memory closed, shutting down vision processor: {e}")
         except Exception as e:
@@ -340,8 +340,8 @@ class OpenChallengeAsyncMultiprocessingVisionProcessor(AsyncMultiprocessingVisio
         super(OpenChallengeAsyncMultiprocessingVisionProcessor,
               self).__init__(*args, **kwargs)
 
-    def _perspective_transform(self, contours: np.ndarray, colors: Sequence[str]) -> np.ndarray:
-        return np.array([VisionObject(contour=contour, color=color) for contour, color in zip(contours, colors)])
+    def _perspective_transform(self, contours: np.ndarray, colors: Sequence[str]) -> Tuple[VisionObject, ...]:
+        return tuple(VisionObject(contour=contour, color=color) for contour, color in zip(contours, colors))
 
     async def comprehensive_analysis(self, shm_name: str, receiver: Connection, sender: Connection) -> None:
         shm = None

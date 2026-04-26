@@ -1,4 +1,4 @@
-import cv2
+from utils import cv2
 from src.modules.config import Config
 from utils.tools.base_tool import BaseTool
 

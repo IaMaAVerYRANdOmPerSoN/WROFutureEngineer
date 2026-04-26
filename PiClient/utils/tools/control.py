@@ -1,5 +1,4 @@
-import cv2
-import asyncio
+from utils import cv2
 from utils.tools.base_tool import BaseTool
 from src.modules.controller import PD
 from src.modules.config import Config

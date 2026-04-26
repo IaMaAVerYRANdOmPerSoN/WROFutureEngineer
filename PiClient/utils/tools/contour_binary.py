@@ -1,6 +1,5 @@
-from utils import logger
+from utils import cv2, logger
 from utils.tools.base_tool import BaseTool
-import cv2
 import numpy as np
 from src.modules.visionProcessing import VisionObject
 

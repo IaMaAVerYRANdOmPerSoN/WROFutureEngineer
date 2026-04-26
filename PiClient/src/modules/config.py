@@ -9,15 +9,15 @@ class Config():
     class CameraConfig():
         FORMAT: Dict = field(default_factory=lambda: {
             "format": "YUV420",
-            "size": (384, 512)
+            "size": (512, 384)  # Camera API expects (width, height); NumPy/OpenCV arrays usually use (height, width).
         })
         OUTPUT_WIDTH: int = 512
         OUTPUT_HEIGHT: int = 384
         OUTPUT_CHANNELS: int = 3
-        INITIAL_ROI: int = 100
+        INITIAL_ROI: int = 110
         EXECUTOR_THREADS: int = 3
-        MAX_CONCURRENT_CAPTURES: int = 2
-        BUFFER_COUNT: int = 2
+        MAX_CONCURRENT_CAPTURES: int = 3
+        BUFFER_COUNT: int = 1
         HW_INIT_TIMEOUT: float = 5.0
         CONFIGURE_TIMEOUT: float = 1.0
         START_TIMEOUT: float = 1.0
@@ -25,7 +25,7 @@ class Config():
         CAPTURE_ERROR_SLEEP_SECONDS: float = 0.01
         SENSOR_CONFIG: Dict = field(default_factory=lambda: {
             "output_size": (640, 480),
-            "bit_depth": 10
+            "bit_depth": 10,
         })
 
         CONTROLS_CONFIG: Dict = field(default_factory=lambda: {
@@ -60,19 +60,19 @@ class Config():
         ], dtype=np.float32)
         # Not tunnned, also uv plane only
         # TODO: Change this to full YUV, and autotuning soonTM (or if I get bored perhaps)
-        LOWER_BLUE: Tuple[int, int] = (100, 150)
-        UPPER_BLUE: Tuple[int, int] = (140, 255)
-        LOWER_ORANGE: Tuple[int, int] = (10, 100)
-        UPPER_ORANGE: Tuple[int, int] = (25, 255)
+        LOWER_BLUE: Tuple[int, int, int] = (35, 140, 70)
+        UPPER_BLUE: Tuple[int, int, int] = (255, 200, 130)
+        LOWER_ORANGE: Tuple[int, int, int] = (60, 50, 140)
+        UPPER_ORANGE: Tuple[int, int, int] = (255, 130, 220)
         LOWER_GREEN: Tuple[int, int] = (40, 50)
         UPPER_GREEN: Tuple[int, int] = (80, 255)
         LOWER_RED: Tuple[int, int] = (0, 100)
         UPPER_RED: Tuple[int, int] = (10, 255)
 
         # Only check y plane for black/white since we don't give a damn about color
-        LOWER_BLACK: int = 0
-        UPPER_BLACK: int = 50
-        LOWER_WHITE: int = 200
+        LOWER_BLACK: Tuple[int, int, int] = (0, 100, 100)
+        UPPER_BLACK: Tuple[int, int, int] = (80, 140, 140)
+        LOWER_WHITE: int = 180
         UPPER_WHITE: int = 255
         DEFAULT_FRAME_WIDTH: int = 512
         MIN_CENTROID_Y: int = 30

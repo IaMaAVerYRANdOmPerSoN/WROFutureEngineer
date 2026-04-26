@@ -2,8 +2,7 @@ import asyncio
 from multiprocessing.connection import Connection
 import multiprocessing as mp
 from multiprocessing import shared_memory
-import cv2
-from utils import logger
+from utils import cv2, logger
 from src.modules.visionProcessing import VisionObject, AsyncMultiprocessingVisionProcessor, OpenChallengeAsyncMultiprocessingVisionProcessor
 from src.modules.camera_factory import get_camera_class
 from src.modules.config import Config

@@ -1,4 +1,4 @@
-import cv2
+from utils import cv2
 import numpy as np
 from utils.tools.base_tool import BaseTool
 from src.modules.config import Config

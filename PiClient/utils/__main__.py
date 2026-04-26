@@ -1,6 +1,5 @@
 import asyncio
-import cv2
-from utils import logger, configure_logging
+from utils import cv2, logger, configure_logging
 import argparse
 import sys
 import multiprocessing as mp

@@ -22,7 +22,7 @@ class AsyncCamera():
         self._CONTROLS_CONFIG: Dict = controls_config
         self._cam = None
 
-        self.FRAME_SIZE = self._CONFIG["size"]
+        self.FRAME_WIDTH, self.FRAME_HEIGHT = self._CONFIG["size"]
 
         self.loop = asyncio.get_event_loop()
         self.executor = None
@@ -101,21 +101,34 @@ class AsyncCamera():
             try:
                 async with self._capture_semaphore:
                     # type: ignore
-                    frame: np.ndarray = await asyncio.wait_for(self.loop.run_in_executor(self.executor, self._cam.capture_array), timeout=timeout)
+                    frame: np.ndarray = await asyncio.wait_for(
+                        self.loop.run_in_executor(self.executor, self._cam.capture_array),
+                        timeout=timeout,
+                    )
 
-                frame = frame.flatten()
-                y_end = self.FRAME_SIZE[0]*self.FRAME_SIZE[1]
-                u_end = y_end + (self.FRAME_SIZE[0]//2 * self.FRAME_SIZE[1]//2)
+                expected_rows = self.FRAME_HEIGHT + (self.FRAME_HEIGHT // 2)
 
-                y_plane = frame[:y_end].reshape(self.FRAME_SIZE)
-                u_plane_raw = frame[y_end:u_end].reshape(
-                    (self.FRAME_SIZE[0]//2, self.FRAME_SIZE[1]//2))
-                v_plane_raw = frame[u_end:].reshape(
-                    (self.FRAME_SIZE[0]//2, self.FRAME_SIZE[1]//2))
+                if frame.ndim != 2 or frame.shape[0] < expected_rows or frame.shape[1] < self.FRAME_WIDTH:
+                    raise ValueError(
+                        f"Unexpected YUV420 frame shape {frame.shape}; expected at least ({expected_rows}, {self.FRAME_WIDTH})"
+                    )
+
+                packed = np.ascontiguousarray(frame[:expected_rows, :self.FRAME_WIDTH]).ravel()
+                y_size = self.FRAME_HEIGHT * self.FRAME_WIDTH
+                uv_size = (self.FRAME_HEIGHT // 2) * (self.FRAME_WIDTH // 2)
+                expected_size = y_size + (2 * uv_size)
+                if packed.size < expected_size:
+                    raise ValueError(
+                        f"Truncated YUV420 buffer size {packed.size}; expected at least {expected_size}"
+                    )
+
+                y_plane = packed[:y_size].reshape((self.FRAME_HEIGHT, self.FRAME_WIDTH))
+                u_plane_raw = packed[y_size:y_size + uv_size].reshape((self.FRAME_HEIGHT // 2, self.FRAME_WIDTH // 2))
+                v_plane_raw = packed[y_size + uv_size:y_size + (2 * uv_size)].reshape((self.FRAME_HEIGHT // 2, self.FRAME_WIDTH // 2))
 
                 y_plane = y_plane[self.INITIAL_ROI:, :]
-                u_plane_raw = u_plane_raw[self.INITIAL_ROI//2:, :]
-                v_plane_raw = v_plane_raw[self.INITIAL_ROI//2:, :]
+                u_plane_raw = u_plane_raw[self.INITIAL_ROI // 2:, :]
+                v_plane_raw = v_plane_raw[self.INITIAL_ROI // 2:, :]
 
                 u_plane = u_plane_raw.repeat(2, axis=0).repeat(2, axis=1)
                 v_plane = v_plane_raw.repeat(2, axis=0).repeat(2, axis=1)
@@ -124,7 +137,7 @@ class AsyncCamera():
 
                 if shm:
                     buffer = np.ndarray(
-                        (self.FRAME_SIZE[0] - self.INITIAL_ROI, self.FRAME_SIZE[1], 3), dtype=np.uint8, buffer=shm.buf)
+                        (self.FRAME_HEIGHT - self.INITIAL_ROI, self.FRAME_WIDTH, 3), dtype=np.uint8, buffer=shm.buf)
                     np.copyto(buffer, full_yuv)
 
                 logger.info(f"Fetched new frame from PiCamera successfully")
