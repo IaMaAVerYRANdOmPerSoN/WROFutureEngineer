@@ -87,7 +87,8 @@ class Config():
         CORNER_TURN_KPKD: Tuple[float, float] = (1.2, 0.2)
         STRAIGHT_SPEED: float = 0.5
         TURN_SPEED: float = 0.3
-        HYBRID_SPEED: float = 0.4
+        TURN_ANGLE: float = 80.0
+        TURN_DURATION: float = 1.0
         DRIVE_COMMAND_DURATION: float = 0.1
         SHM_NAME: str = "camera_frame"
         SHM_SIZE: int = 512*384*3

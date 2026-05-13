@@ -1,14 +1,15 @@
 import asyncio
 from typing import Literal
 from src import logger
+from src.modules.async_camera import AsyncCamera
 from src.modules.comm_protocol import Client
 from src.modules.vision_processing import OpenChallengeAsyncMultiprocessingVisionProcessor, VisionObject
 from src.modules.controller import PD
 from src.modules.config import Config
-from src.modules.subprocess_context_managers import camera_process_context_manager, vision_process_context_manager
 import multiprocessing as mp
 from multiprocessing import shared_memory
 from numpy import isinf
+
 
 async def run_open_challenge():
     async with Client() as client:
@@ -50,11 +51,11 @@ async def run_open_challenge():
         try:
             cam_receiver, cam_sender = mp.Pipe(duplex=False)
             camera_process = mp.Process(
-                target=camera_process_context_manager, args=(shm.name, cam_sender,))
+                target=AsyncCamera.camera_process_context_manager, args=(shm.name, cam_sender,))
             camera_process.start()
 
             data_receiver, data_sender = mp.Pipe(duplex=False)
-            vision_process = mp.Process(target=vision_process_context_manager, args=(
+            vision_process = mp.Process(target=OpenChallengeAsyncMultiprocessingVisionProcessor.vision_process_context_manager, args=(
                 shm.name, cam_receiver, data_sender,))
             vision_process.start()
 
@@ -62,35 +63,34 @@ async def run_open_challenge():
             # Vision process polls cam_receiver and sends results through data_sender.
             # Saticmethod data_yielder polls the data_receiver for data and yields it to to the main loop.
 
+            # pyright: ignore[reportArgumentType]
             async for zone, walls, corner_lines, wall_x_diffs in OpenChallengeAsyncMultiprocessingVisionProcessor.async_pipe_reader(data_receiver):
 
                 assert isinstance(zone, VisionObject) or zone is None
                 assert isinstance(walls, tuple) and all(
                     isinstance(wall, VisionObject) for wall in walls)
                 assert isinstance(corner_lines, tuple) and all(isinstance(
-                    line, VisionObject) for line in corner_lines) or not corner_lines  # Empty tuple
+                    line, VisionObject) for line in corner_lines) or not corner_lines  # Empty tuple is fine
 
                 logger.debug(
                     f"Zone: {zone}, Walls: {walls}, Corner Lines: {corner_lines}, Wall Dists: {wall_x_diffs}")
                 state_history[1] = (state_history[1] +
                                     1 if state_history[0] == state else 0)
-                state_history[0] = state
 
-                if state_history[0] == "Turn" and state_history[1] > Config.OpenChallengeConfig.TURN_HYSTERESIS and not corner_lines:
+                if state_history[0] == "Turn" and state != "Turn" and state_history[1] > Config.OpenChallengeConfig.TURN_HYSTERESIS:
                     turn_counter += 1
                     if turn_counter > Config.OpenChallengeConfig.LAP_LENGTH_IN_TURNS:
                         # TODO: Call function that ends the run loop and does the parallel parking maneuver, then break
                         break
+
+                # Change state tracker after checking for turn
+                state_history[0] = state
 
                 match state:
                     case "Follow wall":
                         if any(isinf(x_diff) for x_diff in wall_x_diffs.values()):
                             corner_turn_controller.previous_error = 0
                             state = "Turn"
-
-                        elif corner_lines:  # We know that that the walls are still good from the previous condition, so we can use hybrid mode
-                            corner_turn_controller.previous_error = 0
-                            state = "Hybrid"
 
                         else:
                             turn_correction = wall_follow.tick(
@@ -106,52 +106,22 @@ async def run_open_challenge():
                             # Also add dynamic speed calculation and dynamic dt calculation
 
                     case "Turn":
-                        if not corner_lines:
-                            wall_follow.previous_error = 0
-                            state = "Follow wall"
-
-                        # We know that the corner lines are still good from the previous condition, so we can use hybrid mode
-                        elif not any(isinf(x_diff) for x_diff in wall_x_diffs.values()):
-                            wall_follow.previous_error = 0
-                            state = "Hybrid"
-
-                        else:
-                            turn_correction = corner_turn_controller.tick(
-                                # Biggest corner line x - frame center
-                                corner_lines[0].x_centroid - Config.CameraConfig.FORMAT["size"][0] // 2)
-                            asyncio.create_task(
-                                client.drive_motors(
+                        if state_history[1] > Config.OpenChallengeConfig.TURN_HYSTERESIS and corner_lines:
+                            if corner_lines[0].color == "blue":  # Left turn
+                                await client.drive_motors(
                                     Config.OpenChallengeConfig.TURN_SPEED,
-                                    turn_correction,
-                                    Config.OpenChallengeConfig.DRIVE_COMMAND_DURATION,
+                                    - Config.OpenChallengeConfig.TURN_ANGLE,
+                                    Config.OpenChallengeConfig.TURN_DURATION,
                                 )
-                            )
-
-                    case "Hybrid":  # Use when both corner lines and wall distance data are good
-                        if not corner_lines:
-                            wall_follow.previous_error = 0
+                            # Right turn, pyright do you not see the assertion on line 70 that guarantees corner_lines contains VisionObjects, or is just an empty tuple that skips this block entirely?
+                            elif corner_lines[0].color == "orange":
+                                await client.drive_motors(
+                                    Config.OpenChallengeConfig.TURN_SPEED,
+                                    Config.OpenChallengeConfig.TURN_ANGLE,
+                                    Config.OpenChallengeConfig.TURN_DURATION,
+                                )
+                            # await blocks so we can be sure the turn is done before switching states
                             state = "Follow wall"
-
-                        elif any(isinf(x_diff) for x_diff in wall_x_diffs.values()):
-                            corner_turn_controller.previous_error = 0
-                            state = "Turn"
-
-                        else:
-                            turn_correction = (
-                                wall_follow.tick(
-                                    wall_x_diffs["left"] - wall_x_diffs["right"])
-                                + corner_turn_controller.tick(
-                                    corner_lines[0].x_centroid
-                                    # Biggest corner line x - frame center
-                                    - Config.CameraConfig.FORMAT["size"][0] // 2)
-                                // 2)  # Average
-                            asyncio.create_task(
-                                client.drive_motors(
-                                    Config.OpenChallengeConfig.HYBRID_SPEED,
-                                    turn_correction,
-                                    Config.OpenChallengeConfig.DRIVE_COMMAND_DURATION,
-                                )
-                            )
 
                     case _:
                         logger.error(f"Invalid state {state}")
