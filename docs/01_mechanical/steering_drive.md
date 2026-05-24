@@ -4,7 +4,7 @@
 Explain the steering and drive mechanism choices.
 
 ## Steering System
-- Steering type:
+- Steering type:    
 - Actuator used:
 - Steering linkage:
 - Steering range:

@@ -65,11 +65,26 @@ Example:
 # 1. Mechanical Design
 This section explains the physical design of the robot, including chassis layout, steering, drivetrain, torque/speed reasoning, and mechanical improvements over time.
 
-### Files
-- [`docs/01_mechanical/chassis_design.md`](docs/01_mechanical/chassis_design.md)
-- [`docs/01_mechanical/steering_drive.md`](docs/01_mechanical/steering_drive.md)
-- [`docs/01_mechanical/torque_speed_reasoning.md`](docs/01_mechanical/torque_speed_reasoning.md)
-- [`docs/01_mechanical/mechanical_iterations.md`](docs/01_mechanical/mechanical_iterations.md)
+- **Dimentions**: 24cm length 10cm wide 28cm high
+    - [Dimentions reasoning](docs/mechanical_reasoning.md#size-reasoning)
+- **Drive Motor**: Furitek Micro Komodo 1212 Stepper Motor
+    - [Motor reasoning](docs/mechanical_reasoning.md#motor-selectionmotor-selection)
+- **Steering Motor**: HS-5055MG 11.9g Metal Gear Digital Micro Servo
+    - [Steering reasoning](docs/mechanical_reasoning.md#servo-motor)
+
+### Images of Robot
+| | |
+|:---:|:---:|
+| ![Photo 1](https://media1.tenor.com/m/na4hpUz4LC8AAAAC/blue-emoji.gif) | ![Photo 2](https://media1.tenor.com/m/na4hpUz4LC8AAAAC/blue-emoji.gif) |
+| ![Photo 3](https://media1.tenor.com/m/na4hpUz4LC8AAAAC/blue-emoji.gif) | ![Photo 4](https://media1.tenor.com/m/na4hpUz4LC8AAAAC/blue-emoji.gif) |
+| ![Photo 5](https://media1.tenor.com/m/na4hpUz4LC8AAAAC/blue-emoji.gif) | ![Photo 6](https://media1.tenor.com/m/na4hpUz4LC8AAAAC/blue-emoji.gif) |
+
+*Placeholder images*
+
+---
+
+- **Drive System**: We use rear wheel drive, means the motor's power is transmitted to the back wheels rather than the front.
+    - [Why RWD?](../mechanical_reasoning.md#drive-system)
 
 ### Summary
 Write a short summary here:
