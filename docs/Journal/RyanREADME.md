@@ -162,4 +162,12 @@ changes.
 ---
 
 ## Week 18 (May 14-21)
-- 
+- Tried another differential, it still doesn't work...
+- Decided that if we cannot create our own differential by next week, we will buy one off amazon
+- Regulator short circuted due to damaged wires caused by getting caught in the motor system
+    - Port for the step down regulator broke
+
+
+## Week 19 (May 22-29)
+- Fixed differential... IT WORKS!
+- Fixing the step down voltage regulator that short circuited
