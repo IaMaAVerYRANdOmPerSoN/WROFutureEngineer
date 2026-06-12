@@ -1,3 +1,10 @@
+"""Tuning tool launcher.
+
+Parses CLI arguments and runs one or more vision/control tuning tools
+concurrently. Supports ``raw``, ``contours``, ``contourbinary``,
+``LiDAR``, and ``control`` tools.
+"""
+
 import asyncio
 from utils import cv2, logger, configure_logging
 import argparse
@@ -7,6 +14,11 @@ from multiprocessing import shared_memory
 
 
 def parse_args():
+    """Parse command-line arguments for the tuning tool launcher.
+
+    :returns: Parsed namespace with ``--verbose``, ``--debug``, and ``--tool`` options.
+    :rtype: argparse.Namespace
+    """
     parser = argparse.ArgumentParser(
         description="Tune color thresholds, ROIs, view detections and control loop outputs, and tune configuration parameters for the Pi client.")
 
@@ -28,6 +40,12 @@ def parse_args():
 
 
 async def main():
+    """Main entry point for the tuning tool launcher.
+
+    Parses CLI args, configures logging, dispatches to the selected
+    tool(s), and handles graceful shutdown (including shared memory
+    and subprocess cleanup).
+    """
     args = parse_args()
     configure_logging(verbose=args.verbose, debug=args.debug)
 

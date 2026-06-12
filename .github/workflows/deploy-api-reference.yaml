@@ -1,0 +1,36 @@
+name: Deploy documentation to firebase
+
+on: [push]
+
+jobs:
+  deploy-api-reference:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+
+    - name: Install dependencies and activate venv
+      run: |
+        cd PiClient
+        python -m venv .venv
+        echo "$PWD/.venv/bin" >> $GITHUB_PATH
+        pip install -r requirements.txt
+
+    - name: Build documentation
+      run: |
+        cd PiClient/docs
+        make html
+
+    - name: Install Firebase CLI
+      run: npm install -g firebase-tools
+
+    - name: Deploy to Firebase
+      env:
+        FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+      run: |
+        firebase deploy --token "$FIREBASE_TOKEN"

@@ -1,16 +1,38 @@
+"""Base class for tuning/debugging tools.
+
+Provides :class:`BaseTool` with shared-memory frame access, camera and
+vision subprocess management, and drawing infrastructure.
+"""
+
 import asyncio
 from multiprocessing.connection import Connection
 import multiprocessing as mp
 from multiprocessing import shared_memory
 from utils import cv2, logger
-from src.modules.visionProcessing import VisionObject, AsyncMultiprocessingVisionProcessor, OpenChallengeAsyncMultiprocessingVisionProcessor
-from src.modules.camera_factory import get_camera_class
-from src.modules.config import Config
+from src.modules.vision.async_base import AsyncMultiprocessingVisionProcessor
+from src.modules.vision.async_open import OpenChallengeAsyncMultiprocessingVisionProcessor
+from src.modules.lib.config import Config
 import numpy as np
 
 
 class BaseTool:
+    """Base class for all tuning/debugging tools.
+
+    Manages shared memory, camera subprocess, vision subprocesses (with
+    and without perspective transform), and provides a drawing loop that
+    displays frames in OpenCV windows.
+
+    :ivar name: Tool name (used for window titles and shared memory).
+    :ivar description: Human-readable description of the tool.
+    :ivar frame: Current frame buffer (BGR, uint8).
+    """
+
     def __init__(self, name, description):
+        """Initialise the base tool.
+
+        :param name: Tool name.
+        :param description: Tool description.
+        """
         self.name = name
         self.description = description
         self._created_windows: set[str] = set()
@@ -18,6 +40,10 @@ class BaseTool:
                               Config.CameraConfig.OUTPUT_WIDTH, Config.CameraConfig.OUTPUT_CHANNELS), dtype=np.uint8)
 
     def _ensure_windows(self, *names):
+        """Create and initialise OpenCV windows with a placeholder frame.
+
+        :param names: Window names to create.
+        """
         for name in names:
             cv2.namedWindow(name, cv2.WINDOW_NORMAL)
 
@@ -26,6 +52,15 @@ class BaseTool:
             cv2.imshow(name, placeholder)
 
     def _draw_vision_object(self, object: VisionObject, color: tuple, frame):
+        """Draw a single :class:`VisionObject` onto a frame.
+
+        Draws the contour outline and a centroid circle. Validates frame
+        shape to avoid crashes from shared-memory race conditions.
+
+        :param object: The :class:`VisionObject` to draw.
+        :param color: BGR colour tuple for the overlay.
+        :param frame: Target frame (numpy array).
+        """
         if not isinstance(frame, np.ndarray) or frame.shape != (Config.CameraConfig.OUTPUT_HEIGHT - Config.CameraConfig.INITIAL_ROI, Config.CameraConfig.OUTPUT_WIDTH, Config.CameraConfig.OUTPUT_CHANNELS,):
             logger.warning(
                 "Frame may have been mishaped due to race condition on shared memory, skipping draw to avoid crash")
@@ -37,6 +72,12 @@ class BaseTool:
                        int(object.y_centroid)), 3, color, -1)
 
     def _vision_process_manager(self, shm_name: str, receiver: Connection, sender: Connection, **kwargs):
+        """Subprocess target for perspective-transformed vision.
+
+        :param shm_name: Shared memory block name.
+        :param receiver: Pipe connection for frame-ready signals.
+        :param sender: Pipe connection for vision results.
+        """
         async def _run(*args, **kwargs):
             async with AsyncMultiprocessingVisionProcessor() as processor:
                 await processor.comprehensive_analysis(shm_name, receiver, sender, *args, **kwargs)
@@ -44,6 +85,12 @@ class BaseTool:
         asyncio.run(_run())
 
     def _no_perspective_vision_process_manager(self, shm_name: str, receiver: Connection, sender: Connection, **kwargs):
+        """Subprocess target for non-perspective vision (Open Challenge).
+
+        :param shm_name: Shared memory block name.
+        :param receiver: Pipe connection for frame-ready signals.
+        :param sender: Pipe connection for vision results.
+        """
         async def _run(*args, **kwargs):
             async with OpenChallengeAsyncMultiprocessingVisionProcessor() as processor:
                 await processor.comprehensive_analysis(shm_name, receiver, sender, *args, **kwargs)
@@ -51,6 +98,11 @@ class BaseTool:
         asyncio.run(_run())
 
     def _camera_process_manager(self, shm_name: str, sender: Connection, *args, **kwargs):
+        """Subprocess target for the camera stream.
+
+        :param shm_name: Shared memory block name.
+        :param sender: Pipe connection for frame-ready signals.
+        """
         async def _run(*args, **kwargs):
             CameraClass = get_camera_class()
             async with CameraClass() as camera:
@@ -59,13 +111,31 @@ class BaseTool:
         asyncio.run(_run())
 
     def _draw(self, *args, **kwargs):
+        """Draw the perspective-transformed view (abstract).
+
+        Subclasses must override this method.
+
+        :raises NotImplementedError: Always, unless overridden.
+        """
         raise NotImplementedError("Subclasses must implement the _draw method")
 
     def _draw_no_perspective(self, *args, **kwargs):
+        """Draw the raw (unwarped) view (abstract).
+
+        Subclasses must override this method.
+
+        :raises NotImplementedError: Always, unless overridden.
+        """
         raise NotImplementedError(
             "Subclasses must implement the _draw_no_perspective method")
 
     async def run(self, *args, **kwargs):
+        """Start the tool's main loop.
+
+        Creates shared memory, spawns camera and vision subprocesses, and
+        runs the drawing loop until the user presses ``q`` or ``Esc``.
+        Cleans up subprocesses and shared memory on exit.
+        """
         shm, camera_process, vision_process, no_perspective_vision_process = None, None, None, None
         shm_frame_bytes = (
             Config.CameraConfig.OUTPUT_WIDTH

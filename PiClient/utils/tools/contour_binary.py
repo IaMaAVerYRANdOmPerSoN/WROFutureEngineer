@@ -1,9 +1,20 @@
+"""Contour binary visualisation tool.
+
+Displays detected contours as filled polygons on a neutral background
+for high-contrast debugging.
+"""
+
 from utils import cv2, logger
 from utils.tools.base_tool import BaseTool
 import numpy as np
 from src.modules.vision_processing import VisionObject
 
 class ContourBinaryTool(BaseTool):
+    """Tool for visualising contours as filled binary blobs.
+
+    Renders detected objects as solid polygons on a dark grey background
+    for maximum visibility, both with and without perspective transform.
+    """
     def __init__(self):
         super().__init__(name="contourbinary", description="View contours detected by vision processing, displayed as filled binary blobs on neutral background for better visibility and debugging")
         self.color_map = {
@@ -17,6 +28,12 @@ class ContourBinaryTool(BaseTool):
         }
 
     def _draw_vision_object(self, object: VisionObject, color: tuple, frame):
+        """Draw a filled polygon and centroid for a :class:`VisionObject`.
+
+        :param object: The :class:`VisionObject` to draw.
+        :param color: BGR colour tuple for the fill.
+        :param frame: Target frame.
+        """
         assert isinstance(frame, np.ndarray), logger.error(
             "Frame cannot be None")
         contour = object.contour
@@ -26,6 +43,12 @@ class ContourBinaryTool(BaseTool):
                        int(object.y_centroid)), 3, color, -1)
 
     def _draw_base(self, data, frame, *args, **kwargs):
+        """Core drawing logic for binary (filled-polygon) visualisation.
+
+        :param data: Vision pipeline output tuple.
+        :param frame: Target frame to draw on.
+        :returns: The modified frame.
+        """
         zone, walls, obstacles, corner_lines, wall_dists, obstacle_dists = data
 
         if zone:
@@ -65,15 +88,24 @@ class ContourBinaryTool(BaseTool):
         return frame
 
     def _draw(self, data, *args, **kwargs):
+        """Draw binary view with perspective-transformed data.
+
+        :param data: Vision pipeline output tuple.
+        """
         frame = np.full(self.frame.shape, (70, 70, 70), dtype=np.uint8)  # Dark background so the white of the zone is visible
         self._draw_base(data, frame, *args, **kwargs) # The contours are already in perspective-transformed coordinates, so we can draw them directly on the warped frame
         cv2.imshow("Contour Binary View", frame)
 
     def _draw_no_perspective(self, data, *args, **kwargs):
+        """Draw binary view without perspective transform.
+
+        :param data: Vision pipeline output tuple.
+        """
         frame = np.full(self.frame.shape, (70, 70, 70), dtype=np.uint8)
         self._draw_base(data, frame, *args, **kwargs) # Same drawing logic, just different data and window title
         cv2.imshow("Contour Binary View - No Perspective", frame)
     
 async def run_contourbinary_tool():
+    """Entry point for the contour binary visualisation tool."""
     tool = ContourBinaryTool()
     await tool.run()

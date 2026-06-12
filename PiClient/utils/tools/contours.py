@@ -1,8 +1,19 @@
+"""Contours visualisation tool.
+
+Displays the camera feed with detected contours overlaid, both with
+and without perspective transformation.
+"""
+
 from utils import cv2
-from src.modules.config import Config
+from src.modules.lib.config import Config
 from utils.tools.base_tool import BaseTool
 
 class ContoursTool(BaseTool):
+    """Tool for visualising detected contours and vision metadata.
+
+    Draws zones, walls, obstacles, and corner lines on the camera feed,
+    along with wall-distance and obstacle-distance readouts.
+    """
     def __init__(self):
         super().__init__(name="contours", description="View camera feed with contours and vision processing output with and without perspective transformation")
         self.color_map = {
@@ -15,6 +26,15 @@ class ContoursTool(BaseTool):
         }
 
     def _draw_base(self, data, frame, *args, **kwargs):
+        """Core drawing logic shared by perspective and no-perspective views.
+
+        Draws detected objects and overlays status text (wall distances,
+        obstacle distances) on the given frame.
+
+        :param data: Vision pipeline output tuple.
+        :param frame: Target frame to draw on.
+        :returns: The modified frame.
+        """
         zone, walls, obstacles, corner_lines, wall_dists, obstacle_dists = data
 
         if zone:
@@ -54,15 +74,24 @@ class ContoursTool(BaseTool):
         return frame
 
     def _draw(self, data, *args, **kwargs):
+        """Draw perspective-transformed view with contour overlays.
+
+        :param data: Vision pipeline output tuple.
+        """
         frame = cv2.warpPerspective(self.frame, Config.VisionConfig.PERSPECTIVE_TRANSFORM, (self.frame.shape[1], self.frame.shape[0]))
         self._draw_base(data, frame, *args, **kwargs) # The contours are already in perspective-transformed coordinates, so we can draw them directly on the warped frame
         cv2.imshow("Feed with contours", frame)
 
     def _draw_no_perspective(self, data, *args, **kwargs):
+        """Draw raw (unwarped) view with contour overlays.
+
+        :param data: Vision pipeline output tuple.
+        """
         frame = self.frame.copy()
         self._draw_base(data, frame, *args, **kwargs) # Same drawing logic, just different data and window title
         cv2.imshow("Before Perspective Transformation", frame)
     
 async def run_contours_tool():
+    """Entry point for the contours visualisation tool."""
     tool = ContoursTool()
     await tool.run()

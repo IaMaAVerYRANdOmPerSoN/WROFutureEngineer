@@ -1,17 +1,23 @@
+"""Obstacle Challenge runner.
+
+Sets up shared memory, camera and vision subprocesses, then runs the
+main control loop for the WRO obstacle challenge course.
+"""
+
 import asyncio
 from multiprocessing.connection import Connection
 from typing import Literal, cast
 from src import logger
-from src.modules.comm_protocol import Client
-from src.modules.async_camera import AsyncCamera
-from src.modules.vision_processing import AsyncMultiprocessingVisionProcessor, VisionObject
-from src.modules.controller import PD
-from src.modules.config import Config
+from src.modules.interface.comm_protocol import Client
+from src.modules.interface.async_camera import AsyncCamera
+from src.modules.vision.async_base import AsyncMultiprocessingVisionProcessor
+from src.modules.lib.controller import PD
+from src.modules.lib.config import Config
 import multiprocessing as mp
 from multiprocessing import shared_memory
 
 async def run_obstacle_challenge():
-    # Largely mirrors open challenge, just with different internal logic and states
+    """Asynchronus runner for the *obstacle challenge*"""
 
     async with Client() as client:
         wall_follow = PD(1, 0.2)
@@ -20,8 +26,6 @@ async def run_obstacle_challenge():
 
         # Starting code here
         state: Literal["Straight", "Turn"] = "Straight"
-
-                
         camera_process, vision_process, shm = None, None, None
 
         try:
@@ -57,14 +61,6 @@ async def run_obstacle_challenge():
             # Staticmethod data_yielder polls the data_receiver for data and yields it to the main loop.
 
             async for zone, walls, obstacles, corner_lines, wall_x_diffs, obstacle_x_diffs, obstacle_path_x in AsyncMultiprocessingVisionProcessor.async_pipe_reader(cast(Connection, data_receiver)):
-
-                assert isinstance(zone, VisionObject)
-                assert isinstance(walls, tuple) and all(
-                    isinstance(wall, VisionObject) for wall in walls)
-                assert isinstance(obstacles, tuple) and all(
-                    isinstance(obstacle, VisionObject) for obstacle in obstacles)
-                assert isinstance(corner_lines, tuple) and all(
-                    isinstance(line, VisionObject) for line in corner_lines)
 
                 logger.debug(
                     f"Zone: {zone}, Walls: {walls}, Obstacles: {obstacles}, Corner Lines: {corner_lines}, Wall Dists: {wall_x_diffs}, Obstacle Dists: {obstacle_x_diffs}, Obstacle Path X: {obstacle_path_x}")

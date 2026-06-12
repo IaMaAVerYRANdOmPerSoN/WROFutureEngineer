@@ -87,7 +87,7 @@ class Server {
                 unsigned long duration = (unsigned long)(fabs(request.arg2) * 1000.0f + 0.5f);
                 request.timeout = millis() + duration;
                 _serial->println(prefix + "WAITMS " + String(duration));
-                _motor.writeMicroseconds(1500 + (int)(request.arg1 * 500.0f / 100.0f)); // Speed passed in percent
+                _motor.writeMicroseconds(1500 + (int)(request.arg1 * 300.0f / 100.0f)); // Speed passed in percent
                 digitalWrite(5, HIGH);
             }
             else if (request.command == "SET_LED") {
@@ -194,3 +194,18 @@ void setup() {
 void loop() {
     server->ProcessRequest();
 }
+
+
+/*#include <Arduino.h>
+#include <Servo.h>
+
+#define STEERING_PWM 11 // Servo PWM
+
+Servo steering;
+
+void setup() {
+    steering.attach(STEERING_PWM);
+    steering.write(90);
+}
+
+void loop() {}*/

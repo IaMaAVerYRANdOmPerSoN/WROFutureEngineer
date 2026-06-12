@@ -1,3 +1,9 @@
+"""LD19 LiDAR interface.
+
+Provides :class:`LiDARPacket` for parsed LD19 data and :class:`LiDAR`
+for async serial reading, packet parsing, and point-cloud extraction.
+"""
+
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
@@ -9,7 +15,7 @@ from typing import Any, Dict, Generator, List, NoReturn, Optional, Sequence, Tup
 import aioserial
 
 from src import logger
-from src.modules.config import Config
+from src.modules.lib.config import Config
 
 from multiprocessing.connection import Connection
 
@@ -73,18 +79,39 @@ class LiDAR:
         )
 
     def _find_packet_start(self, buffer: bytearray) -> int:
+        """Locate the start of a valid LD19 packet in the buffer.
+
+        Scans for the packet header byte (``0x54``) followed by the
+        expected version/length byte (``0x2C``).
+
+        :param buffer: Raw byte buffer from the serial stream.
+        :returns: Index of the packet start, or ``-1`` if not found.
+        """
         for i in range(len(buffer) - 1):
             if buffer[i] == self.PACKET_HEADER and (buffer[i + 1] & 0xFF) == self.VER_LEN:
                 return i
         return -1
     
     def _convert_to_xy(self, coords: Sequence[Tuple[float, float]]) -> Generator[Tuple[float, float], None, None]:
+        """Convert polar (distance, angle) pairs to Cartesian (x, y).
+
+        :param coords: Sequence of ``(distance_mm, angle_deg)`` tuples.
+        :yields: ``(x_mm, y_mm)`` tuples.
+        """
         for r, theta in coords:
             x = r * np.cos(np.deg2rad(theta))
             y = r * np.sin(np.deg2rad(theta))
             yield (x, y)
 
     def _parse_packet(self, packet: bytes) -> Optional[LiDARPacket]:
+        """Parse a raw 47-byte LD19 packet into a :class:`LiDARPacket`.
+
+        Extracts speed, angles, timestamp, CRC, and 12 measurement points
+        with interpolated angles.
+
+        :param packet: Raw 47-byte packet from the serial stream.
+        :returns: Parsed :class:`LiDARPacket`, or ``None`` if invalid.
+        """
         if len(packet) != self.PACKET_LEN:
             return None
 
@@ -116,11 +143,24 @@ class LiDAR:
 
     @staticmethod
     def _interpolate_angles(start: float, end: float, count: int) -> List[float]:
+        """Linearly interpolate angles between start and end (wrapping 360°).
+
+        :param start: Start angle in degrees.
+        :param end: End angle in degrees.
+        :param count: Number of interpolation points.
+        :returns: List of interpolated angles in degrees.
+        """
         angle_range = (end - start + 360.0) % 360.0
         step = angle_range / (count - 1)
         return [((start + i * step) % 360.0) for i in range(count)]
 
     async def _serial_listener(self) -> NoReturn:
+        """Background task that reads raw bytes and parses LD19 packets.
+
+        Accumulates chunks into :attr:`_buffer`, extracts full packets,
+        parses them, and stores the latest packet in :attr:`_latest_packet`.
+        Sets :attr:`_packet_event` when a new packet is available.
+        """
         assert self.SERIAL is not None, "Serial interface not initialized. Did you forget to use the async context manager?"
 
         while True:
@@ -194,6 +234,14 @@ class LiDAR:
             logger.warning("No LiDAR serial listener to cancel")
 
     async def capture_packet(self, timeout: float = 1.0) -> bool:
+        """Wait for the next available LiDAR packet.
+
+        Clears :attr:`_packet_event` and waits for the listener to set it.
+
+        :param timeout: Maximum wait time in seconds.
+        :returns: ``True`` if a new packet was captured, ``False`` on timeout.
+        :rtype: bool
+        """
         self._packet_event.clear()
         try:
             await asyncio.wait_for(self._packet_event.wait(), timeout=timeout)

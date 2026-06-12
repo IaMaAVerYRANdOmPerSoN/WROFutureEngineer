@@ -1,3 +1,9 @@
+"""Pi Client - Main robot control package.
+
+This package provides the core logging configuration, challenge runners,
+and module-level imports for the WRO Future Engineer robot.
+"""
+
 import sys
 from loguru import logger
 
@@ -7,6 +13,7 @@ LOG_FORMAT = (
     "<level>{level: <8}</level> | "
     "<level>{message}</level>"
 )
+"""str: Default loguru format string with coloured time, line, function, and level fields."""
 
 
 def configure_logging(verbose: bool = False, debug: bool = False) -> None:

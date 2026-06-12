@@ -1,33 +1,51 @@
+"""Asynchronous camera interface using picamera2.
+
+Provides :class:`AsyncCamera`, a native async wrapper over the picamera2
+library that supports non-blocking frame capture, shared memory streaming,
+and subprocess-safe context management.
+"""
+
 import asyncio
 from multiprocessing.connection import Connection
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
-from src import logger
-# pyright: ignore[reportMissingImports] TODO: Get the .pyi file from the picamera2 repo and add it to the project so my stuff gets linted.
+from src import logger 
 import picamera2
 from multiprocessing import shared_memory
-from src.modules.config import Config
+from src.modules.lib.config import Config
 from typing import Dict
 
 
 class AsyncCamera():
-    def __init__(self, config=Config.CameraConfig().FORMAT, sensor_config=Config.CameraConfig().SENSOR_CONFIG, controls_config=Config.CameraConfig().CONTROLS_CONFIG,):
-        """
-        The constructor for the AsyncCamera class.
+    """
+    A native python asynchronus wrapper over the picamera2.Picamera2 class
 
-        :param self: The instance of `AsyncCamera`.
-        :param config: A PiCamera2 configuration dictionary passed to `picamera2.Picamera2.create_preview_configuration()`.
+    :ivar config: Camera format configuration dict (default: ``CameraConfig.FORMAT``).
+    :ivar sensor_config: Sensor mode configuration dict (default: ``CameraConfig.SENSOR_CONFIG``).
+    :ivar controls_config: Camera controls configuration dict (default: ``CameraConfig.CONTROLS_CONFIG``).
+    :ivar _cam: Internal picamera2.Picamera2 instance for frame capture, initilized to none and created by ``__aenter__``
+    :ivar frame_width: Infered width of frame from configuration values
+    :ivar frame_height: Infered height of frame from configuration values
+    :ivar loop: Asyncio event loop to run capture coroutines
+    :ivar executor: ``Concurent.futures.ThreadPoolExecutor`` created by __aenter__ for running synchronus picamera2 functions asynchronusly.
+    
+    """
+    def __init__(self, config=Config.CameraConfig().FORMAT, sensor_config=Config.CameraConfig().SENSOR_CONFIG, controls_config=Config.CameraConfig().CONTROLS_CONFIG,):
+        """Initialize the async camera wrapper.
+
+        :param config: Camera format configuration dict (default: ``CameraConfig.FORMAT``).
+        :param sensor_config: Sensor mode configuration dict (default: ``CameraConfig.SENSOR_CONFIG``).
+        :param controls_config: Camera controls configuration dict (default: ``CameraConfig.CONTROLS_CONFIG``).
         """
-        self._CONFIG: Dict = config
-        self._SENSOR_CONFIG: Dict = sensor_config
-        self._CONTROLS_CONFIG: Dict = controls_config
+        self.config: Dict = config
+        self.sensor_config: Dict = sensor_config
+        self.controls_config: Dict = controls_config
         self._cam = None
 
-        self.FRAME_WIDTH, self.FRAME_HEIGHT = self._CONFIG["size"]
+        self.frame_width, self.frame_height = self.config["size"]
 
         self.loop = asyncio.get_event_loop()
         self.executor = None
-        self.INITIAL_ROI = Config.CameraConfig().INITIAL_ROI
 
     async def __aenter__(self):
         """
@@ -50,10 +68,10 @@ class AsyncCamera():
             )
 
             config = self._cam.create_preview_configuration(
-                main=self._CONFIG,
-                sensor=self._SENSOR_CONFIG,
+                main=self.config,
+                sensor=self.sensor_config,
                 raw=None,
-                controls=self._CONTROLS_CONFIG,
+                controls=self.controls_config,
                 buffer_count=Config.CameraConfig.BUFFER_COUNT,
             )
 
@@ -79,6 +97,12 @@ class AsyncCamera():
 
     # Let the main loop handle the logging and execeptions
     async def __aexit__(self, *args):
+        """Tear down camera hardware resources asynchronously.
+
+        Stops the camera, closes the device, and shuts down the thread pool
+        executor. Exceptions during cleanup are intentionally not raised so
+        the main loop can handle logging.
+        """
         if hasattr(self, "_cam") and self._cam:
             await self.loop.run_in_executor(self.executor, self._cam.stop)
             await self.loop.run_in_executor(self.executor, self._cam.close)
@@ -87,18 +111,20 @@ class AsyncCamera():
         if hasattr(self, "executor") and self.executor:
             self.executor.shutdown()
 
-    async def get_frame_async(self, timeout=0.1, shm_name=None):
+    async def get_frame_async(self, shm: shared_memory.SharedMemory | None = None, timeout=0.1) -> None | np.ndarray:
         """
         Fetch a frame asynchronously from `self._cam`
 
         :param self: The instance of `AsyncCamera`
         :param timeout: The maximum roundtrip time, in seconds, before raising asyncio.TimeoutError
-        :returns: frame: a 3D array of shape `Vres * Hres * 3` Where each pixel is represented in YUV color space.
+        :returns: frame: an array representing the captured frame, determined by the format passed to the constructor.
+        :raises: AttributeError when self._cam does is None, usually due to improper context management.
         """
 
-        shm = shared_memory.SharedMemory(name=shm_name) if shm_name else None
-
         while True:
+            if not self._cam:
+                raise AttributeError("Please Use the AysncCamera's aysnc context manager to initilize hardware resources before perfoming any operations.")
+
             try:
                 async with self._capture_semaphore:
                     # type: ignore
@@ -107,47 +133,16 @@ class AsyncCamera():
                             self.executor, self._cam.capture_array),
                         timeout=timeout,
                     )
-
-                expected_rows = self.FRAME_HEIGHT + (self.FRAME_HEIGHT // 2)
-
-                if frame.ndim != 2 or frame.shape[0] < expected_rows or frame.shape[1] < self.FRAME_WIDTH:
-                    raise ValueError(
-                        f"Unexpected YUV420 frame shape {frame.shape}; expected at least ({expected_rows}, {self.FRAME_WIDTH})"
-                    )
-
-                packed = np.ascontiguousarray(
-                    frame[:expected_rows, :self.FRAME_WIDTH]).ravel()
-                y_size = self.FRAME_HEIGHT * self.FRAME_WIDTH
-                uv_size = (self.FRAME_HEIGHT // 2) * (self.FRAME_WIDTH // 2)
-                expected_size = y_size + (2 * uv_size)
-                if packed.size < expected_size:
-                    raise ValueError(
-                        f"Truncated YUV420 buffer size {packed.size}; expected at least {expected_size}"
-                    )
-
-                y_plane = packed[:y_size].reshape(
-                    (self.FRAME_HEIGHT, self.FRAME_WIDTH))
-                u_plane_raw = packed[y_size:y_size + uv_size].reshape(
-                    (self.FRAME_HEIGHT // 2, self.FRAME_WIDTH // 2))
-                v_plane_raw = packed[y_size + uv_size:y_size + (2 * uv_size)].reshape(
-                    (self.FRAME_HEIGHT // 2, self.FRAME_WIDTH // 2))
-
-                y_plane = y_plane[self.INITIAL_ROI:, :]
-                u_plane_raw = u_plane_raw[self.INITIAL_ROI // 2:, :]
-                v_plane_raw = v_plane_raw[self.INITIAL_ROI // 2:, :]
-
-                u_plane = u_plane_raw.repeat(2, axis=0).repeat(2, axis=1)
-                v_plane = v_plane_raw.repeat(2, axis=0).repeat(2, axis=1)
-
-                full_yuv = np.dstack((y_plane, u_plane, v_plane))
-
+                
                 if shm:
-                    buffer = np.ndarray(
-                        (self.FRAME_HEIGHT - self.INITIAL_ROI, self.FRAME_WIDTH, 3), dtype=np.uint8, buffer=shm.buf)
-                    np.copyto(buffer, full_yuv)
+                    # Copy BGR888 data (H, W, 3) to shared buffer
+                    shared_buffer = np.ndarray(
+                        (self.frame_height, self.frame_width, 3), dtype=np.uint8, buffer=shm.buf)
+                    np.copyto(shared_buffer, frame)
 
-                logger.info(f"Fetched new frame from PiCamera successfully")
-                return full_yuv.astype(np.uint8)
+                    return
+                else:
+                    return frame.astype(np.uint8)
 
             except asyncio.TimeoutError as e:
                 logger.warning(
@@ -180,16 +175,31 @@ class AsyncCamera():
         :returns: `None`
         """
 
-        while True:
-            await self.get_frame_async(shm_name=shm_name)
-            # Signal that a new frame is ready, the frame itself is in shared memory so we dont have to send it through the pipe.
-            sender.send(True)
-            if args:
-                for conn in args:
-                    conn.send(True)
+        shm = None
+        try:
+            shm = shared_memory.SharedMemory(name=shm_name)
+            while True:
+                await self.get_frame_async(shm=shm)
+                # Signal that a new frame is ready
+                sender.send(True)
+                if args:
+                    for conn in args:
+                        conn.send(True)
+        finally:
+            if shm:
+                shm.close()
 
     @staticmethod
     def camera_process_context_manager(shm, sender):
+        """Subprocess entry point for streaming camera frames.
+
+        Creates an :class:`AsyncCamera` instance within a fresh asyncio
+        event loop and streams frames into the shared memory block named
+        *shm*, signalling *sender* when each frame is ready.
+
+        :param shm: Name of the shared memory block for frame data.
+        :param sender: Multiprocessing :class:`Connection` used to signal new frames.
+        """
         async def _run(shm, sender):
             async with AsyncCamera() as camera:
                 await camera.stream(shm, sender)

@@ -1,10 +1,21 @@
+"""Control diagnostics tool.
+
+Displays PD controller outputs for both the Open and Obstacle challenges,
+helping to tune gains and visualise correction signals.
+"""
+
 from utils import cv2
 from utils.tools.base_tool import BaseTool
-from src.modules.controller import PD
-from src.modules.config import Config
+from src.modules.lib.controller import PD
+from src.modules.lib.config import Config
 
 
 class ControlTool(BaseTool):
+    """Tool for viewing PD controller outputs in real time.
+
+    Computes wall-following, corner-turn, and obstacle-avoidance
+    corrections for both challenge types and overlays them on the frame.
+    """
     def __init__(self):
         super().__init__(name="control", description="View control status and diagnostics")
         self.open_challenge_pd_straight = PD(
@@ -19,6 +30,14 @@ class ControlTool(BaseTool):
             *Config.ObstacleChallengeConfig.OBSTACLE_AVOID_KPKD)
 
     def _compute(self, data, *args, **kwargs):
+        """Compute PD controller outputs from vision data.
+
+        Runs wall-following, corner-turn, and obstacle-avoidance PD
+        controllers for both the Open and Obstacle challenges.
+
+        :param data: Vision pipeline output tuple.
+        :returns: Dict mapping correction names to float values.
+        """
         zone, walls, obstacles, corner_lines, wall_dists, obstacle_dists = data
         open_challenge_straight_correction = self.open_challenge_pd_straight.tick(
             wall_dists["left"] - wall_dists["right"]
@@ -58,6 +77,10 @@ class ControlTool(BaseTool):
         }
 
     def _draw(self, data, *args, **kwargs):
+        """Draw PD controller outputs as text overlays on the frame.
+
+        :param data: Vision pipeline output tuple.
+        """
         data = self._compute(data, *args, **kwargs)
         for key, value in data.items():
             cv2.putText(self.frame, f"{key}: {value:.2f}", (10, 30 + 30 * list(
@@ -65,6 +88,13 @@ class ControlTool(BaseTool):
         cv2.imshow("Control Status", self.frame)
 
     def _draw_no_perspective(self, data, *args, **kwargs):
+        """Draw PD outputs on the unwarped frame.
+
+        Perspective transforms are non-linear, so outputs differ between
+        the warped and unwarped views. Both are displayed for debugging.
+
+        :param data: Vision pipeline output tuple.
+        """
         self._draw(data, *args, **kwargs)
         cv2.imshow("Control Status No Transform", self.frame)
         # Because perspective transform is nonlinear the outputs will be different,
@@ -74,5 +104,6 @@ class ControlTool(BaseTool):
 
 
 async def run_control_tool():
+    """Entry point for the control diagnostics tool."""
     tool = ControlTool()
     await tool.run()

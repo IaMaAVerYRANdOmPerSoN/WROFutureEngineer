@@ -1,13 +1,24 @@
 
+"""Pi Client entry point.
+
+Parses command-line arguments and dispatches to the selected challenge
+loop (open or obstacle). Supports --verbose and --debug logging flags.
+"""
+
 import asyncio
 import sys
-from src.modules.open_challenge import run_open_challenge
-from src.modules.obstacle_challenge import run_obstacle_challenge
+from src.modules.core.open_challenge import run_open_challenge
+from src.modules.core.obstacle_challenge import run_obstacle_challenge
 import argparse
 from src import configure_logging, logger
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse command-line arguments for the Pi Client.
+
+    :returns: Parsed namespace with ``--verbose``, ``--debug``, and ``--challenge`` options.
+    :rtype: argparse.Namespace
+    """
     parser = argparse.ArgumentParser(
         description="Run the main control loop for the robot.")
 
@@ -18,13 +29,6 @@ def parse_args() -> argparse.Namespace:
                        help="Enable debug logging to verbose.txt (overrides --verbose)")
 
     parser.add_argument(
-        "--test",
-        nargs="?",  # Optional
-        const="all",  # Empty = "all"
-        choices=["camera", "vision", "rpc", "vision_rpc", "all"],
-        help="Run specific tests (default: all)",
-    )
-    parser.add_argument(
         "--challenge",
         choices=["open", "obstacle"],
         default="open",
@@ -34,58 +38,23 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def test_main(test_target: str):
-    try:
-        if test_target == "camera":
-            from src.tests.unit.camera import run_tests as camera_tests
-            asyncio.run(camera_tests())
-        elif test_target == "vision":
-            from src.tests.unit.vision import run_tests as vision_tests
-            asyncio.run(vision_tests())
-        elif test_target == "rpc":
-            from src.tests.unit.rpc import run_tests as rpc_tests
-            asyncio.run(rpc_tests())
-        elif test_target == "vision_rpc":
-            from src.tests.integration.vision_rpc import run_tests as vision_rpc_tests
-            asyncio.run(vision_rpc_tests())
-        elif test_target == "all":
-            from src.tests.unit.vision import run_tests as vision_tests
-            from src.tests.unit.camera import run_tests as camera_tests
-            from src.tests.unit.rpc import run_tests as rpc_tests
-            from src.tests.integration.vision_rpc import run_tests as vision_rpc_tests
-
-            async def run_all_tests():
-                await camera_tests()
-                await vision_tests()
-                await rpc_tests()
-                await vision_rpc_tests()
-            asyncio.run(run_all_tests())
-        else:
-            raise ValueError(
-                "Invalid test option. Use --test, --test camera, --test vision, --test rpc, or --test all.")
-
-        logger.success("All tests completed successfully!")
-    except AssertionError as e:
-        logger.critical(f"Test failed: {e}")
-        logger.info(
-            "Test failed with an assertion error, not an runtime exception. Perhaps check your typing or add type annotations michael -_-")
-        # Re-raise to be caught by main's exception handler
-        logger.exception("Traceback:")
-        raise RuntimeError(
-            "One or more tests failed. See logs for details.") from e
-
-
 def main():
+    """Main entry point for the Pi Client.
+
+    Configures logging, selects the challenge based on CLI arguments,
+    and runs the appropriate async challenge loop. Handles graceful
+    shutdown on KeyboardInterrupt and logs fatal exceptions.
+    """
     parsed_args = parse_args()
     configure_logging(verbose=parsed_args.verbose, debug=parsed_args.debug)
 
     try:
-        if parsed_args.test:
-            test_main(parsed_args.test)
-        elif parsed_args.challenge == "obstacle":
+        if parsed_args.challenge == "obstacle":
             asyncio.run(run_obstacle_challenge())
-        else:
+        elif parsed_args.challenge == "open":
             asyncio.run(run_open_challenge())
+        else:
+            logger.warning("Nothing to run!")
 
         exitcode = 0
     except KeyboardInterrupt:

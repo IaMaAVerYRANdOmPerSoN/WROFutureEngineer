@@ -1,3 +1,8 @@
+"""Utilities package for tuning and debugging tools.
+
+Provides shared logging, OpenCV access, and the tool launcher entry point.
+"""
+
 import sys
 from loguru import logger
 import cv2
@@ -8,6 +13,7 @@ LOG_FORMAT = (
     "<level>{level: <8}</level> | "
     "<level>{message}</level>"
 )
+"""str: Default loguru format string with coloured time, line, function, and level fields."""
 
 def configure_logging(verbose: bool = False, debug: bool = False) -> None:
     """Configure shared logging sinks for the Pi client package."""
