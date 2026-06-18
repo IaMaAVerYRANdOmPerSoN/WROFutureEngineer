@@ -1,0 +1,8 @@
+~_autosave-EDA.kicad_pcb.lck
+EDA-backups/*
+EDA.kicad_prl
+EDA.kicad_sch-bak
+EDA.pdf
+EDA.plt
+fp-info-cache
+# Stuff that needs to be kept (tracked in git): EDA.kicad_pcb, EDA.kicad_sch, EDA.kicad_pro

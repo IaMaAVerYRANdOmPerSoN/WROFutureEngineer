@@ -1,7 +1,7 @@
 import asyncio
+import numpy as np
 from asyncCamera import AsyncCamera
 from visionProcessing import AsyncVisionProcessor
-import numpy as np
 from loguru import logger
 import multiprocessing as mp
 from multiprocessing import shared_memory
