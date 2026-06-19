@@ -8,14 +8,15 @@ coalescing drive commands with latest-wins semantics.
 import aioserial
 import asyncio
 import re
-from src import logger
+from piclient import logger
 from itertools import cycle
 from typing import Literal, NoReturn, Tuple
-from src.modules.lib.config import Config
+from ..lib import Config, export
 from collections import defaultdict
 
 
-class Client():
+@export
+class Client:
     """Async serial client for the Arduino communication protocol.
 
     Manages a TID-based request/response pipeline with a background
@@ -304,7 +305,8 @@ class Client():
         return response == '200 OK'
 
 
-class DriveCommandExecutor():
+@export
+class DriveCommandExecutor:
     """
     A fully-async, single-consumer executor for drive commands.
 

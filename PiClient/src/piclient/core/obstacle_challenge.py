@@ -5,17 +5,15 @@ main control loop for the WRO obstacle challenge course.
 """
 
 import asyncio
-from multiprocessing.connection import Connection
-from typing import Literal, cast
-from src import logger
-from src.modules.interface.comm_protocol import Client
-from src.modules.interface.async_camera import AsyncCamera
-from src.modules.vision.async_base import AsyncMultiprocessingVisionProcessor
-from src.modules.lib.controller import PD
-from src.modules.lib.config import Config
+from typing import Literal
+from piclient import logger
+from ..interface import Client, AsyncCamera
+from ..vision import AsyncMultiprocessingVisionProcessor
+from ..lib import PD, Config, export
 import multiprocessing as mp
 from multiprocessing import shared_memory
 
+@export
 async def run_obstacle_challenge():
     """Asynchronus runner for the *obstacle challenge*"""
 
@@ -60,7 +58,7 @@ async def run_obstacle_challenge():
             # Vision process listens on cam_receiver for the signal, then reads the frame from shared memory, processes it, and sends the results back through data_sender.
             # Staticmethod data_yielder polls the data_receiver for data and yields it to the main loop.
 
-            async for zone, walls, obstacles, corner_lines, wall_x_diffs, obstacle_x_diffs, obstacle_path_x in AsyncMultiprocessingVisionProcessor.async_pipe_reader(cast(Connection, data_receiver)):
+            async for zone, walls, obstacles, corner_lines, wall_x_diffs, obstacle_x_diffs, obstacle_path_x in AsyncMultiprocessingVisionProcessor.async_pipe_reader(data_receiver):
 
                 logger.debug(
                     f"Zone: {zone}, Walls: {walls}, Obstacles: {obstacles}, Corner Lines: {corner_lines}, Wall Dists: {wall_x_diffs}, Obstacle Dists: {obstacle_x_diffs}, Obstacle Path X: {obstacle_path_x}")

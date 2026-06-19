@@ -51,5 +51,16 @@ def configure_logging(verbose: bool = False, debug: bool = False) -> None:
     else:
         logger.add(sys.stderr, level="WARNING", format=LOG_FORMAT)
 
+from . import core
+from . import interface
+from . import lib
+from . import vision
 
-__all__ = ["configure_logging", "logger"]
+__all__ = [
+    "core",
+    "interface",
+    "lib",
+    "vision",
+    "configure_logging",
+    "logger"
+]

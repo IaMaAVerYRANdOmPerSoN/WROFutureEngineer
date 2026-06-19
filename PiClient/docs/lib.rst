@@ -3,12 +3,5 @@ Lib
 
 Basic configuration and utilities.
 
-.. automodule:: src.modules.lib.config
+.. automodule:: piclient.lib
     :members:
-    :private-members:
-    :undoc-members:
-
-.. automodule:: src.modules.lib.controller
-    :members:
-    :private-members:
-    :undoc-members:

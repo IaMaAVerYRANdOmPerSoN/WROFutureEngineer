@@ -5,17 +5,19 @@ Combines :class:`OpenChallengeVisionProcessor` with
 wall-distance measurement.
 """
 
-from src import logger
+from piclient import logger
 
-from src.modules.vision.open_challenge import OpenChallengeVisionProcessor
-from src.modules.vision.async_base import AsyncMultiprocessingVisionProcessor
-from src.modules.lib.config import Config
+from .open_challenge import OpenChallengeVisionProcessor
+from .async_base import AsyncMultiprocessingVisionProcessor
+from ..lib import Config, export
 
 from multiprocessing import shared_memory 
-from multiprocessing.connection import Connection
+from multiprocessing.connection import PipeConnection
 
 import numpy as np
 
+
+@export
 class OpenChallengeAsyncMultiprocessingVisionProcessor(OpenChallengeVisionProcessor, AsyncMultiprocessingVisionProcessor):
     """Async multiprocessing vision processor for the Open Challenge.
 
@@ -36,7 +38,7 @@ class OpenChallengeAsyncMultiprocessingVisionProcessor(OpenChallengeVisionProces
         """
         return await self.loop.run_in_executor(self.executor, super(OpenChallengeAsyncMultiprocessingVisionProcessor, self).get_normalized_relative_wall_distances, frame)
     
-    async def comprehensive_analysis(self, shm_name: str, receiver: Connection, sender: Connection ) -> None:
+    async def comprehensive_analysis(self, shm_name: str, receiver: PipeConnection, sender: PipeConnection ) -> None:
         """Full async vision pipeline for the Open Challenge.
 
         Reads frames from shared memory, computes wall distances, and

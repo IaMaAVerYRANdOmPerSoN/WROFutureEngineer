@@ -6,17 +6,17 @@ main control loop for the WRO open challenge course.
 
 import multiprocessing as mp
 from multiprocessing import shared_memory
-from src.modules.interface.async_camera import AsyncCamera
-from src.modules.vision.async_open import OpenChallengeAsyncMultiprocessingVisionProcessor
+from ..interface import AsyncCamera
+from ..vision import OpenChallengeAsyncMultiprocessingVisionProcessor
 import numpy as np
 import cv2
-from src.modules.interface.comm_protocol import Client, DriveCommandExecutor
-from src.modules.lib.config import Config
-from src.modules.lib.controller import PD
-from src import logger
+from ..interface import Client, DriveCommandExecutor
+from ..lib import Config, PD, export
+from piclient import logger
 import time
 from typing import Literal
 
+@export
 async def run_open_challenge():
     """
     asynchronus runner for the *open challenge*

@@ -3,10 +3,12 @@
 Provides :class:`PD`, a simple proportional-derivative controller.
 """
 
-from src import logger
+from piclient import logger
+from .exporter import export
 
 
-class PD():
+@export
+class PD:
     """Proportional-Derivative (PD) controller.
 
     A simple PD controller with no integral term. Suitable for

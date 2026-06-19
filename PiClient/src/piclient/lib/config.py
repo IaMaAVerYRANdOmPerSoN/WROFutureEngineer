@@ -5,12 +5,13 @@ and challenge-specific tuning parameters.
 """
 
 from dataclasses import dataclass, field
-from tkinter import N
 from typing import ClassVar, Dict, Tuple
 import numpy as np
+from .exporter import export
 
 
-class Config():
+@export
+class Config:
     """Root configuration container.
 
     All configuration is organised into nested :class:`dataclass` subclasses.
@@ -18,7 +19,7 @@ class Config():
     """
 
     @dataclass
-    class CameraConfig():
+    class CameraConfig:
         """Camera hardware and frame-capture settings.
 
         Controls picamera2 format, resolution, thread pool size,
@@ -51,7 +52,7 @@ class Config():
         })
 
     @dataclass
-    class ClientConfig():
+    class ClientConfig:
         """Serial client communication settings.
 
         Defines the serial port, baud rate, timeouts, TID range,
@@ -74,7 +75,7 @@ class Config():
         SERVO_MAX_ANGLE: int = 180
 
     @dataclass
-    class VisionConfig():
+    class VisionConfig:
         """Vision processing parameters.
 
         Includes the perspective-transform homography matrix, HSV colour
@@ -98,7 +99,7 @@ class Config():
         RIGHT_WALL_ROI: Tuple = np.s_[208 // 12: 208 - 208 // 5, 512 - 512 // 5:]
 
     @dataclass
-    class OpenChallengeConfig():
+    class OpenChallengeConfig:
         """Tuning parameters for the Open Challenge.
 
         Includes PD gains, speeds, hysteresis thresholds, shared memory
@@ -117,7 +118,7 @@ class Config():
         TURN_DETECTION_THRESHOLD: float = 0.1
 
     @dataclass
-    class ObstacleChallengeConfig():
+    class ObstacleChallengeConfig:
         """Tuning parameters for the Obstacle Challenge.
 
         Includes PD gains for wall-following, corner turning, and obstacle
@@ -135,7 +136,7 @@ class Config():
         LAP_LENGTH_IN_TURNS: int = 4*3  # 4 turns per lap, 3 laps total
 
     @dataclass
-    class LiDARConfig():
+    class LiDARConfig:
         """LD19 LiDAR serial and packet settings.
 
         Defines the UART port, baud rate, packet framing constants,

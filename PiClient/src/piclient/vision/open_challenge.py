@@ -4,12 +4,14 @@ Extends :class:`VisionProcessor` with wall-distance measurement using
 left/right regions of interest.
 """
 
-from src.modules.vision.data import Walls
-from src.modules.vision.base import VisionProcessor
-from src.modules.lib.config import Config
+from .data import Walls
+from .base import VisionProcessor
+from ..lib import Config, export
 import numpy as np
 import cv2
 
+
+@export
 class OpenChallengeVisionProcessor(VisionProcessor):
     """Vision processor specialised for the Open Challenge.
 

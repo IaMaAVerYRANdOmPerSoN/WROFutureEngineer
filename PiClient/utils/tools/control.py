@@ -6,8 +6,8 @@ helping to tune gains and visualise correction signals.
 
 from utils import cv2
 from utils.tools.base_tool import BaseTool
-from src.modules.lib.controller import PD
-from src.modules.lib.config import Config
+from src.piclient.lib.controller import PD
+from src.piclient.lib.config import Config
 
 
 class ControlTool(BaseTool):

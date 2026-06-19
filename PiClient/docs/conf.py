@@ -25,7 +25,12 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path('..').resolve()))
+sys.path.insert(0, str(Path('..', 'src').resolve()))
+
+# Mock Raspberry Pi hardware libraries so autodoc can import on non-Pi machines
+autodoc_mock_imports = [
+    "picamera2",
+]
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output

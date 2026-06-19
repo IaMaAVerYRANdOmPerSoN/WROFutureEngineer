@@ -5,12 +5,15 @@ context management, pipe-based data reading, and subprocess scaffolding
 to :class:`VisionProcessor`.
 """
 
-from src.modules.vision.base import VisionProcessor
+from .base import VisionProcessor
+from ..lib import export
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from collections import deque
-from multiprocessing.connection import Connection
+from multiprocessing.connection import PipeConnection
 
+
+@export
 class AsyncMultiprocessingVisionProcessor(VisionProcessor):
     """Async-capable vision processor with multiprocessing support.
 
@@ -57,7 +60,7 @@ class AsyncMultiprocessingVisionProcessor(VisionProcessor):
         raise NotImplementedError("Comprehensive analysis is abstract")
 
     @staticmethod
-    async def async_pipe_reader(receiver: Connection):
+    async def async_pipe_reader(receiver: PipeConnection):
         """Async generator that yields data from a multiprocessing pipe.
 
         On Linux, uses ``loop.add_reader`` for efficient event-driven
@@ -99,7 +102,7 @@ class AsyncMultiprocessingVisionProcessor(VisionProcessor):
                 yield data
 
     @classmethod
-    def vision_process_context_manager(cls, shm, frameReceiver: Connection, data_sender: Connection, executor_size = 5, loop: asyncio.EventLoop | None = None):
+    def vision_process_context_manager(cls, shm, frameReceiver: PipeConnection, data_sender: PipeConnection, executor_size = 5, loop: asyncio.EventLoop | None = None):
         """Subprocess entry point for the vision pipeline.
 
         Creates an instance of this class, enters its async context,

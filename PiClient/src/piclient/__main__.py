@@ -7,13 +7,13 @@ loop (open or obstacle). Supports --verbose and --debug logging flags.
 
 import asyncio
 import sys
-from src.modules.core.open_challenge import run_open_challenge
-from src.modules.core.obstacle_challenge import run_obstacle_challenge
+from .core.open_challenge import run_open_challenge
+from .core.obstacle_challenge import run_obstacle_challenge
 import argparse
-from src import configure_logging, logger
+from . import configure_logging, logger
 
 
-def parse_args() -> argparse.Namespace:
+def _parse_args() -> argparse.Namespace:
     """Parse command-line arguments for the Pi Client.
 
     :returns: Parsed namespace with ``--verbose``, ``--debug``, and ``--challenge`` options.
@@ -45,7 +45,7 @@ def main():
     and runs the appropriate async challenge loop. Handles graceful
     shutdown on KeyboardInterrupt and logs fatal exceptions.
     """
-    parsed_args = parse_args()
+    parsed_args = _parse_args()
     configure_logging(verbose=parsed_args.verbose, debug=parsed_args.debug)
 
     try:

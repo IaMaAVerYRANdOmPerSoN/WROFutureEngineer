@@ -5,12 +5,15 @@ for normalised wall-distance measurements.
 """
 
 from dataclasses import dataclass
+from ..lib import export
 import numpy as np
 import cv2
 from typing import Tuple
 
+
+@export
 @dataclass
-class VisionObject():
+class VisionObject:
     """A detected object in the camera frame.
 
     Wraps an OpenCV contour with colour metadata and derived properties
@@ -28,14 +31,16 @@ class VisionObject():
     def __post_init__(self):
         """Compute bounding-box and centroid properties after dataclass init."""
         # Added custom type stub, default type stubs use Sequence[int]
-        self.bbox: Tuple[int, int, int, int] = cv2.boundingRect(self.contour)
+        self.bbox: cv2.typing.Rect = cv2.boundingRect(self.contour)
         x, y, w, h = self.bbox
         self.x_centroid: float = x + w/2
         self.y_centroid: float = y + h/2
         # Bottom y deprecated because perspective transform makes everything top-down
 
+
+@export
 @dataclass
-class Walls():
+class Walls:
     """Normalised wall-distance measurements.
 
     Distances are expressed as the fraction of black pixels in the

@@ -9,14 +9,23 @@ import asyncio
 from multiprocessing.connection import Connection
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
-from src import logger 
-import picamera2
+from piclient import logger 
+
+try:
+    import picamera2 # pyright: ignore[reportMissingImports]
+except ImportError:
+    # Probally not on Pi
+    logger.warning("picamera2 import failed, are you running on a Raspberry Pi?" \
+    "Make sure include-system-site-packages=true in your environment." \
+    "If you are building documentation or testing on a different OS, you may ignore this message," \
+    "but some modules will not work as inteded, and may raise exceptions.")
 from multiprocessing import shared_memory
-from src.modules.lib.config import Config
+from ..lib import Config, export
 from typing import Dict
 
 
-class AsyncCamera():
+@export
+class AsyncCamera:
     """
     A native python asynchronus wrapper over the picamera2.Picamera2 class
 
@@ -117,7 +126,7 @@ class AsyncCamera():
 
         :param self: The instance of `AsyncCamera`
         :param timeout: The maximum roundtrip time, in seconds, before raising asyncio.TimeoutError
-        :returns: frame: an array representing the captured frame, determined by the format passed to the constructor.
+        :returns: *np.ndarray* an array representing the captured frame, determined by the format passed to the constructor.
         :raises: AttributeError when self._cam does is None, usually due to improper context management.
         """
 

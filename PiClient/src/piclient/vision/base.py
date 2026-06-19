@@ -4,14 +4,16 @@ Provides :class:`VisionProcessor` with common preprocessing, perspective
 transform, and contour-finding utilities.
 """
 
-from src.modules.lib.config import Config
+from ..lib import Config, export
 import numpy as np
 import cv2
-from src.modules.vision.data import VisionObject
-from src import logger
+from .data import VisionObject
+from piclient import logger
 from typing import Sequence, Tuple
 
-class VisionProcessor():
+
+@export
+class VisionProcessor:
     """Base class for vision processing pipelines.
 
     Handles HSV conversion, ROI cropping, perspective transforms,

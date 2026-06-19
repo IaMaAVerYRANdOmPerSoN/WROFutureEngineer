@@ -7,7 +7,7 @@ transformation, with no overlays.
 from utils import cv2
 import numpy as np
 from utils.tools.base_tool import BaseTool
-from src.modules.lib.config import Config
+from src.piclient.lib.config import Config
 
 
 class RawTool(BaseTool):

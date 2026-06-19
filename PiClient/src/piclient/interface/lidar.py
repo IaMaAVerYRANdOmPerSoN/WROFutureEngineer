@@ -14,26 +14,30 @@ from typing import Any, Dict, Generator, List, NoReturn, Optional, Sequence, Tup
 
 import aioserial
 
-from src import logger
-from src.modules.lib.config import Config
+from piclient import logger
+from ..lib import Config, export
 
 from multiprocessing.connection import Connection
 
 
+@export
 @dataclass
 class LiDARPacket:
     """
     Represents a single LD19 LiDAR packet with parsed fields.
-    Attributes:
-        speed (float): Rotational speed in RPM.
-        start_angle (float): Starting angle of the scan in degrees.
-        end_angle (float): Ending angle of the scan in degrees.
-        timestamp (int): Timestamp from the LiDAR in milliseconds.
-        crc (int): CRC byte from the packet for integrity checking.
-        points (List[Dict[str, Any]]): List of measurement points, each containing:
-            - x (float): X coordinate in millimeters.
-            - y (float): Y coordinate in millimeters.
-            - confidence (int): Confidence level of the measurement (0-255).
+
+    :ivar speed: Rotational speed in RPM.
+    :vartype speed: float
+    :ivar start_angle: Starting angle of the scan in degrees.
+    :vartype start_angle: float
+    :ivar end_angle: Ending angle of the scan in degrees.
+    :vartype end_angle: float
+    :ivar timestamp: Timestamp from the LiDAR in milliseconds.
+    :vartype timestamp: int
+    :ivar crc: CRC byte from the packet for integrity checking.
+    :vartype crc: int
+    :ivar points: List of measurement points, each containing:
+    :vartype points: List[Dict[str, Any]]
     """
     speed: float
     start_angle: float
@@ -43,6 +47,7 @@ class LiDARPacket:
     points: List[Dict[str, Any]]
 
 
+@export
 class LiDAR:
     """Async LD19 LiDAR reader.
 
