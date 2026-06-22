@@ -1,0 +1,25 @@
+[build-system]
+requires = ["hatchling >= 1.26"]
+build-backend = "hatchling.build"
+
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/piclient/obstacle_challenge"]
+
+
+[project]
+name = "piclient-obstacle-challenge"
+version = "0.0.1"
+authors = [
+    { name = "Michael Xie", email = "wenmike.xie@gmail.com" },
+]
+description = "Apostla team WRO FE 2026 - Obstacle Challenge runner"
+
+requires-python = ">=3.10"
+dependencies = [
+    "piclient",
+]
+
+classifiers = [
+    "Private :: Do Not Upload",
+]

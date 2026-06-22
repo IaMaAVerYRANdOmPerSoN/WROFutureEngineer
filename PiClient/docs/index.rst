@@ -10,7 +10,9 @@ Apostla documentation
    :maxdepth: 2
    :caption: Contents:
 
-   core
+   wrofutureengineer
+   open_challenge
+   obstacle_challenge
    interface
    lib
    vision

@@ -1,7 +1,5 @@
 Interface
 =========
 
-Classes for interfacing with hardware resources.
-
-.. automodule:: piclient.interface
+.. automodule:: piclient.core.interface
     :members:

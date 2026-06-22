@@ -1,9 +1,6 @@
 Vision
 ======
 
-Vision logic classes.
-
-
-.. automodule:: piclient.vision
+.. automodule:: piclient.core.vision
     :members:
     :private-members:

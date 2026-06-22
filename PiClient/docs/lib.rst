@@ -1,7 +1,5 @@
 Lib
 ===
 
-Basic configuration and utilities.
-
-.. automodule:: piclient.lib
+.. automodule:: piclient.core.lib
     :members:

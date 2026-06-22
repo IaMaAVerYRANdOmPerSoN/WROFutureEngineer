@@ -9,9 +9,9 @@ from multiprocessing.connection import Connection
 import multiprocessing as mp
 from multiprocessing import shared_memory
 from utils import cv2, logger
-from src.piclient.vision.async_base import AsyncMultiprocessingVisionProcessor
-from src.piclient.vision.async_open import OpenChallengeAsyncMultiprocessingVisionProcessor
-from src.piclient.lib.config import Config
+from src.core.vision.async_base import AsyncMultiprocessingVisionProcessor
+from src.core.vision.async_open import OpenChallengeAsyncMultiprocessingVisionProcessor
+from src.core.lib.config import Config
 import numpy as np
 
 

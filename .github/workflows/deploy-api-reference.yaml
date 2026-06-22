@@ -19,7 +19,7 @@ jobs:
         cd PiClient
         python -m venv .venv
         echo "$PWD/.venv/bin" >> $GITHUB_PATH
-        pip install -r requirements.txt
+        pip install -r requirements-dev.txt
 
     - name: Build documentation
       run: |

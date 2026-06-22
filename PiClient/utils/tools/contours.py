@@ -5,7 +5,7 @@ and without perspective transformation.
 """
 
 from utils import cv2
-from src.piclient.lib.config import Config
+from src.core.lib.config import Config
 from utils.tools.base_tool import BaseTool
 
 class ContoursTool(BaseTool):

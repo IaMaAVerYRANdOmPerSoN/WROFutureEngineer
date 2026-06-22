@@ -5,7 +5,7 @@ without perspective rotation.
 """
 
 from utils import cv2
-from src.piclient.lib.config import Config
+from src.core.lib.config import Config
 from utils.tools.base_tool import BaseTool
 import numpy as np
 
