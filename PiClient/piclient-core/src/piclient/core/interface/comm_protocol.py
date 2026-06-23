@@ -5,12 +5,13 @@ Arduino over async serial, and :class:`DriveCommandExecutor` for
 coalescing drive commands with latest-wins semantics.
 """
 
-import aioserial
+import aioserial  # pyright: ignore[reportMissingTypeStubs]
 import asyncio
 import re
 from .. import logger
 from itertools import cycle
-from typing import Literal, NoReturn, Tuple
+from collections.abc import Coroutine
+from typing import Any, Literal, NoReturn, Self
 from ..lib import Config, export
 from collections import defaultdict
 
@@ -23,14 +24,25 @@ class Client:
     serial listener. Supports motor, servo, LED, and ping commands.
 
     :ivar _serial: Underlying :class:`aioserial.AioSerial` instance.
-    :ivar PORT: Serial port path.
-    :ivar BAUD: Serial baud rate.
-    :ivar DEFAULT_TIMEOUT: Default timeout for granular requests.
+    :ivar port: Serial port path.
+    :ivar baud: Serial baud rate.
+    :ivar timeout: Default timeout for granular requests.
     :ivar TIDS: Cyclic transaction ID generator.
     :ivar is_connected: Whether the Arduino handshake has succeeded.
     """
 
-    def __init__(self, port=Config.ClientConfig.SERIAL_PORT, baud=Config.ClientConfig.SERIAL_BAUD, timeout=Config.ClientConfig.SERIAL_TIMEOUT, ):
+    def __init__(
+            self,
+            port: str = Config.ClientConfig.SERIAL_PORT,
+            baud: int = Config.ClientConfig.SERIAL_BAUD,
+            timeout: float = Config.ClientConfig.SERIAL_TIMEOUT,
+            retries: int = Config.ClientConfig.CONNECT_RETRIES,
+            max_speed: int = Config.ClientConfig.MAX_SPEED,
+            tid_start: int = Config.ClientConfig.TID_START,
+            tid_end: int = Config.ClientConfig.TID_END,
+            wait_re_pattern: str = Config.ClientConfig.WAIT_RE_PATTERN,
+            loop: asyncio.AbstractEventLoop | None = None,
+    ):
         """
         The constructor for the `Client` class
 
@@ -38,28 +50,36 @@ class Client:
         :param port: The serial port passed to `aioserial.AioSerial`.
         :param baud: The baudrate of the serial protocol.
         :param timeout: Default timeout for granular requests.
+        :param tid_start: First transaction ID (inclusive).
+        :param tid_end: Last transaction ID (inclusive) before cycling.
+        :param wait_re_pattern: Regex pattern for Arduino WAITMS responses.
 
         :returns self: an instance of `Client`
         """
 
         self._serial = None
-        self.PORT, self.BAUD = port, baud
-        self.DEFAULT_TIMEOUT = timeout
-        self.TIDS = cycle([i for i in range(
-            Config.ClientConfig.TID_START, Config.ClientConfig.TID_END + 1)])
-        self.WHEELBASE = Config.ClientConfig.WHEELBASE
-        self.MAX_SPEED = Config.ClientConfig.MAX_SPEED
-        self.WAIT_RE = re.compile(Config.ClientConfig.WAIT_RE_PATTERN)
+        self.port, self.baud = port, baud
+        self.timeout = timeout
+        self.retries = retries
+        self._tids = cycle([i for i in range(tid_start, tid_end + 1)])
+        self.max_speed = max_speed
+        self._wait_re = re.compile(wait_re_pattern)
         self.is_connected = False
-        self.loop = asyncio.get_event_loop()
-        self._pending_requests: defaultdict[str, asyncio.Future[Tuple[str, str]]] = defaultdict(asyncio.Future)  # {TID: future} -> {TID: response}
+
+        try:
+            self.loop = loop if loop else asyncio.get_event_loop()
+        except RuntimeError:
+            logger.warning(
+                "No event loop currently running in thread, are you building docs?")
+
+        self._pending_requests: defaultdict[str, asyncio.Future[tuple[str, str]]] = defaultdict(
+            asyncio.Future)  # {TID: future} -> {TID: response}
         self._lock = asyncio.Lock()
         self._drive_semaphore = asyncio.BoundedSemaphore(1)
         self.servo_angle = 0
-        self.encoder_value = 0
 
         logger.info(
-            f"======= CLIENT INSTANCE STARTED: Port = {self.PORT}, Baud = {self.BAUD}, Timeout = {self.DEFAULT_TIMEOUT} ======= ")
+            f"======= CLIENT INSTANCE STARTED: Port = {self.port}, Baud = {self.baud}, Timeout = {self.timeout} ======= ")
 
     async def _serial_listener(self) -> NoReturn:
         """Background task that reads lines from serial and resolves pending futures.
@@ -90,7 +110,7 @@ class Client:
                 if not future.done():
                     future.set_result((tid, message))
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> Self:
         """
         Async context manager entry point that initializes the serial interface
         and starts the background serial listener task.
@@ -100,8 +120,8 @@ class Client:
         :rtype: Client
         """
         self._serial = aioserial.AioSerial(
-            self.PORT, self.BAUD, timeout=self.DEFAULT_TIMEOUT)
-        
+            self.port, self.baud, timeout=self.timeout)
+
         loop = asyncio._get_running_loop()
         loop.set_exception_handler(lambda loop, context: None)
 
@@ -112,7 +132,14 @@ class Client:
             logger.warning("Serial listener already started in this context")
         return self
 
-    async def __aexit__(self, *args):
+    async def __aexit__(self, *args: Any) -> None:
+        """
+        Async context manager exit point that cancels the background serial
+        listener task and closes the serial connection.
+
+        :param self: The instance of `Client`
+        :param args: Exception type, value, and traceback (per context manager protocol).
+        """
         if hasattr(self, "_listener_task"):
             self._listener_task.cancel()
             self._serial.close() if self._serial else None
@@ -120,7 +147,31 @@ class Client:
         else:
             logger.warning("No serial listener to cancel")
 
-    async def _request(self, command, type, timeout=Config.ClientConfig.REQUEST_TIMEOUT):
+    async def reload(self) -> Self:
+        """Hot reload after changing attributes.
+
+        Tears down existing hardware resources, reinitialises the client
+        with the updated configuration, and cleans up on failure before
+        re-raising
+
+        ALWAYS call after changing attributes to reload internal context.
+        Not doing so will lead to unpredictable behaviour.
+
+        :returns: ``self``
+        :raises Exception: Re-raises any exception during reload
+        """
+        await self.__aexit__()
+        try:
+            return await self.__aenter__()
+        except Exception:
+            await self.__aexit__()
+            raise
+
+    async def _request(
+        self,
+        command: str,
+        timeout: float | None = None
+    ):
         """Send a request to the Arduino and await its response.
 
         Assigns a unique transaction ID, writes the command to serial,
@@ -134,11 +185,12 @@ class Client:
         :raises AttributeError: If the serial interface is not initialized.
         """
         if not self._serial:
-            raise AttributeError("Please Use the Client's aysnc context manager to initilize hardware resources before perfoming any operations.")
+            raise AttributeError(
+                "Please Use the Client's aysnc context manager to initilize hardware resources before perfoming any operations.")
 
-        tid = str(next(self.TIDS))
+        tid = str(next(self._tids))
 
-        future: asyncio.Future[Tuple[str, str]]= self.loop.create_future()
+        future: asyncio.Future[tuple[str, str]] = self.loop.create_future()
         self._pending_requests[tid] = future
 
         try:
@@ -147,18 +199,19 @@ class Client:
             async with self._lock:
                 await self._serial.write_async(f"{tid} {command}\n".encode('utf-8'))
                 logger.info(
-                    f"Sending Request: {command} with timeout {timeout} and transaction ID {tid}")
+                    f"Sending Request: {command} with timeout {timeout if timeout else self.timeout} and transaction ID {tid}")
 
-            _, response = await asyncio.wait_for(future, timeout)
+            _, response = await asyncio.wait_for(future, timeout if timeout else self.timeout)
 
-            if matches := self.WAIT_RE.search(response):
+            if matches := self._wait_re.search(response):
                 requested_timeout = int(matches.group(
-                    1))/1000 + Config.ClientConfig.WAIT_RESPONSE_EXTRA_SECONDS
+                    1))/1000 + timeout if timeout else self.timeout
                 logger.info(
                     f"    ⤷ Arduino processing task, requires delay of {matches.group(1)}ms")
                 future = self.loop.create_future()
                 self._pending_requests[tid] = future
-                asyncio.create_task(asyncio.wait_for(future, requested_timeout))
+                asyncio.create_task(asyncio.wait_for(
+                    future, requested_timeout))
                 return response
 
             logger.success(
@@ -176,7 +229,7 @@ class Client:
             return f"ERR_{type(e).__name__}"
 
     # 1, debug led pin number
-    async def verify_connection(self, retries=Config.ClientConfig.CONNECT_RETRIES):
+    async def verify_connection(self, retries: int | None = None):
         """Verify serial connectivity with the Arduino via PING/PONG.
 
         :param retries: Number of connection attempts before giving up.
@@ -185,8 +238,8 @@ class Client:
         """
         logger.info("Establishing Serial interface...")
 
-        for attempt in range(1, retries + 1):
-            response = await self._request("PING", 'PING', timeout=Config.ClientConfig.REQUEST_TIMEOUT)
+        for attempt in range(1, self.retries + 1):
+            response = await self._request("PING")
 
             if response == "PONG":
                 logger.success(
@@ -196,13 +249,13 @@ class Client:
 
             logger.warning(
                 f"    ⤷ Connection attempt {attempt}/{retries} failed ({response})")
-            await asyncio.sleep(Config.ClientConfig.CONNECT_RETRY_SLEEP_SECONDS)
+            await asyncio.sleep(10 * self.timeout)
 
         logger.critical(
             "Failed to establish connection after multiple attempts.")
         return False
 
-    async def set_servo_angle(self, angle):  # 2
+    async def set_servo_angle(self, angle: int):  # 2
         """Set the servo to an absolute angle.
 
         Clamps *angle* to the configured min/max range before sending.
@@ -220,10 +273,10 @@ class Client:
                 f"Invalid request clamped: 'SET_SERVO {angle}'. {angle} is not in [{Config.ClientConfig.SERVO_MIN_ANGLE}, {Config.ClientConfig.SERVO_MAX_ANGLE}]")
             angle = Config.ClientConfig.SERVO_MIN_ANGLE
         command = f'SET_SERVO {angle}'
-        response = await self._request(command, 'SET_SERVO')
+        response = await self._request(command)
         return response == '200 OK' or response.startswith('WAITMS ')
 
-    async def increment_servo_angle(self, increment):  # 3
+    async def increment_servo_angle(self, increment: int):  # 3
         """Adjust the servo angle by a relative increment.
 
         :param increment: Signed angle change in degrees.
@@ -231,31 +284,31 @@ class Client:
         :rtype: bool
         """
         command = f'INC_SERVO {increment}'
-        response = await self._request(command, 'INC_SERVO')
+        response = await self._request(command)
         return response == '200 OK' or response.startswith('WAITMS ')
 
-    async def set_motor_speed(self, speed, duration):  # 4
+    async def set_motor_speed(self, speed: float, duration: float) -> bool:  # 4
         """Set the motor speed for a specified duration.
 
-        :param speed: Normalized motor speed in ``[-1, 1]`` (scaled by ``MAX_SPEED``).
+        :param speed: Normalized motor speed in ``[-1, 1]`` (scaled by ``max_speed``).
         :param duration: Motor run duration in seconds.
         :returns: ``True`` if the command was acknowledged, ``False`` otherwise.
         :rtype: bool
         """
         # changed api to be 0-1 instead of absolute don't think I need refactoring changes though
-        speed = speed * self.MAX_SPEED
+        speed = speed * self.max_speed
         command = f'SET_MOTOR {speed:.2f} {duration:.3f}'
         # Fallback timeout in case WAITMS is delayed or dropped under serial contention.
-        request_timeout = max(
+        request_timeout: float = max(
             Config.ClientConfig.REQUEST_TIMEOUT,
             abs(float(duration)) +
             Config.ClientConfig.WAIT_RESPONSE_EXTRA_SECONDS + 1.0,
         )
-        response = await self._request(command, 'SET_MOTOR', timeout=request_timeout)
+        response = await self._request(command, timeout=request_timeout)
         return response == '200 OK' or response.startswith('WAITMS ')
 
     # hybrid, no debug led pin number
-    async def drive_motors(self, speed: float, angle: float, duration: float):
+    async def drive_motors(self, speed: float, angle: int, duration: float):
         """Send a combined motor speed and servo angle command.
 
         Uses a bounded semaphore to prevent overlapping drive commands.
@@ -271,7 +324,7 @@ class Client:
             return False
 
         async with self._drive_semaphore:
-            promises = []
+            promises: list[Coroutine[Any, Any, Any]] = []
             promises.append(self.set_motor_speed(speed, duration))
             promises.append(self.set_servo_angle(angle))
 
@@ -284,7 +337,7 @@ class Client:
         :returns: ``True`` if a valid integer angle was received, ``False`` otherwise.
         :rtype: bool
         """
-        response = await self._request("SERVO_ANGLE", "SERVO_ANGLE")
+        response = await self._request("SERVO_ANGLE")
         try:
             self.servo_angle = int(response)
             return True
@@ -301,7 +354,7 @@ class Client:
         :rtype: bool
         """
         command = f'SET_LED {state}'
-        response = await self._request(command, 'SET_LED')
+        response = await self._request(command)
         return response == '200 OK'
 
 
@@ -323,21 +376,21 @@ class DriveCommandExecutor:
     long-lived task on the event loop -> no threads, no pools, no GIL contention.
     """
 
-    def __init__(self, client: "Client"):
+    def __init__(self, client: Client):
         """
         :param client: The `Client` whose `drive_motors` the worker will call.
         """
-        self._client = client
-        self._pending: Tuple[float, float, float] | None = None
+        self._client: Client = client
+        self._pending: tuple[float, float, float] | None = None
         self._wakeup = asyncio.Event()
         self._worker_task = None
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> Self:
         self._worker_task = asyncio.create_task(self._worker())
         logger.info("Drive command executor started")
         return self
 
-    async def __aexit__(self, *args):
+    async def __aexit__(self, *args: Any) -> None:
         if self._worker_task:
             self._worker_task.cancel()
             try:
@@ -345,6 +398,26 @@ class DriveCommandExecutor:
             except asyncio.CancelledError:
                 pass
             logger.info("Drive command executor stopped")
+
+    async def reload(self) -> Self:
+        """Hot reload after changing attributes.
+
+        Tears down existing hardware resources, reinitialises the worker
+        with the updated configuration, and cleans up on failure before
+        re-raising.
+
+        ALWAYS call after changing attributes to reload internal context.
+        Not doing so will lead to unpredictable behaviour.
+
+        :returns: ``self``
+        :raises Exception: Re-raises any exception during reload
+        """
+        await self.__aexit__()
+        try:
+            return await self.__aenter__()
+        except Exception:
+            await self.__aexit__()
+            raise
 
     def submit(self, speed: float, angle: float, duration: float) -> None:
         """
@@ -373,6 +446,7 @@ class DriveCommandExecutor:
                 continue
 
             try:
-                await self._client.drive_motors(*command)
+                speed, angle, duration = command
+                await self._client.drive_motors(speed, int(angle), duration)
             except Exception as e:
                 logger.error(f"Drive command {command} failed: {e}")

@@ -5,7 +5,7 @@ and challenge-specific tuning parameters.
 """
 
 from dataclasses import dataclass, field
-from typing import ClassVar, Dict, Tuple
+from typing import Any, ClassVar
 import numpy as np
 from .exporter import export
 
@@ -25,7 +25,7 @@ class Config:
         Controls picamera2 format, resolution, thread pool size,
         timeouts, and sensor/control parameters.
         """
-        FORMAT: Dict = field(default_factory=lambda: {
+        FORMAT: dict[str, Any] = field(default_factory=lambda: {
             "format": "BGR888",
             # Camera API expects (width, height); NumPy/OpenCV arrays usually use (height, width).
             "size": (512, 384)
@@ -33,22 +33,23 @@ class Config:
         OUTPUT_WIDTH: int = 512
         OUTPUT_HEIGHT: int = 384
         OUTPUT_CHANNELS: int = 3
-        EXECUTOR_THREADS: int = 3 # Number of executor threads used to capture frames
-        MAX_CONCURRENT_CAPTURES: int = 3 
+        EXECUTOR_THREADS: int = 3  # Number of executor threads used to capture frames
+        MAX_CONCURRENT_CAPTURES: int = 3
         BUFFER_COUNT: int = 1
-        HW_INIT_TIMEOUT: float = 5.0 # Hardware
+        HW_INIT_TIMEOUT: float = 5.0  # Hardware
         CONFIGURE_TIMEOUT: float = 1.0
         START_TIMEOUT: float = 1.0
         CAPTURE_RETRY_SLEEP_SECONDS: float = 0.03
         CAPTURE_ERROR_SLEEP_SECONDS: float = 0.01
-        SENSOR_CONFIG: Dict = field(default_factory=lambda: {
+        SENSOR_CONFIG: dict[str, Any] = field(default_factory=lambda: {
             "output_size": (640, 480),
             "bit_depth": 10,
         })
 
-        CONTROLS_CONFIG: Dict = field(default_factory=lambda: {
-            "FrameDurationLimits": (33333, 33333), # Frame duration in nano/micro seconds
-            "AeEnable": True, # Enables automatic exposure
+        CONTROLS_CONFIG: dict[str, Any] = field(default_factory=lambda: {
+            # Frame duration in microseconds
+            "FrameDurationLimits": (33333, 33333),
+            "AeEnable": True,  # Enables automatic exposure
         })
 
     @dataclass
@@ -58,15 +59,15 @@ class Config:
         Defines the serial port, baud rate, timeouts, TID range,
         servo limits, and motor parameters.
         """
-        SERIAL_PORT: str = '/dev/ttyACM0' 
-        SERIAL_BAUD: int = 115200 
-        SERIAL_TIMEOUT: float = 0.3 
-        REQUEST_TIMEOUT: float = 2.0 
-        WAIT_PATTERN: str = r"WAITMS ([0-9]+)" # Regex for wait ms responce
-        WAIT_RE_PATTERN: str = WAIT_PATTERN 
-        WAIT_RESPONSE_EXTRA_SECONDS: float = 1 
-        TID_START: int = 1 # Last transaction ID 
-        TID_END: int = 500 # Last transaction ID before cycling to 1
+        SERIAL_PORT: str = '/dev/ttyACM0'
+        SERIAL_BAUD: int = 115200
+        SERIAL_TIMEOUT: float = 0.3
+        REQUEST_TIMEOUT: float = 2.0
+        WAIT_PATTERN: str = r"WAITMS ([0-9]+)"  # Regex for wait ms responce
+        WAIT_RE_PATTERN: str = WAIT_PATTERN
+        WAIT_RESPONSE_EXTRA_SECONDS: float = 1
+        TID_START: int = 1  # First transaction ID
+        TID_END: int = 500  # Last transaction ID before cycling to TID_START
         WHEELBASE: float = 0.1
         MAX_SPEED: int = 100
         CONNECT_RETRIES: int = 5
@@ -81,22 +82,25 @@ class Config:
         Includes the perspective-transform homography matrix, HSV colour
         thresholds for wall/line detection, and region-of-interest slices.
         """
-        PERSPECTIVE_TRANSFORM: ClassVar[np.ndarray] = np.array([ 
+        PERSPECTIVE_TRANSFORM: ClassVar[np.ndarray] = np.array([
             [1, 0, 0],
             [0, 1, 0],
             [0, 0, 1]
-        ], dtype=np.float32) # Hemography matrix
+        ], dtype=np.float32)  # Hemography matrix
 
-        LOWER_BLACK: Tuple[int, int, int] = (0, 0, 0)
-        UPPER_BLACK: Tuple[int, int, int] = (179, 255, 70)
+        LOWER_BLACK: tuple[int, int, int] = (0, 0, 0)
+        UPPER_BLACK: tuple[int, int, int] = (179, 255, 70)
 
         # 384 // 3 = 128
         # 384 - 384 // 8 = 336
         # 336 - 128 = 208
 
-        INITIAL_ROI: Tuple = np.s_[384 // 3 : 384 - 384 // 8, :, :]
-        LEFT_WALL_ROI: Tuple = np.s_[208 // 12: 208 - 208 // 5, :512 // 5]
-        RIGHT_WALL_ROI: Tuple = np.s_[208 // 12: 208 - 208 // 5, 512 - 512 // 5:]
+        INITIAL_ROI: tuple[slice, slice, slice] = np.s_[
+            384 // 3: 384 - 384 // 8, :, :]
+        LEFT_WALL_ROI: tuple[slice, slice] = np.s_[
+            208 // 12: 208 - 208 // 5, :512 // 5]
+        RIGHT_WALL_ROI: tuple[slice, slice] = np.s_[
+            208 // 12: 208 - 208 // 5, 512 - 512 // 5:]
 
     @dataclass
     class OpenChallengeConfig:
@@ -105,15 +109,15 @@ class Config:
         Includes PD gains, speeds, hysteresis thresholds, shared memory
         settings, and lap-length constants.
         """
-        WALL_FOLLOW_KPKD: Tuple[float, float] = (0.50, 0.0)
-        CORNER_TURN_KPKD: Tuple[float, float] = (0.55, 0.0)
+        WALL_FOLLOW_KPKD: tuple[float, float] = (0.50, 0.0)
+        CORNER_TURN_KPKD: tuple[float, float] = (0.55, 0.0)
         STRAIGHT_SPEED: float = -0.4
         TURN_SPEED: float = -0.33
         TURN_DURATION: float = 1.0
         DRIVE_COMMAND_DURATION: float = 0.2
-        SHM_NAME: str = "camera_frame" 
+        SHM_NAME: str = "camera_frame"
         SHM_SIZE: int = 512*384*3
-        TURN_HYSTERESIS: int = 6 # Number of frames deciding before changing states
+        TURN_HYSTERESIS: int = 6  # Number of frames deciding before changing states
         LAP_LENGTH_IN_TURNS: int = 4*3  # 4 turns per lap, 3 laps total
         TURN_DETECTION_THRESHOLD: float = 0.1
 
@@ -124,9 +128,9 @@ class Config:
         Includes PD gains for wall-following, corner turning, and obstacle
         avoidance, along with speeds and shared memory settings.
         """
-        WALL_FOLLOW_KPKD: Tuple[float, float] = (1, 0.2)
-        CORNER_TURN_KPKD: Tuple[float, float] = (1.2, 0.2)
-        OBSTACLE_AVOID_KPKD: Tuple[float, float] = (0.8, 0.1)
+        WALL_FOLLOW_KPKD: tuple[float, float] = (1, 0.2)
+        CORNER_TURN_KPKD: tuple[float, float] = (1.2, 0.2)
+        OBSTACLE_AVOID_KPKD: tuple[float, float] = (0.8, 0.1)
         STRAIGHT_SPEED: float = 0.5
         TURN_SPEED: float = 0.4
         HYBRID_SPEED: float = 0.4

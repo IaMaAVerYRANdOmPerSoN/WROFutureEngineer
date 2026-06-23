@@ -17,7 +17,7 @@ import time
 from typing import Literal
 
 @export
-async def run_open_challenge():
+async def run_open_challenge() -> None:
     """
     asynchronus runner for the *open challenge*
     """
@@ -37,6 +37,10 @@ async def run_open_challenge():
     state: Literal["Straight", "Turn", "Final Turn", "Final Straight"] = "Straight"
 
     # Create the shared memory block and spawn processes
+    shm = None
+    camera_process = None
+    vision_process = None
+    
     try: 
         try:
             shm = shared_memory.SharedMemory(
@@ -71,7 +75,7 @@ async def run_open_challenge():
         async with Client() as client: # Initilize the client and open resources with the async context manager
             if not await client.verify_connection():
                 logger.critical(
-                    f"Couldn't establish connection to Arduino, is the USB cable plugged in? The selected USB port is {client.PORT}, baud {client.BAUD} (check config.py).")
+                    f"Couldn't establish connection to Arduino, is the USB cable plugged in? The selected USB port is {client.port}, baud {client.baud} (check config.py).")
                 return
 
             await client.drive_motors(0, 0, 0.1) # Turn straight

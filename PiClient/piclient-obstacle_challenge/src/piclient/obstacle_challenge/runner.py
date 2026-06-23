@@ -6,15 +6,15 @@ main control loop for the WRO obstacle challenge course.
 
 import asyncio
 from typing import Literal
-from piclient.core import logger
-from piclient.core.interface import Client, AsyncCamera
-from piclient.core.vision import AsyncMultiprocessingVisionProcessor
-from piclient.core.lib import PD, Config, export
+from piclient.core import logger # pyright: ignore[reportMissingTypeStubs]
+from piclient.core.interface import Client, AsyncCamera # pyright: ignore[reportMissingTypeStubs]
+from piclient.core.vision import AsyncMultiprocessingVisionProcessor # pyright: ignore[reportMissingTypeStubs]
+from piclient.core.lib import PD, Config, export # pyright: ignore[reportMissingTypeStubs]
 import multiprocessing as mp
 from multiprocessing import shared_memory
 
 @export
-async def run_obstacle_challenge():
+async def run_obstacle_challenge() -> None:
     """Asynchronus runner for the *obstacle challenge*"""
 
     async with Client() as client:
@@ -79,12 +79,12 @@ async def run_obstacle_challenge():
                                     # hey i mean at least it's recomputed every 5 frames
                                 )
                                 asyncio.create_task(client.drive_motors(
-                                    0.5, turn_correction, 0.1))
+                                    0.5, int(turn_correction), 0.1))
                             else:
                                 turn_correction = wall_follow.tick(
                                     wall_x_diffs["left"] - wall_x_diffs["right"])
                                 asyncio.create_task(client.drive_motors(
-                                    0.5, turn_correction, 0.1))
+                                    0.5, int(turn_correction), 0.1))
 
                     case "Turn":
                         if not corner_lines:
@@ -94,7 +94,7 @@ async def run_obstacle_challenge():
                                 # Biggest corner line, 192 is frame center
                                 corner_lines[0].x_centroid - Config.CameraConfig.FORMAT["size"][0] // 2)
                             asyncio.create_task(client.drive_motors(
-                                0.5, turn_correction, 0.1))
+                                0.5, int(turn_correction), 0.1))
 
                     case _:
                         logger.error(f"Invalid state {state}")

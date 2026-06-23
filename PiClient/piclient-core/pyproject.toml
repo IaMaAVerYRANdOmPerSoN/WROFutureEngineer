@@ -9,7 +9,7 @@ packages = ["src/piclient/core"]
 
 [project]
 name = "piclient"
-version = "0.0.1"
+version = "0.1.0"
 authors = [
     { name = "Michael Xie", email = "wenmike.xie@gmail.com" },
     { name = "Elvis Wang" },

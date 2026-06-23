@@ -1,7 +1,7 @@
 """Entry point for ``python -m piclient.open_challenge``."""
 
 import asyncio
-from piclient.open_challenge import run_open_challenge
+from .runner import run_open_challenge
 from piclient.core import configure_logging, logger
 
 if __name__ == "__main__":
