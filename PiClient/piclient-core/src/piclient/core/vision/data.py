@@ -27,7 +27,7 @@ class VisionObject:
     contour: np.ndarray
     color: str
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Compute bounding-box and centroid properties after dataclass init."""
         # Added custom type stub, default type stubs use Sequence[int]
         self.bbox: cv2.typing.Rect = cv2.boundingRect(self.contour)
@@ -53,7 +53,7 @@ class Walls:
     right: float
     area: float
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Normalise wall distances by dividing by ROI area."""
         self.left = self.left / self.area  # Can only be 0 - 1
         self.right = self.right / self.area

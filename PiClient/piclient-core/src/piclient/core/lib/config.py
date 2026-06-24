@@ -5,9 +5,11 @@ and challenge-specific tuning parameters.
 """
 
 from dataclasses import dataclass, field
-from typing import Any, ClassVar
+from typing import Any
 import numpy as np
 from .exporter import export
+
+from tomllib import load as load_toml
 
 
 @export
@@ -82,7 +84,7 @@ class Config:
         Includes the perspective-transform homography matrix, HSV colour
         thresholds for wall/line detection, and region-of-interest slices.
         """
-        PERSPECTIVE_TRANSFORM: ClassVar[np.ndarray] = np.array([
+        PERSPECTIVE_TRANSFORM: np.ndarray[tuple[int, ...], np.dtype[np.float32 | np.float64]] = np.array([
             [1, 0, 0],
             [0, 1, 0],
             [0, 0, 1]
@@ -152,3 +154,51 @@ class Config:
         PACKET_HEADER: int = 0x54
         PACKET_VER_LEN: int = 0x2C
         PACKET_LEN: int = 47
+
+
+_GLOBAL_CONFIG: Config = Config()
+
+
+@export
+def GLOBAL_CONFIG() -> Config:  # Function to use the decorator
+    return _GLOBAL_CONFIG
+
+
+@export
+def load_configuration(path: str = "./piclient.toml") -> Config:
+    """Load a TOML configuration file and hydrate the internal global :class:`Config` object.
+
+    Each top-level key in the TOML file should correspond to a nested
+    dataclass name inside :class:`Config` (e.g. ``CameraConfig``,
+    ``ClientConfig``).  The values under that key are unpacked as keyword
+    arguments to the dataclass constructor.
+
+    :returns: :class:`Config`
+    :raises: AttributeError if arguments are missing or do not match the type definition.
+    """
+    config: Config = GLOBAL_CONFIG()
+
+    with open(path, "rb") as toml:
+        raw_config: dict[str, Any] = load_toml(toml)
+
+    for section_name, section_values in raw_config.items():
+        if not hasattr(config, section_name):
+            raise AttributeError(
+                f"'{section_name}' is not an attribute of Config."
+            )
+        nested_cls: type = getattr(Config, section_name)
+        if not isinstance(section_values, dict):
+            raise AttributeError(
+                f"TOML section '{section_name}' must be a table, "
+                f"got {type(section_values).__name__} instead."
+            )
+        try:
+            hydrated = nested_cls(**section_values)
+        except TypeError as e:
+            raise AttributeError(
+                f"TOML section '{section_name}' does not match "
+                f"the type definition. Check below for more details"
+            ) from e
+        setattr(config, section_name, hydrated)
+
+    return config

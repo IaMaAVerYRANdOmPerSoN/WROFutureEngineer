@@ -8,11 +8,11 @@
     "python.analysis.completeFunctionParens": true,
     "python.analysis.diagnosticMode": "workspace",
     "python.analysis.diagnosticsSource": "Pylance",
-    "python.analysis.disableTaggedHints": true,
+    "python.analysis.disableTaggedHints": false,
     "python.analysis.enableParallelIndexing": true,
     "python.analysis.enableTroubleshootMissingImports": true,
     "python.analysis.importFormat": "relative",
-    "python.analysis.inlayHints.callArgumentNames": "partial",
+    "python.analysis.inlayHints.callArgumentNames": "off",
     "python.analysis.inlayHints.functionReturnTypes": true,
     "python.analysis.inlayHints.pytestParameters": true,
     "python.analysis.inlayHints.variableTypes": true,
@@ -22,5 +22,11 @@
     "python.analysis.typeEvaluation.enableReachabilityAnalysis": true,
     "python.analysis.typeEvaluation.strictDictionaryInference": true,
     "python.analysis.typeEvaluation.strictListInference": true,
-    "python.analysis.typeEvaluation.strictSetInference": true
+    "python.analysis.typeEvaluation.strictSetInference": true,
+    "python.analysis.exclude": [
+        "**/node_modules",
+        "**/__pycache__",
+        "**/.*",
+        "**/.venv",
+    ]
 }

@@ -6,7 +6,7 @@ left/right regions of interest.
 
 from .data import Walls
 from .base import VisionProcessor
-from ..lib import Config, export
+from ..lib import GLOBAL_CONFIG, export
 import numpy as np
 import cv2
 
@@ -24,8 +24,8 @@ class OpenChallengeVisionProcessor(VisionProcessor):
     :ivar right_wall_roi: Region-of-interest slice for the right wall.
     """
 
-    _DEFAULT_LEFT_WALL_ROI = Config.VisionConfig.LEFT_WALL_ROI
-    _DEFAULT_RIGHT_WALL_ROI = Config.VisionConfig.RIGHT_WALL_ROI
+    _DEFAULT_LEFT_WALL_ROI = GLOBAL_CONFIG().VisionConfig.LEFT_WALL_ROI
+    _DEFAULT_RIGHT_WALL_ROI = GLOBAL_CONFIG().VisionConfig.RIGHT_WALL_ROI
 
     def __init__(self, left_wall_roi: tuple[slice, slice] | None = None, right_wall_roi: tuple[slice, slice] | None = None, *args: Any, **kwargs: Any):
         """Initialise the Open Challenge vision processor.

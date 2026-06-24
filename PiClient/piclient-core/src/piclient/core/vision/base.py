@@ -4,7 +4,8 @@ Provides :class:`VisionProcessor` with common preprocessing, perspective
 transform, and contour-finding utilities.
 """
 
-from ..lib import Config, export
+
+from ..lib import GLOBAL_CONFIG, export
 import numpy as np
 import cv2
 from .data import VisionObject
@@ -27,25 +28,37 @@ class VisionProcessor:
     """
 
     # class-level defaults (overridden per-instance via __init__)
-    _DEFAULT_PERSPECTIVE_TRANSFORM = np.array(
-        Config.VisionConfig.PERSPECTIVE_TRANSFORM, dtype=np.float32)
-    _DEFAULT_INITIAL_ROI = Config.VisionConfig.INITIAL_ROI
-    _DEFAULT_LOWER_BLACK = np.array(
-        Config.VisionConfig.LOWER_BLACK, dtype=np.uint8)
-    _DEFAULT_UPPER_BLACK = np.array(
-        Config.VisionConfig.UPPER_BLACK, dtype=np.uint8)
+    _DEFAULT_PERSPECTIVE_TRANSFORM: np.ndarray[tuple[int, ...], np.dtype[np.float32 | np.float64]] = np.array(
+        GLOBAL_CONFIG().VisionConfig.PERSPECTIVE_TRANSFORM, dtype=np.float32)
+    _DEFAULT_INITIAL_ROI: tuple[slice[int, int, int], slice[int, int,
+                                                            int], slice[int, int, int]] = GLOBAL_CONFIG().VisionConfig.INITIAL_ROI
+    _DEFAULT_LOWER_BLACK: np.ndarray[tuple[int, ...], np.dtype[np.uint8]] = np.array(
+        GLOBAL_CONFIG().VisionConfig.LOWER_BLACK, dtype=np.uint8)
+    _DEFAULT_UPPER_BLACK: np.ndarray[tuple[int, ...], np.dtype[np.uint8]] = np.array(
+        GLOBAL_CONFIG().VisionConfig.UPPER_BLACK, dtype=np.uint8)
 
     def __init__(
         self,
         use_transform: bool = False,
         *,
-        perspective_transform: np.ndarray | None = None,
-        src: np.ndarray | None = None,
-        dst: np.ndarray | None = None,
-        initial_roi: tuple[slice, slice, slice] | None = None,
-        lower_black: np.ndarray | None = None,
-        upper_black: np.ndarray | None = None,
-    ):
+        perspective_transform: np.ndarray[
+            tuple[int, ...],
+            np.dtype[np.float32 | np.float64]
+        ] | None = None,
+        src: np.ndarray[
+            tuple[int, ...],
+            np.dtype[np.float32 | np.float64]
+        ] | None = None,
+        dst: np.ndarray[
+            tuple[int, ...],
+            np.dtype[np.float32 | np.float64]
+        ] | None = None,
+        initial_roi: tuple[slice[int, int, int], slice[int, int, int], slice[int, int, int]] | None = None,
+        lower_black: np.ndarray[tuple[int, ...],
+                                np.dtype[np.uint8]] | None = None,
+        upper_black: np.ndarray[tuple[int, ...],
+                                np.dtype[np.uint8]] | None = None,
+    ) -> None:
         """Initialise the vision processor.
 
         :param use_transform: If ``True``, apply perspective transform to detected contours.
@@ -56,34 +69,35 @@ class VisionProcessor:
         :param lower_black: Lower HSV bound for black detection (default from Config).
         :param upper_black: Upper HSV bound for black detection (default from Config).
         """
-        self.use_transform = use_transform
+        self.use_transform: bool = use_transform
         if (perspective_transform and src) or (src and not dst) or (dst and not src):
             raise ValueError(
                 "Cannot have both perspective_transform and src/dst, or only one of src/dst")
         elif perspective_transform:
-            self.perspective_transform = perspective_transform
+            self.perspective_transform: np.ndarray[tuple[int, ...],
+                                                   np.dtype[np.float32 | np.float64]] = perspective_transform
         elif src and dst:
             self.perspective_transform = self.get_perspective_transform(
-                src, dst)
+                src, dst)  # type: ignore
         else:
             self.perspective_transform = self._DEFAULT_PERSPECTIVE_TRANSFORM
-        self.initial_roi = (
+        self.initial_roi: tuple[slice[int, int, int], slice[int, int, int], slice[int, int, int]] = (
             initial_roi if initial_roi is not None else self._DEFAULT_INITIAL_ROI
         )
-        self.lower_black = (
+        self.lower_black: np.ndarray[tuple[int, ...], np.dtype[np.uint8]] = (
             lower_black if lower_black is not None else self._DEFAULT_LOWER_BLACK
         )
-        self.upper_black = (
+        self.upper_black: np.ndarray[tuple[int, ...], np.dtype[np.uint8]] = (
             upper_black if upper_black is not None else self._DEFAULT_UPPER_BLACK
         )
 
-    def _preprocess(self, frame: np.ndarray):
+    def _preprocess(self, frame: np.ndarray[tuple[int, ...], np.dtype[np.uint8]]) -> np.ndarray[tuple[int, ...], np.dtype[np.uint8]]:
         """Convert a BGR frame to HSV and apply the initial ROI.
 
         :param frame: Raw BGR frame as a numpy array.
         :returns: Preprocessed HSV frame cropped to :attr:`initial_roi`.
         """
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)[self.initial_roi]
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)[self.initial_roi].astype(np.uint8)
         return frame
 
     # Applying cv2.perspectiveTransform is much more efficient than warping whole frame
@@ -135,7 +149,7 @@ class VisionProcessor:
         # Okay so I this is a pragmatic solution because I only have to change a single method to apply perspective transforms globally. Also way faster then warping whole frame.
 
     @staticmethod
-    def get_perspective_transform(src: np.ndarray, dst: np.ndarray):
+    def get_perspective_transform(src: np.ndarray, dst: np.ndarray) -> cv2.typing.MatLike | np.ndarray[tuple[int, ...], np.dtype[np.float32 | np.float64]]:
         """Compute a perspective-transform matrix from source to destination points.
 
         :param: src: 4x2 matrix of source points.

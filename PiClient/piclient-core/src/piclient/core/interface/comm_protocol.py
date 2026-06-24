@@ -5,6 +5,8 @@ Arduino over async serial, and :class:`DriveCommandExecutor` for
 coalescing drive commands with latest-wins semantics.
 """
 
+from _asyncio import Future, Task
+
 import aioserial  # pyright: ignore[reportMissingTypeStubs]
 import asyncio
 import re
@@ -12,7 +14,7 @@ from .. import logger
 from itertools import cycle
 from collections.abc import Coroutine
 from typing import Any, Literal, NoReturn, Self
-from ..lib import Config, export
+from ..lib import GLOBAL_CONFIG, export
 from collections import defaultdict
 
 
@@ -33,14 +35,14 @@ class Client:
 
     def __init__(
             self,
-            port: str = Config.ClientConfig.SERIAL_PORT,
-            baud: int = Config.ClientConfig.SERIAL_BAUD,
-            timeout: float = Config.ClientConfig.SERIAL_TIMEOUT,
-            retries: int = Config.ClientConfig.CONNECT_RETRIES,
-            max_speed: int = Config.ClientConfig.MAX_SPEED,
-            tid_start: int = Config.ClientConfig.TID_START,
-            tid_end: int = Config.ClientConfig.TID_END,
-            wait_re_pattern: str = Config.ClientConfig.WAIT_RE_PATTERN,
+            port: str = GLOBAL_CONFIG().ClientConfig.SERIAL_PORT,
+            baud: int = GLOBAL_CONFIG().ClientConfig.SERIAL_BAUD,
+            timeout: float = GLOBAL_CONFIG().ClientConfig.SERIAL_TIMEOUT,
+            retries: int = GLOBAL_CONFIG().ClientConfig.CONNECT_RETRIES,
+            max_speed: int = GLOBAL_CONFIG().ClientConfig.MAX_SPEED,
+            tid_start: int = GLOBAL_CONFIG().ClientConfig.TID_START,
+            tid_end: int = GLOBAL_CONFIG().ClientConfig.TID_END,
+            wait_re_pattern: str = GLOBAL_CONFIG().ClientConfig.WAIT_RE_PATTERN,
             loop: asyncio.AbstractEventLoop | None = None,
     ):
         """
@@ -59,15 +61,16 @@ class Client:
 
         self._serial = None
         self.port, self.baud = port, baud
-        self.timeout = timeout
-        self.retries = retries
-        self._tids = cycle([i for i in range(tid_start, tid_end + 1)])
-        self.max_speed = max_speed
-        self._wait_re = re.compile(wait_re_pattern)
+        self.timeout: float = timeout
+        self.retries: int = retries
+        self._tids: cycle[int] = cycle(
+            [i for i in range(tid_start, tid_end + 1)])
+        self.max_speed: int = max_speed
+        self._wait_re: re.Pattern[str] = re.compile(wait_re_pattern)
         self.is_connected = False
 
         try:
-            self.loop = loop if loop else asyncio.get_event_loop()
+            self.loop: asyncio.AbstractEventLoop = loop if loop else asyncio.get_running_loop()
         except RuntimeError:
             logger.warning(
                 "No event loop currently running in thread, are you building docs?")
@@ -94,19 +97,19 @@ class Client:
         assert self._serial is not None, "Serial interface not initialized. Did you forget to use the async context manager?"
 
         while True:
-            line = await self._serial.readline_async()
-            response = line.decode('utf-8').strip()
+            line: bytes = await self._serial.readline_async()
+            response: str = line.decode('utf-8').strip()
 
             logger.debug(f"Line read from serial buffer: '{response}'")
 
-            parts = response.split(" ", 1)
+            parts: list[str] = response.split(" ", 1)
             if len(parts) < 2:
                 continue
 
             tid, message = parts[0], parts[1]
 
             if tid in self._pending_requests:
-                future = self._pending_requests[tid]
+                future: Future[tuple[str, str]] = self._pending_requests[tid]
                 if not future.done():
                     future.set_result((tid, message))
 
@@ -122,11 +125,12 @@ class Client:
         self._serial = aioserial.AioSerial(
             self.port, self.baud, timeout=self.timeout)
 
-        loop = asyncio._get_running_loop()
+        loop: asyncio.AbstractEventLoop = asyncio._get_running_loop()
         loop.set_exception_handler(lambda loop, context: None)
 
         if not hasattr(self, "_listener_task"):
-            self._listener_task = asyncio.create_task(self._serial_listener())
+            self._listener_task: Task[NoReturn] = asyncio.create_task(
+                self._serial_listener())
             logger.info("Serial Listener Started")
         else:
             logger.warning("Serial listener already started in this context")
@@ -171,7 +175,7 @@ class Client:
         self,
         command: str,
         timeout: float | None = None
-    ):
+    ) -> str:
         """Send a request to the Arduino and await its response.
 
         Assigns a unique transaction ID, writes the command to serial,
@@ -204,7 +208,7 @@ class Client:
             _, response = await asyncio.wait_for(future, timeout if timeout else self.timeout)
 
             if matches := self._wait_re.search(response):
-                requested_timeout = int(matches.group(
+                requested_timeout: float = int(matches.group(
                     1))/1000 + timeout if timeout else self.timeout
                 logger.info(
                     f"    ⤷ Arduino processing task, requires delay of {matches.group(1)}ms")
@@ -239,7 +243,7 @@ class Client:
         logger.info("Establishing Serial interface...")
 
         for attempt in range(1, self.retries + 1):
-            response = await self._request("PING")
+            response: str = await self._request("PING")
 
             if response == "PONG":
                 logger.success(
@@ -255,7 +259,7 @@ class Client:
             "Failed to establish connection after multiple attempts.")
         return False
 
-    async def set_servo_angle(self, angle: int):  # 2
+    async def set_servo_angle(self, angle: int) -> bool:  # 2
         """Set the servo to an absolute angle.
 
         Clamps *angle* to the configured min/max range before sending.
@@ -264,27 +268,27 @@ class Client:
         :returns: ``True`` if the command was acknowledged, ``False`` otherwise.
         :rtype: bool
         """
-        if Config.ClientConfig.SERVO_MAX_ANGLE <= angle:
+        if GLOBAL_CONFIG().ClientConfig.SERVO_MAX_ANGLE <= angle:
             logger.warning(
-                f"Invalid request clamped: 'SET_SERVO {angle}'. {angle} is not in [{Config.ClientConfig.SERVO_MIN_ANGLE}, {Config.ClientConfig.SERVO_MAX_ANGLE}]")
-            angle = Config.ClientConfig.SERVO_MAX_ANGLE
-        elif Config.ClientConfig.SERVO_MIN_ANGLE >= angle:
+                f"Invalid request clamped: 'SET_SERVO {angle}'. {angle} is not in [{GLOBAL_CONFIG().ClientConfig.SERVO_MIN_ANGLE}, {GLOBAL_CONFIG().ClientConfig.SERVO_MAX_ANGLE}]")
+            angle = GLOBAL_CONFIG().ClientConfig.SERVO_MAX_ANGLE
+        elif GLOBAL_CONFIG().ClientConfig.SERVO_MIN_ANGLE >= angle:
             logger.warning(
-                f"Invalid request clamped: 'SET_SERVO {angle}'. {angle} is not in [{Config.ClientConfig.SERVO_MIN_ANGLE}, {Config.ClientConfig.SERVO_MAX_ANGLE}]")
-            angle = Config.ClientConfig.SERVO_MIN_ANGLE
-        command = f'SET_SERVO {angle}'
-        response = await self._request(command)
+                f"Invalid request clamped: 'SET_SERVO {angle}'. {angle} is not in [{GLOBAL_CONFIG().ClientConfig.SERVO_MIN_ANGLE}, {GLOBAL_CONFIG().ClientConfig.SERVO_MAX_ANGLE}]")
+            angle = GLOBAL_CONFIG().ClientConfig.SERVO_MIN_ANGLE
+        command: str = f'SET_SERVO {angle}'
+        response: str = await self._request(command)
         return response == '200 OK' or response.startswith('WAITMS ')
 
-    async def increment_servo_angle(self, increment: int):  # 3
+    async def increment_servo_angle(self, increment: int) -> bool:  # 3
         """Adjust the servo angle by a relative increment.
 
         :param increment: Signed angle change in degrees.
         :returns: ``True`` if the command was acknowledged, ``False`` otherwise.
         :rtype: bool
         """
-        command = f'INC_SERVO {increment}'
-        response = await self._request(command)
+        command: str = f'INC_SERVO {increment}'
+        response: str = await self._request(command)
         return response == '200 OK' or response.startswith('WAITMS ')
 
     async def set_motor_speed(self, speed: float, duration: float) -> bool:  # 4
@@ -297,18 +301,18 @@ class Client:
         """
         # changed api to be 0-1 instead of absolute don't think I need refactoring changes though
         speed = speed * self.max_speed
-        command = f'SET_MOTOR {speed:.2f} {duration:.3f}'
+        command: str = f'SET_MOTOR {speed:.2f} {duration:.3f}'
         # Fallback timeout in case WAITMS is delayed or dropped under serial contention.
         request_timeout: float = max(
-            Config.ClientConfig.REQUEST_TIMEOUT,
+            GLOBAL_CONFIG().ClientConfig.REQUEST_TIMEOUT,
             abs(float(duration)) +
-            Config.ClientConfig.WAIT_RESPONSE_EXTRA_SECONDS + 1.0,
+            GLOBAL_CONFIG().ClientConfig.WAIT_RESPONSE_EXTRA_SECONDS + 1.0,
         )
-        response = await self._request(command, timeout=request_timeout)
+        response: str = await self._request(command, timeout=request_timeout)
         return response == '200 OK' or response.startswith('WAITMS ')
 
     # hybrid, no debug led pin number
-    async def drive_motors(self, speed: float, angle: int, duration: float):
+    async def drive_motors(self, speed: float, angle: int, duration: float) -> bool:
         """Send a combined motor speed and servo angle command.
 
         Uses a bounded semaphore to prevent overlapping drive commands.
@@ -324,20 +328,20 @@ class Client:
             return False
 
         async with self._drive_semaphore:
-            promises: list[Coroutine[Any, Any, Any]] = []
+            promises: list[Coroutine[Any, Any, bool]] = []
             promises.append(self.set_motor_speed(speed, duration))
             promises.append(self.set_servo_angle(angle))
 
-            results = await asyncio.gather(*promises)
+            results: list[bool] = await asyncio.gather(*promises)
             return all(results)
 
-    async def get_servo_angle(self):
+    async def get_servo_angle(self) -> bool:
         """Query the current servo angle from the Arduino.
 
         :returns: ``True`` if a valid integer angle was received, ``False`` otherwise.
         :rtype: bool
         """
-        response = await self._request("SERVO_ANGLE")
+        response: str = await self._request("SERVO_ANGLE")
         try:
             self.servo_angle = int(response)
             return True
@@ -346,15 +350,15 @@ class Client:
                 f"Received non-integer response '{response}' from request 'SERVO_ANGLE'")
             return False
 
-    async def set_led_state(self, state: Literal[1, 0]):  # 5
+    async def set_led_state(self, state: Literal[1, 0]) -> bool:  # 5
         """Set the debug LED on the Arduino.
 
         :param state: ``1`` for on, ``0`` for off.
         :returns: ``True`` if the command was acknowledged, ``False`` otherwise.
         :rtype: bool
         """
-        command = f'SET_LED {state}'
-        response = await self._request(command)
+        command: str = f'SET_LED {state}'
+        response: str = await self._request(command)
         return response == '200 OK'
 
 
@@ -376,14 +380,14 @@ class DriveCommandExecutor:
     long-lived task on the event loop -> no threads, no pools, no GIL contention.
     """
 
-    def __init__(self, client: Client):
+    def __init__(self, client: Client) -> None:
         """
         :param client: The `Client` whose `drive_motors` the worker will call.
         """
         self._client: Client = client
         self._pending: tuple[float, float, float] | None = None
         self._wakeup = asyncio.Event()
-        self._worker_task = None
+        self._worker_task: Task[NoReturn] | None = None
 
     async def __aenter__(self) -> Self:
         self._worker_task = asyncio.create_task(self._worker())
@@ -440,7 +444,7 @@ class DriveCommandExecutor:
             await self._wakeup.wait()
             self._wakeup.clear()
 
-            command = self._pending
+            command: tuple[float, float, float] | None = self._pending
             self._pending = None
             if command is None:
                 continue

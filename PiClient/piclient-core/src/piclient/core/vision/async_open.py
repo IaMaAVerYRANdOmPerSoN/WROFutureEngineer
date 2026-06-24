@@ -7,11 +7,13 @@ wall-distance measurement.
 
 from typing import Any
 
+from piclient.core.vision.data import Walls
+
 from .. import logger
 
 from .open_challenge import OpenChallengeVisionProcessor
 from .async_base import AsyncMultiprocessingVisionProcessor
-from ..lib import Config, export
+from ..lib import GLOBAL_CONFIG, export
 
 from multiprocessing import shared_memory
 from multiprocessing.connection import PipeConnection
@@ -27,12 +29,12 @@ class OpenChallengeAsyncMultiprocessingVisionProcessor(OpenChallengeVisionProces
     logic with async multiprocessing support.
     """
 
-    def __init__(self, *args: Any, **kwargs: Any):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         """Initialise via MRO, forwarding args to parent classes."""
         super(OpenChallengeAsyncMultiprocessingVisionProcessor,
               self).__init__(*args, **kwargs)
 
-    async def get_normalized_relative_wall_distances_async(self, frame: np.ndarray):
+    async def get_normalized_relative_wall_distances_async(self, frame: np.ndarray) -> Walls:
         """Async wrapper around the synchronous wall-distance method.
 
         :param frame: Preprocessed HSV frame.
@@ -58,17 +60,18 @@ class OpenChallengeAsyncMultiprocessingVisionProcessor(OpenChallengeVisionProces
             if not shm or not shm.buf:
                 raise RuntimeError("Failed to find Shared memory block")
 
-            h, w = Config.CameraConfig.OUTPUT_HEIGHT, Config.CameraConfig.OUTPUT_WIDTH
-            c = Config.CameraConfig.OUTPUT_CHANNELS
-            full_frame_size = h * w * c
+            h: int = GLOBAL_CONFIG().CameraConfig.OUTPUT_HEIGHT
+            w: int = GLOBAL_CONFIG().CameraConfig.OUTPUT_WIDTH
+            c: int = GLOBAL_CONFIG().CameraConfig.OUTPUT_CHANNELS
+            full_frame_size: int = h * w * c
 
             async for _ in OpenChallengeAsyncMultiprocessingVisionProcessor.async_pipe_reader(receiver):
                 # Read the full raw frame from SHM then preprocess (which applies INITIAL_ROI)
-                raw_frame = np.ndarray(
+                raw_frame: np.ndarray[tuple[int, ...], np.dtype[np.uint8]] = np.ndarray(
                     (h, w, c), dtype=np.uint8, buffer=shm.buf[:full_frame_size])
-                frame = self._preprocess(raw_frame)
-
-                walls = await self.get_normalized_relative_wall_distances_async(frame)
+                frame: np.ndarray[tuple[int, ...],
+                                  np.dtype[np.uint8]] = self._preprocess(raw_frame)
+                walls: Walls = await self.get_normalized_relative_wall_distances_async(frame)
 
                 await self.loop.run_in_executor(None, sender.send, walls)
         except (OSError, EOFError) as e:

@@ -15,8 +15,8 @@ def export(obj: _T) -> _T:
     """
     mod = sys.modules[obj.__module__]
     if hasattr(mod, '__all__'):
-        name = obj.__name__
-        all_ = mod.__all__
+        name: str = obj.__name__
+        all_: list[str] = mod.__all__
         if name not in all_:
             all_.append(name)
     else:
@@ -24,20 +24,21 @@ def export(obj: _T) -> _T:
     return obj
 
 
-def export_globals():
+def export_globals() -> None:
     """Add every public name in the *caller's* namespace to its ``__all__`` (excluding leading underscores).
 
     Call this at the end of an ``__init__.py`` to auto-populate ``__all__``
     from all the names that were imported or defined in that file.
     """
     caller = inspect.currentframe()
-    caller_globals = caller.f_globals if caller is not None else {}
+    caller_globals: dict[str,
+                         Any] = caller.f_globals if caller is not None else {}
     mod = sys.modules[caller_globals["__name__"]]
     for name in tuple(caller_globals):
         if name.startswith("_") or "export_globals" in name:
             continue
         if hasattr(mod, '__all__'):
-            all_ = mod.__all__
+            all_: list[str] = mod.__all__
             if name not in all_:
                 all_.append(name)
         else:

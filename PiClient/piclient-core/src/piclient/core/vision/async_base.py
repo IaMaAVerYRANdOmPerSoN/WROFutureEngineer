@@ -11,6 +11,7 @@ from ..lib import export
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from collections import deque
+from collections.abc import AsyncGenerator
 from multiprocessing.connection import PipeConnection
 from typing import Any, Self
 
@@ -27,6 +28,8 @@ class AsyncMultiprocessingVisionProcessor(VisionProcessor):
     :ivar executor: :class:`ThreadPoolExecutor` instance.
     :ivar loop: The asyncio event loop.
     """
+
+    loop: asyncio.AbstractEventLoop
 
     def __init__(
         self,
@@ -45,7 +48,7 @@ class AsyncMultiprocessingVisionProcessor(VisionProcessor):
         self.executor_size = executor_size
         self._executor = None
         try:
-            self.loop = loop if loop else asyncio.get_event_loop
+            self.loop = loop if loop else asyncio.get_running_loop()
         except RuntimeError:
             logger.warning(
                 "No event loop currently running in thread, are you building docs?")
@@ -93,7 +96,7 @@ class AsyncMultiprocessingVisionProcessor(VisionProcessor):
         raise NotImplementedError("Comprehensive analysis is abstract")
 
     @staticmethod
-    async def async_pipe_reader(receiver: PipeConnection):
+    async def async_pipe_reader(receiver: PipeConnection) -> AsyncGenerator[Any, Any]:
         """Async generator that yields data from a multiprocessing pipe.
 
         On Linux, uses ``loop.add_reader`` for efficient event-driven
@@ -102,13 +105,13 @@ class AsyncMultiprocessingVisionProcessor(VisionProcessor):
         :param receiver: Multiprocessing :class:`Connection` to read from.
         :yields: Objects received from the pipe (LIFO order).
         """
-        loop = asyncio.get_event_loop()
+        loop: asyncio.AbstractEventLoop = asyncio.get_running_loop()
         local_cache: deque[Any] = deque(maxlen=3)
 
         try:
             data_event = asyncio.Event()
 
-            def yielder():
+            def yielder() -> None:
                 data_event.set()
 
             loop.add_reader(receiver.fileno(), yielder)
@@ -142,7 +145,7 @@ class AsyncMultiprocessingVisionProcessor(VisionProcessor):
         data_sender: PipeConnection,
         executor_size: int = 5,
         loop: asyncio.AbstractEventLoop | None = None
-    ):
+    ) -> None:
         """Subprocess entry point for the vision pipeline.
 
         Creates an instance of this class, enters its async context,
@@ -154,7 +157,7 @@ class AsyncMultiprocessingVisionProcessor(VisionProcessor):
         :param executor_size: Thread-pool size.
         :param loop: Asyncio event loop (optional).
         """
-        async def _run():
+        async def _run() -> None:
             if loop:
                 async with cls(executor_size, loop) as vision:
                     await vision.comprehensive_analysis(shm, frameReceiver, data_sender)

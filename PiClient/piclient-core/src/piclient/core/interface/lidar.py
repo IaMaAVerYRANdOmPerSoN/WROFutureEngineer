@@ -10,13 +10,15 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 import struct
 import numpy as np
-from collections.abc import Generator, Sequence
+from collections.abc import Generator, AsyncGenerator, Sequence
 from typing import Any, NoReturn, Self
 
 import aioserial  # pyright: ignore[reportMissingTypeStubs]
+# pyright: ignore[reportMissingTypeStubs]
+from piclient.core.interface import Task
 
 from .. import logger
-from ..lib import Config, export
+from ..lib import GLOBAL_CONFIG, export
 
 from multiprocessing.connection import PipeConnection
 
@@ -59,21 +61,21 @@ class LiDAR:
     - Byte 46: crc
     """
 
-    PACKET_HEADER = Config.LiDARConfig.PACKET_HEADER
-    VER_LEN = Config.LiDARConfig.PACKET_VER_LEN
+    PACKET_HEADER: int = GLOBAL_CONFIG().LiDARConfig.PACKET_HEADER
+    VER_LEN: int = GLOBAL_CONFIG().LiDARConfig.PACKET_VER_LEN
 
     def __init__(
         self,
-        port: str = Config.LiDARConfig.SERIAL_PORT,
-        baud: int = Config.LiDARConfig.SERIAL_BAUD,
-        timeout: float = Config.LiDARConfig.SERIAL_TIMEOUT,
-        packet_len: int = Config.LiDARConfig.PACKET_LEN,
+        port: str = GLOBAL_CONFIG().LiDARConfig.SERIAL_PORT,
+        baud: int = GLOBAL_CONFIG().LiDARConfig.SERIAL_BAUD,
+        timeout: float = GLOBAL_CONFIG().LiDARConfig.SERIAL_TIMEOUT,
+        packet_len: int = GLOBAL_CONFIG().LiDARConfig.PACKET_LEN,
     ) -> None:
         self._serial: aioserial.AioSerial | None = None
-        self.PORT = port
-        self.BAUD = baud
-        self.DEFAULT_TIMEOUT = timeout
-        self.PACKET_LEN = packet_len
+        self.PORT: str = port
+        self.BAUD: int = baud
+        self.DEFAULT_TIMEOUT: float = timeout
+        self.PACKET_LEN: int = packet_len
 
         self._buffer = bytearray()
         self._latest_packet: LiDARPacket | None = None
@@ -105,8 +107,8 @@ class LiDAR:
         :yields: ``(x_mm, y_mm)`` tuples.
         """
         for r, theta in coords:
-            x = r * np.cos(np.deg2rad(theta))
-            y = r * np.sin(np.deg2rad(theta))
+            x: float = r * np.cos(np.deg2rad(theta))
+            y: float = r * np.sin(np.deg2rad(theta))
             yield (x, y)
 
     def _parse_packet(self, packet: bytes) -> LiDARPacket | None:
@@ -121,22 +123,23 @@ class LiDAR:
         if len(packet) != self.PACKET_LEN:
             return None
 
-        speed = struct.unpack_from("<H", packet, 2)[0] / 64.0
-        start_angle = struct.unpack_from("<H", packet, 4)[0] / 100.0
+        speed: float = struct.unpack_from("<H", packet, 2)[0] / 64.0
+        start_angle: float = struct.unpack_from("<H", packet, 4)[0] / 100.0
 
         measurements: list[tuple[float, float]] = []
         for i in range(12):
-            offset = 6 + i * 3
-            dist = struct.unpack_from("<H", packet, offset)[0]
-            confidence = packet[offset + 2]
+            offset: int = 6 + i * 3
+            dist: float = struct.unpack_from("<H", packet, offset)[0]
+            confidence: int = packet[offset + 2]
             measurements.append((dist, confidence))
 
-        end_angle = struct.unpack_from("<H", packet, 42)[0] / 100.0
-        timestamp = struct.unpack_from("<H", packet, 44)[0]
-        crc = packet[46]
+        end_angle: float = struct.unpack_from("<H", packet, 42)[0] / 100.0
+        timestamp: int = struct.unpack_from("<H", packet, 44)[0]
+        crc: int = packet[46]
 
-        angles = self._interpolate_angles(start_angle, end_angle, 12)
-        points = self._convert_to_xy(
+        angles: list[float] = self._interpolate_angles(
+            start_angle, end_angle, 12)
+        points: Generator[tuple[float, float], None, None] = self._convert_to_xy(
             [(dist, angle) for (dist, _), angle in zip(measurements, angles)])
 
         return LiDARPacket(
@@ -158,8 +161,8 @@ class LiDAR:
         :param count: Number of interpolation points.
         :returns: list of interpolated angles in degrees.
         """
-        angle_range = (end - start + 360.0) % 360.0
-        step = angle_range / (count - 1)
+        angle_range: float = (end - start + 360.0) % 360.0
+        step: float = angle_range / (count - 1)
         return [((start + i * step) % 360.0) for i in range(count)]
 
     async def _serial_listener(self) -> NoReturn:
@@ -173,7 +176,7 @@ class LiDAR:
 
         while True:
             try:
-                chunk = await self._serial.read_async(256)
+                chunk: bytes = await self._serial.read_async(256)
             except Exception as e:
                 logger.error(f"Error reading from serial: {e}")
                 continue
@@ -185,7 +188,7 @@ class LiDAR:
             self._buffer.extend(chunk)
 
             while True:
-                idx = self._find_packet_start(self._buffer)
+                idx: int = self._find_packet_start(self._buffer)
                 if idx == -1:
                     if len(self._buffer) > 1:
                         del self._buffer[:-1]
@@ -200,7 +203,7 @@ class LiDAR:
                 packet = bytes(self._buffer[: self.PACKET_LEN])
                 del self._buffer[: self.PACKET_LEN]
 
-                parsed = self._parse_packet(packet)
+                parsed: LiDARPacket | None = self._parse_packet(packet)
                 if not parsed:
                     logger.debug("Discarded invalid LD19 packet")
                     continue
@@ -218,7 +221,8 @@ class LiDAR:
             self.PORT, self.BAUD, timeout=self.DEFAULT_TIMEOUT)
 
         if not hasattr(self, "_listener_task"):
-            self._listener_task = asyncio.create_task(self._serial_listener())
+            self._listener_task: Task[NoReturn] = asyncio.create_task(
+                self._serial_listener())
             logger.info("LiDAR serial listener started")
         else:
             logger.warning(
@@ -285,24 +289,24 @@ class LiDAR:
 
     async def stream_packets(self, sender: PipeConnection, timeout: float = 1.0) -> NoReturn:
         pipe_executor = ThreadPoolExecutor(max_workers=2)
-        loop = asyncio.get_running_loop()
+        loop: asyncio.AbstractEventLoop = asyncio.get_running_loop()
 
         while True:
             if await self.capture_packet(timeout=timeout):
-                packet = await self.get_latest_packet()
+                packet: LiDARPacket | None = await self.get_latest_packet()
                 if packet:
                     await loop.run_in_executor(pipe_executor, sender.send, packet)
             else:
                 logger.warning("LiDAR packet capture timed out")
 
     @staticmethod
-    async def async_pipe_reader(receiver: PipeConnection):
-        loop = asyncio.get_running_loop()
+    async def async_pipe_reader(receiver: PipeConnection) -> AsyncGenerator[Any, Any]:
+        loop: asyncio.AbstractEventLoop = asyncio.get_running_loop()
 
         try:
             data_event = asyncio.Event()
 
-            def yielder():
+            def yielder() -> None:
                 data_event.set()
 
             loop.add_reader(receiver.fileno(), yielder)
@@ -320,14 +324,14 @@ class LiDAR:
         except NotImplementedError:
             while True:
                 try:
-                    data = await loop.run_in_executor(None, receiver.recv)
+                    data: Any = await loop.run_in_executor(None, receiver.recv)
                 except (EOFError, OSError):
                     break
                 yield data
 
     @staticmethod
-    def lidar_process_context_manager(sender: PipeConnection):
-        async def _run(sender: PipeConnection):
+    def lidar_process_context_manager(sender: PipeConnection) -> None:
+        async def _run(sender: PipeConnection) -> NoReturn:
             async with LiDAR() as lidar:
                 await lidar.stream_packets(sender)
         asyncio.run(_run(sender))
