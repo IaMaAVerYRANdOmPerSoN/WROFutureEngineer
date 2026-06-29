@@ -5,7 +5,7 @@ from .runner import run_open_challenge
 from piclient.core import configure_logging, logger
 
 if __name__ == "__main__":
-    configure_logging(verbose=True)
+    configure_logging(level_ = "WARNING")
     try:
         asyncio.run(run_open_challenge())
     except KeyboardInterrupt:

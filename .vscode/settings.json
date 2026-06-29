@@ -28,5 +28,6 @@
         "**/__pycache__",
         "**/.*",
         "**/.venv",
+        "PiClient/utils"
     ]
 }

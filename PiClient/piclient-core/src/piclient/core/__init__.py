@@ -4,6 +4,7 @@ This package provides the core logging configuration and module-level imports fo
 """
 
 import sys
+from typing import Literal
 from loguru import logger
 from . import lib # Shut up pylance
 from . import *
@@ -16,19 +17,21 @@ LOG_FORMAT = (
 )
 """str: Default loguru format string with coloured time, line, function, and level fields."""
 
-def configure_logging(verbose: bool = False, debug: bool = False) -> None:
+def configure_logging(level_: Literal["CRITICAL", "ERROR", "WARNING", "SUCCESS", "INFO", "DEBUG"]) -> None:
     """Configure shared logging sinks for the Pi client package."""
     logger.remove()
     logger.add(
         "logs/log.txt",
-        level="WARNING",
+        level=level_,
         enqueue=True,
         rotation="5 MB",
         retention="10 days",
         format=LOG_FORMAT,
     )
+    logger.add(sys.stderr, level=level_, format=LOG_FORMAT)
 
-    if debug:
+
+    if level_ == "DEBUG":
         logger.add(
             "logs/verbose.txt",
             level="DEBUG",
@@ -37,8 +40,7 @@ def configure_logging(verbose: bool = False, debug: bool = False) -> None:
             retention="3 days",
             format=LOG_FORMAT,
         )
-        logger.add(sys.stderr, level="DEBUG", format=LOG_FORMAT)
-    elif verbose:
+    elif level_ == "INFO":
         logger.add(
             "logs/verbose.txt",
             level="INFO",
@@ -47,8 +49,5 @@ def configure_logging(verbose: bool = False, debug: bool = False) -> None:
             retention="3 days",
             format=LOG_FORMAT,
         )
-        logger.add(sys.stderr, level="INFO", format=LOG_FORMAT)
-    else:
-        logger.add(sys.stderr, level="WARNING", format=LOG_FORMAT)
 
 lib.export_globals()

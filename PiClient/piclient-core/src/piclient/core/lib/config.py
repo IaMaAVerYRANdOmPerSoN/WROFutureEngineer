@@ -5,7 +5,8 @@ and challenge-specific tuning parameters.
 """
 
 from dataclasses import dataclass, field
-from typing import Any
+import dataclasses
+from typing import Any, Literal
 import numpy as np
 from .exporter import export
 
@@ -17,8 +18,26 @@ class Config:
     """Root configuration container.
 
     All configuration is organised into nested :class:`dataclass` subclasses.
-    Each subclass defines default values that can be overridden at runtime.
+    Each subclass is instantiated at construction time.
     """
+
+    def __init__(self) -> None:
+        for name in dir(type(self)):
+            if name.startswith("_"):
+                continue
+            cls: type | None = getattr(type(self), name, None)
+            if dataclasses.is_dataclass(cls):
+                setattr(self, name, cls())
+
+    @dataclass
+    class GeneralConfig:
+        """
+        General Configuration.
+        
+        Controls logging level and which challenge to ru
+        """
+        LEVEL: Literal["CRITICAL", "ERROR", "WARNING", "SUCCESS", "INFO", "DEBUG"] = "WARNING"
+        CHALLENGE: Literal["open", "obstacle"] = "open"
 
     @dataclass
     class CameraConfig:
@@ -84,11 +103,11 @@ class Config:
         Includes the perspective-transform homography matrix, HSV colour
         thresholds for wall/line detection, and region-of-interest slices.
         """
-        PERSPECTIVE_TRANSFORM: np.ndarray[tuple[int, ...], np.dtype[np.float32 | np.float64]] = np.array([
+        PERSPECTIVE_TRANSFORM: np.ndarray[tuple[int, ...], np.dtype[np.float32 | np.float64]] = field(default_factory = lambda: np.array([
             [1, 0, 0],
             [0, 1, 0],
             [0, 0, 1]
-        ], dtype=np.float32)  # Hemography matrix
+        ], dtype=np.float32))  # Homography matrix
 
         LOWER_BLACK: tuple[int, int, int] = (0, 0, 0)
         UPPER_BLACK: tuple[int, int, int] = (179, 255, 70)

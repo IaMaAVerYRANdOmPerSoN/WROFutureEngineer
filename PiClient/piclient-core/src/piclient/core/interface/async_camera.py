@@ -6,7 +6,7 @@ and subprocess-safe context management.
 """
 
 from typing import NoReturn, Self
-from ..lib import Config, GLOBAL_CONFIG, export
+from ..lib import GLOBAL_CONFIG, export
 from multiprocessing import shared_memory
 import asyncio
 from multiprocessing.connection import PipeConnection
@@ -27,7 +27,7 @@ except ImportError:
                    "but some modules will not work as intended, and may raise exceptions.")
 
 
-_CAM_DEFAULTS: Config.CameraConfig = GLOBAL_CONFIG().CameraConfig()
+_CAM_DEFAULTS = GLOBAL_CONFIG().CameraConfig
 
 
 @export

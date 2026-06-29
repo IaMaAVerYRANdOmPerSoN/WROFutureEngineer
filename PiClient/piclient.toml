@@ -1,3 +1,7 @@
+[GeneralConfig]
+LEVEL = "WARNING"
+CHALLENGE = "open"
+
 [CameraConfig]
 OUTPUT_WIDTH = 512
 OUTPUT_HEIGHT = 384

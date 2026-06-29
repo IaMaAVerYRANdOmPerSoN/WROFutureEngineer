@@ -15,7 +15,6 @@ from typing import Any, NoReturn, Self
 
 import aioserial  # pyright: ignore[reportMissingTypeStubs]
 # pyright: ignore[reportMissingTypeStubs]
-from piclient.core.interface import Task
 
 from .. import logger
 from ..lib import GLOBAL_CONFIG, export
@@ -221,7 +220,7 @@ class LiDAR:
             self.PORT, self.BAUD, timeout=self.DEFAULT_TIMEOUT)
 
         if not hasattr(self, "_listener_task"):
-            self._listener_task: Task[NoReturn] = asyncio.create_task(
+            self._listener_task: asyncio.Task[NoReturn] = asyncio.create_task(
                 self._serial_listener())
             logger.info("LiDAR serial listener started")
         else:

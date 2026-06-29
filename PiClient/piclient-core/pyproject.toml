@@ -15,7 +15,7 @@ authors = [
     { name = "Elvis Wang" },
     { name = "Ryan Rao" },
 ]
-description = "Apostla team WRO FE 2026 - shared library"
+description = "Apostla team WRO FE 2026 shared library"
 
 requires-python = ">=3.10"
 dependencies = [

@@ -9,9 +9,8 @@ from multiprocessing.connection import Connection
 import multiprocessing as mp
 from multiprocessing import shared_memory
 from utils import cv2, logger
-from src.core.vision.async_base import AsyncMultiprocessingVisionProcessor
-from src.core.vision.async_open import OpenChallengeAsyncMultiprocessingVisionProcessor
-from src.core.lib.config import Config
+from piclient.core.vision import AsyncMultiprocessingVisionProcessor, OpenChallengeAsyncMultiprocessingVisionProcessor, VisionObject
+from piclient.core.lib import GLOBAL_CONFIG
 import numpy as np
 
 
@@ -27,7 +26,7 @@ class BaseTool:
     :ivar frame: Current frame buffer (BGR, uint8).
     """
 
-    def __init__(self, name, description):
+    def __init__(self, name: str, description: str):
         """Initialise the base tool.
 
         :param name: Tool name.
@@ -36,10 +35,10 @@ class BaseTool:
         self.name = name
         self.description = description
         self._created_windows: set[str] = set()
-        self.frame = np.zeros((Config.CameraConfig.OUTPUT_HEIGHT - Config.CameraConfig.INITIAL_ROI,
-                              Config.CameraConfig.OUTPUT_WIDTH, Config.CameraConfig.OUTPUT_CHANNELS), dtype=np.uint8)
+        self.frame: np.ndarray[tuple[int, ...], np.dtype[np.uint8]] = np.zeros([GLOBAL_CONFIG().CameraConfig.OUTPUT_HEIGHT,
+                              GLOBAL_CONFIG().CameraConfig.OUTPUT_WIDTH, GLOBAL_CONFIG().CameraConfig.OUTPUT_CHANNELS], dtype=np.uint8)
 
-    def _ensure_windows(self, *names):
+    def _ensure_windows(self, *names: str):
         """Create and initialise OpenCV windows with a placeholder frame.
 
         :param names: Window names to create.
@@ -51,7 +50,7 @@ class BaseTool:
         for name in names:
             cv2.imshow(name, placeholder)
 
-    def _draw_vision_object(self, object: VisionObject, color: tuple, frame):
+    def _draw_vision_object(self, object: VisionObject, color: tuple[str, ...], frame: np.ndarray[tuple[int, ...], np.dtype[np.uint8]]):
         """Draw a single :class:`VisionObject` onto a frame.
 
         Draws the contour outline and a centroid circle. Validates frame
@@ -61,26 +60,25 @@ class BaseTool:
         :param color: BGR colour tuple for the overlay.
         :param frame: Target frame (numpy array).
         """
-        if not isinstance(frame, np.ndarray) or frame.shape != (Config.CameraConfig.OUTPUT_HEIGHT - Config.CameraConfig.INITIAL_ROI, Config.CameraConfig.OUTPUT_WIDTH, Config.CameraConfig.OUTPUT_CHANNELS,):
+        if frame.shape != (GLOBAL_CONFIG().CameraConfig.OUTPUT_HEIGHT, GLOBAL_CONFIG().CameraConfig.OUTPUT_WIDTH, GLOBAL_CONFIG().CameraConfig.OUTPUT_CHANNELS,):
             logger.warning(
                 "Frame may have been mishaped due to race condition on shared memory, skipping draw to avoid crash")
             return
         contour = object.contour
-        if contour is not None:
-            cv2.drawContours(frame, [contour], -1, color, 2)
-            cv2.circle(frame, (int(object.x_centroid),
-                       int(object.y_centroid)), 3, color, -1)
+        cv2.drawContours(frame, [contour], -1, color, 2)
+        cv2.circle(frame, (int(object.x_centroid),
+                    int(object.y_centroid)), 3, color, -1)
 
-    def _vision_process_manager(self, shm_name: str, receiver: Connection, sender: Connection, **kwargs):
+    def _vision_process_manager(self, shm_name: str, receiver: Connection, sender: Connection):
         """Subprocess target for perspective-transformed vision.
 
         :param shm_name: Shared memory block name.
         :param receiver: Pipe connection for frame-ready signals.
         :param sender: Pipe connection for vision results.
         """
-        async def _run(*args, **kwargs):
-            async with AsyncMultiprocessingVisionProcessor() as processor:
-                await processor.comprehensive_analysis(shm_name, receiver, sender, *args, **kwargs)
+        async def _run() -> None:
+            async with AsyncMultiprocessingVisionProcessor(3) as processor:
+                await processor.comprehensive_analysis(shm_name, receiver, sender)
 
         asyncio.run(_run())
 

@@ -13,7 +13,7 @@ version = "0.1.0"
 authors = [
     { name = "Michael Xie", email = "wenmike.xie@gmail.com" },
 ]
-description = "Apostla team WRO FE 2026 - CLI entry point"
+description = "Apostla team WRO FE 2026 CLI entry point"
 
 requires-python = ">=3.10"
 dependencies = [
