@@ -9,6 +9,7 @@ import dataclasses
 from typing import Any, Literal
 import numpy as np
 from .exporter import export
+from os import environ
 
 from tomllib import load as load_toml
 
@@ -178,9 +179,24 @@ class Config:
 _GLOBAL_CONFIG: Config = Config()
 
 
+def _set_nested_attr(root: object, dotted_path: str, value: object) -> None:
+    """Set ``root.a.b.c = value`` given ``dotted_path == 'a.b.c'``."""
+    *parents, leaf = dotted_path.split(".")
+    for part in parents:
+        root = getattr(root, part)
+    setattr(root, leaf, value)
+
 @export
 def GLOBAL_CONFIG() -> Config:  # Function to use the decorator
     return _GLOBAL_CONFIG
+
+
+def _apply_env_overrides():
+    for var, value in environ.items():
+        try:
+            _set_nested_attr(GLOBAL_CONFIG(), var, value)
+        except AttributeError:
+            continue
 
 
 @export
@@ -220,4 +236,8 @@ def load_configuration(path: str = "./piclient.toml") -> Config:
             ) from e
         setattr(config, section_name, hydrated)
 
+    _apply_env_overrides() # env > Config file
+
     return config
+
+_apply_env_overrides() # Call at module loading time
