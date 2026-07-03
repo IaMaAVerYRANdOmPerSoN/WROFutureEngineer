@@ -6,22 +6,17 @@ main control loop for the WRO obstacle challenge course.
 
 import asyncio
 from typing import Literal
-from piclient.core import logger  # pyright: ignore[reportMissingTypeStubs]
-# pyright: ignore[reportMissingTypeStubs]
+from piclient.core import logger
 from piclient.core.interface import Client, AsyncCamera
-# pyright: ignore[reportMissingTypeStubs]
 from piclient.core.vision import AsyncMultiprocessingVisionProcessor
-# pyright: ignore[reportMissingTypeStubs]
-from piclient.core.lib import PD, GLOBAL_CONFIG, export, load_configuration
+from piclient.core.lib import PD, GLOBAL_CONFIG, export
 import multiprocessing as mp
 from multiprocessing import shared_memory
 
 
 @export
 async def run_obstacle_challenge() -> None:
-    """Asynchronus runner for the *obstacle challenge*"""
-
-    load_configuration()
+    """Asynchronous runner for the *obstacle challenge*"""
 
     async with Client() as client:
         config = GLOBAL_CONFIG().ObstacleChallengeConfig
@@ -37,7 +32,7 @@ async def run_obstacle_challenge() -> None:
 
             try:
                 shm = shared_memory.SharedMemory(
-                    create=True, size=512*384*3, name="camera_frame")
+                    create=True, size=GLOBAL_CONFIG().ObstacleChallengeConfig.SHM_SIZE, name="camera_frame")
             except FileExistsError:
                 try:
                     shm = shared_memory.SharedMemory(name="camera_frame")
@@ -45,11 +40,11 @@ async def run_obstacle_challenge() -> None:
                     shm.unlink()
                     # Make sure it has exactly the size we need, and is empty
                     shm = shared_memory.SharedMemory(
-                        create=True, size=512*384*3, name="camera_frame")
+                        create=True, size=GLOBAL_CONFIG().ObstacleChallengeConfig.SHM_SIZE, name="camera_frame")
                 except FileNotFoundError:
                     # The shared memory segment disappeared between create and cleanup attempts, try again
                     shm = shared_memory.SharedMemory(
-                        create=True, size=512*384*3, name="camera_frame")
+                        create=True, size=GLOBAL_CONFIG().ObstacleChallengeConfig.SHM_SIZE, name="camera_frame")
 
             cam_receiver, cam_sender = mp.Pipe(duplex=False)
             camera_process = mp.Process(

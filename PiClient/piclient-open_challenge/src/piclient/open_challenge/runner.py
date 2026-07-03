@@ -11,7 +11,7 @@ from piclient.core.vision import OpenChallengeAsyncMultiprocessingVisionProcesso
 import numpy as np
 import cv2
 from piclient.core.interface import Client, DriveCommandExecutor
-from piclient.core.lib import GLOBAL_CONFIG, PD, export, load_configuration
+from piclient.core.lib import GLOBAL_CONFIG, PD, export
 from piclient.core import logger
 import time
 from typing import Literal
@@ -20,10 +20,8 @@ from typing import Literal
 @export
 async def run_open_challenge() -> None:
     """
-    asynchronus runner for the *open challenge*
+    asynchronous runner for the *open challenge*
     """
-
-    load_configuration()
 
     wall_follow = PD(
         *GLOBAL_CONFIG().OpenChallengeConfig.WALL_FOLLOW_KPKD)
@@ -51,7 +49,7 @@ async def run_open_challenge() -> None:
     try:
         try:
             shm = shared_memory.SharedMemory(
-                create=True, size=512*384*3, name="camera_frame")
+                create=True, size=GLOBAL_CONFIG().OpenChallengeConfig.SHM_SIZE, name="camera_frame")
         except FileExistsError:
             try:
                 shm = shared_memory.SharedMemory(name="camera_frame")
@@ -59,11 +57,11 @@ async def run_open_challenge() -> None:
                 shm.unlink()
                 # Make sure it has exactly the size we need, and is empty
                 shm = shared_memory.SharedMemory(
-                    create=True, size=512*384*3, name="camera_frame")
+                    create=True, size=GLOBAL_CONFIG().OpenChallengeConfig.SHM_SIZE, name="camera_frame")
             except FileNotFoundError:
                 # The shared memory segment disappeared between create and cleanup attempts, try again
                 shm = shared_memory.SharedMemory(
-                    create=True, size=512*384*3, name="camera_frame")
+                    create=True, size=GLOBAL_CONFIG().OpenChallengeConfig.SHM_SIZE, name="camera_frame")
 
         cam_receiver, cam_sender = mp.Pipe(duplex=False)
         camera_process = mp.Process(
@@ -79,7 +77,7 @@ async def run_open_challenge() -> None:
         # Vision process listens on cam_receiver for the signal, then reads the frame from shared memory, processes it, and sends the results back through data_sender.
         # Staticmethod async_pipe_reader polls the data_receiver for data and yields it to the main loop.
 
-        async with Client() as client:  # Initilize the client and open resources with the async context manager
+        async with Client() as client:  # Initialize the client and open resources with the async context manager
             if not await client.verify_connection():
                 logger.critical(
                     f"Couldn't establish connection to Arduino, is the USB cable plugged in? The selected USB port is {client.port}, baud {client.baud} (check Config.py).")
@@ -193,7 +191,7 @@ async def run_open_challenge() -> None:
                                 )
 
                             case _:
-                                logger.error(f"Unrecogized state: {state}")
+                                logger.error(f"Unrecognized state: {state}")
                                 state = "Straight"
 
                         h, w = GLOBAL_CONFIG().CameraConfig.OUTPUT_HEIGHT, GLOBAL_CONFIG().CameraConfig.OUTPUT_WIDTH

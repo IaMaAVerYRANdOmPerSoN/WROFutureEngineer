@@ -14,7 +14,6 @@ from collections.abc import Generator, AsyncGenerator, Sequence
 from typing import Any, NoReturn, Self
 
 import aioserial  # pyright: ignore[reportMissingTypeStubs]
-# pyright: ignore[reportMissingTypeStubs]
 
 from .. import logger
 from ..lib import GLOBAL_CONFIG, export

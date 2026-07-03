@@ -31,8 +31,9 @@ def export_globals() -> None:
     from all the names that were imported or defined in that file.
     """
     caller = inspect.currentframe()
-    caller_globals: dict[str,
-                         Any] = caller.f_globals if caller is not None else {}
+    if caller is None or caller.f_back is None:
+        return
+    caller_globals: dict[str, Any] = caller.f_back.f_globals
     mod = sys.modules[caller_globals["__name__"]]
     for name in tuple(caller_globals):
         if name.startswith("_") or "export_globals" in name:

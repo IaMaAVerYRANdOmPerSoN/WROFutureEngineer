@@ -1,0 +1,27 @@
+name: Test piclient-cli
+
+on: [push, pull_request]
+
+jobs:
+  test-cli:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+
+    - name: Install dependencies and activate venv
+      run: |
+        cd PiClient
+        python -m venv .venv
+        echo "$PWD/.venv/bin" >> $GITHUB_PATH
+        pip install -r requirements-dev.txt
+
+    - name: test piclient-cli
+      run: |
+        cd PiClient
+        python -m unittest discover -s piclient-cli/src/piclient/cli/tests

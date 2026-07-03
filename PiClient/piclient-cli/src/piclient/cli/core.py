@@ -6,41 +6,17 @@ Provides the ``main()`` function wired to the ``wro`` console script
 """
 
 import asyncio
+import os
 import sys
 import argparse
-from .piclient_argument_parser import PICLIENT_ARGUMENT_PARSER
-import dataclasses
+from .argument_parser import TypedArgumentParser
 
 from typing import NoReturn
 
 from piclient.open_challenge import run_open_challenge
-# pyright: ignore[reportMissingTypeStubs]
-from piclient.obstacle_challenge import run_obstacle_challenge # pyright: ignore[reportMissingTypeStubs]
+from piclient.obstacle_challenge import run_obstacle_challenge
 from piclient.core import configure_logging, logger
 from piclient.core.lib import export, GLOBAL_CONFIG
-
-from collections.abc import Generator
-
-
-def _set_nested_attr(root: object, dotted_path: str, value: object) -> None:
-    """Set ``root.a.b.c = value`` given ``dotted_path == 'a.b.c'``."""
-    *parents, leaf = dotted_path.split(".")
-    for part in parents:
-        root = getattr(root, part)
-    setattr(root, leaf, value)
-
-
-def _walk_config(
-    obj: object,
-    prefix: str = "",
-) -> Generator[tuple[str, object], None, None]:
-    """Yield ``(dotted_key, value)`` pairs for every leaf in a nested dataclass tree."""
-    for key, value in vars(obj).items():
-        full_key = f"{prefix}.{key}" if prefix else key
-        if dataclasses.is_dataclass(value):
-            yield from _walk_config(value, full_key)
-        else:
-            yield full_key, value
 
 
 def _parse_args() -> argparse.Namespace:
@@ -48,12 +24,34 @@ def _parse_args() -> argparse.Namespace:
 
     :returns: Parsed namespace.
     """
-    parser = PICLIENT_ARGUMENT_PARSER()
+    return TypedArgumentParser(GLOBAL_CONFIG()).parse_args()
 
-    for k, v in _walk_config(GLOBAL_CONFIG()):
-        parser.add_argument(f"--{k}", help=f"Default: {v}")
 
-    return parser.parse_args()
+async def _init_sentry() -> None:
+    """
+    Initialize Sentry SDK for error tracking if SENTRY_DSN is set in the environment.
+
+    "In async programs, we recommend to initialize the
+    Sentry SDK inside an async function to ensure async
+    code is instrumented properly. If possible, call
+    sentry_sdk.init() at the beginning of the first
+    async function you call" --- sentry sdk docs
+    """
+    dsn: str | None = os.getenv("SENTRY_DSN")
+    if not dsn:
+        return
+
+    try:
+        import sentry_sdk
+    except ImportError:
+        return
+
+    sentry_sdk.init(
+        dsn=dsn,
+        send_default_pii=True,
+        traces_sample_rate=1.0,  # Everything, until everything is working
+        enable_logs=True,
+    )
 
 
 @export
@@ -64,24 +62,32 @@ def main() -> NoReturn:
     and runs the appropriate async challenge loop. Handles graceful
     shutdown on KeyboardInterrupt and logs fatal exceptions.
     """
+    asyncio.run(_init_sentry())
+
+    try:
+        GLOBAL_CONFIG().from_toml()
+    except OSError:
+        logger.warning(
+            "No configuration file found, using cli args, env vars, and defaults")
+    GLOBAL_CONFIG().from_env()
+
     parsed_args: argparse.Namespace = _parse_args()
     configure_logging(getattr(parsed_args, "GeneralConfig.LEVEL", "WARNING"))
 
-    for key, value in vars(parsed_args).items():
-        _set_nested_attr(GLOBAL_CONFIG(), key, value)
+    GLOBAL_CONFIG().freeze()  # Prevent further modifications to the configuration
 
     exitcode = 1
     try:
         if getattr(parsed_args, "GeneralConfig.CHALLENGE", "open") == "obstacle":
-            asyncio.run(main=run_obstacle_challenge())
+            asyncio.run(run_obstacle_challenge())
         elif getattr(parsed_args, "GeneralConfig.CHALLENGE", "open") == "open":
-            asyncio.run(main=run_open_challenge())
+            asyncio.run(run_open_challenge())
         else:
             logger.warning("Nothing to run!")
         exitcode = 0
     except KeyboardInterrupt:
         logger.error(
-            "SIGINT recieved, shutting down... (Send SIGINT [CTRL+C] again to force)")
+            "SIGINT received, shutting down... (Send SIGINT [CTRL+C] again to force)")
         exitcode = 0
     except Exception:
         logger.critical("A FATAL EXCEPTION HAS OCCURRED")

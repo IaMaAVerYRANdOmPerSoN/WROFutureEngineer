@@ -2,7 +2,7 @@
     "python.analysis.autoImportCompletions": true,
     "python.analysis.typeCheckingMode": "strict",
     "python.analysis.generateWithTypeAnnotation": true,
-    "python.analysis.includeVenvInWorkspaceSymbols": true,
+    "python.analysis.includeVenvInWorkspaceSymbols": false,
     "python.analysis.typeEvaluation.deprecateTypingAliases": true,
     "python.analysis.autoFormatStrings": true,
     "python.analysis.completeFunctionParens": true,
