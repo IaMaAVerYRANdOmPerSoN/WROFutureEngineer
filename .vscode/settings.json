@@ -29,5 +29,12 @@
         "**/.*",
         "**/.venv",
         "PiClient/utils"
-    ]
+    ],
+    "python.analysis.extraPaths": [
+        "piclient-core/src",
+        "piclient-cli/src",
+        "piclient-open_challenge/src",
+        "piclient-obstacle_challenge/src"
+    ],
+    "python-envs.defaultEnvManager": "ms-python.python:venv"
 }

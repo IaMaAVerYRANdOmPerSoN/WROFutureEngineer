@@ -1,7 +1,7 @@
 import unittest
 import os
 import numpy as np
-from piclient.cli import TypedArgumentParser # pyright: ignore[reportMissingTypeStubs]
+from piclient.cli import TypedArgumentParser
 from piclient.core.lib import GLOBAL_CONFIG, Config
 
 

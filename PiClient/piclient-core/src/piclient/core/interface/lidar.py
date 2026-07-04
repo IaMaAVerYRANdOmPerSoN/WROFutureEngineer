@@ -13,7 +13,7 @@ import numpy as np
 from collections.abc import Generator, AsyncGenerator, Sequence
 from typing import Any, NoReturn, Self
 
-import aioserial  # pyright: ignore[reportMissingTypeStubs]
+import aioserial
 
 from .. import logger
 from ..lib import GLOBAL_CONFIG, export

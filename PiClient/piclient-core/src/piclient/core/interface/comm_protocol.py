@@ -7,7 +7,7 @@ coalescing drive commands with latest-wins semantics.
 
 from _asyncio import Future, Task
 
-import aioserial  # pyright: ignore[reportMissingTypeStubs]
+import aioserial
 import asyncio
 import re
 from .. import logger
