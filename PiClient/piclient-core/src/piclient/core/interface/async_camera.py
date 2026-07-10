@@ -5,23 +5,29 @@ library that supports non-blocking frame capture, shared memory streaming,
 and subprocess-safe context management.
 """
 
+from typing import NoReturn, Self
+from ..lib import GLOBAL_CONFIG, export
+from multiprocessing import shared_memory
 import asyncio
-from multiprocessing.connection import Connection
+from multiprocessing.connection import PipeConnection
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
-from .. import logger 
+from .. import logger
+from typing import Any
+
+picamera2: Any = None
 
 try:
-    import picamera2 # pyright: ignore[reportMissingImports]
+    import picamera2  # pyright: ignore[reportMissingImports]
 except ImportError:
-    # Probally not on Pi
-    logger.warning("picamera2 import failed, are you running on a Raspberry Pi? " \
-    "Make sure include-system-site-packages=true in your environment. " \
-    "If you are building documentation or testing on a different OS, you may ignore this message, " \
-    "but some modules will not work as inteded, and may raise exceptions.")
-from multiprocessing import shared_memory
-from ..lib import Config, export
-from typing import Dict
+    # Probably not on Pi
+    logger.warning("picamera2 import failed, are you running on a Raspberry Pi? "
+                   "Make sure include-system-site-packages=true in your environment. "
+                   "If you are building documentation or testing on a different OS, you may ignore this message, "
+                   "but some modules will not work as intended, and may raise exceptions.")
+
+
+_CAM_DEFAULTS = GLOBAL_CONFIG().CameraConfig
 
 
 @export
@@ -29,34 +35,51 @@ class AsyncCamera:
     """
     A native python asynchronus wrapper over the picamera2.Picamera2 class
 
-    :ivar config: Camera format configuration dict (default: ``CameraConfig.FORMAT``).
-    :ivar sensor_config: Sensor mode configuration dict (default: ``CameraConfig.SENSOR_CONFIG``).
-    :ivar controls_config: Camera controls configuration dict (default: ``CameraConfig.CONTROLS_CONFIG``).
+    :ivar config: Camera format configuration dict (default: ``CameraGLOBAL_CONFIG().FORMAT``).
+    :ivar sensor_config: Sensor mode configuration dict (default: ``CameraGLOBAL_CONFIG().SENSOR_CONFIG``).
+    :ivar controls_config: Camera controls configuration dict (default: ``CameraGLOBAL_CONFIG().CONTROLS_CONFIG``).
     :ivar _cam: Internal picamera2.Picamera2 instance for frame capture, initilized to none and created by ``__aenter__``
     :ivar frame_width: Infered width of frame from configuration values
     :ivar frame_height: Infered height of frame from configuration values
     :ivar loop: Asyncio event loop to run capture coroutines
-    :ivar executor: ``Concurent.futures.ThreadPoolExecutor`` created by __aenter__ for running synchronus picamera2 functions asynchronusly.
-    
+    :ivar _executor: Internal ``Concurent.futures.ThreadPoolExecutor`` created by __aenter__ for running synchronus picamera2 functions asynchronusly.
+
     """
-    def __init__(self, config=Config.CameraConfig().FORMAT, sensor_config=Config.CameraConfig().SENSOR_CONFIG, controls_config=Config.CameraConfig().CONTROLS_CONFIG,):
+
+    def __init__(
+        self,
+        config: dict[str, Any] = _CAM_DEFAULTS.FORMAT,
+        sensor_config: dict[str, Any] = _CAM_DEFAULTS.SENSOR_CONFIG,
+        controls_config: dict[str, Any] = _CAM_DEFAULTS.CONTROLS_CONFIG,
+        executor_threads: int = _CAM_DEFAULTS.EXECUTOR_THREADS,
+        max_concurrent_captures: int = _CAM_DEFAULTS.MAX_CONCURRENT_CAPTURES
+    ) -> None:
         """Initialize the async camera wrapper.
 
-        :param config: Camera format configuration dict (default: ``CameraConfig.FORMAT``).
-        :param sensor_config: Sensor mode configuration dict (default: ``CameraConfig.SENSOR_CONFIG``).
-        :param controls_config: Camera controls configuration dict (default: ``CameraConfig.CONTROLS_CONFIG``).
+        :param config: Camera format configuration dict (default: ``CameraGLOBAL_CONFIG().FORMAT``).
+        :param sensor_config: Sensor mode configuration dict (default: ``CameraGLOBAL_CONFIG().SENSOR_CONFIG``).
+        :param controls_config: Camera controls configuration dict (default: ``CameraGLOBAL_CONFIG().CONTROLS_CONFIG``).
+        :param executor_threads: The number of executor threads for the internal executor (default: ``CameraGLOBAL_CONFIG().EXECUTOR_THREADS``)
+        :param max_concurrent_captures: The maxmimum number of concurretn captures permitted by the internal semaphore (default: ``CameraGLOBAL_CONFIG().MAX_CONCURRENT_CAPTURES``)
         """
-        self.config: Dict = config
-        self.sensor_config: Dict = sensor_config
-        self.controls_config: Dict = controls_config
+        self.config: dict[str, Any] = config
+        self.sensor_config: dict[str, Any] = sensor_config
+        self.controls_config: dict[str, Any] = controls_config
+        self.executor_threads: int = executor_threads
+        self.max_concurrent_captures: int = max_concurrent_captures
         self._cam = None
 
         self.frame_width, self.frame_height = self.config["size"]
 
-        self.loop = asyncio.get_event_loop()
-        self.executor = None
+        try:
+            self.loop: asyncio.AbstractEventLoop = asyncio.get_running_loop()
+        except RuntimeError:
+            logger.warning(
+                "No event loop currently running in thread, are you building docs?")
 
-    async def __aenter__(self):
+        self._executor = None
+
+    async def __aenter__(self) -> Self:
         """
         Initializes hardware resources defined in __init__ asynchronously.
 
@@ -65,15 +88,14 @@ class AsyncCamera:
 
         :returns: `self`: the instance of `AsyncCamera`
         """
-        self.executor = ThreadPoolExecutor(
-            Config.CameraConfig.EXECUTOR_THREADS)
+        self._executor = ThreadPoolExecutor(self.executor_threads)
         self._capture_semaphore = asyncio.Semaphore(
-            Config.CameraConfig.MAX_CONCURRENT_CAPTURES)
+            self.max_concurrent_captures)
 
         try:
             self._cam = await asyncio.wait_for(
-                self.loop.run_in_executor(self.executor, picamera2.Picamera2),
-                timeout=Config.CameraConfig.HW_INIT_TIMEOUT
+                self.loop.run_in_executor(self._executor, picamera2.Picamera2),
+                timeout=GLOBAL_CONFIG().CameraConfig.HW_INIT_TIMEOUT
             )
 
             config = self._cam.create_preview_configuration(
@@ -81,17 +103,17 @@ class AsyncCamera:
                 sensor=self.sensor_config,
                 raw=None,
                 controls=self.controls_config,
-                buffer_count=Config.CameraConfig.BUFFER_COUNT,
+                buffer_count=GLOBAL_CONFIG().CameraConfig.BUFFER_COUNT,
             )
 
             await asyncio.wait_for(
                 self.loop.run_in_executor(
-                    self.executor, self._cam.configure, config),
-                timeout=Config.CameraConfig.CONFIGURE_TIMEOUT
+                    self._executor, self._cam.configure, config),
+                timeout=GLOBAL_CONFIG().CameraConfig.CONFIGURE_TIMEOUT
             )
             await asyncio.wait_for(
-                self.loop.run_in_executor(self.executor, self._cam.start),
-                timeout=Config.CameraConfig.START_TIMEOUT
+                self.loop.run_in_executor(self._executor, self._cam.start),
+                timeout=GLOBAL_CONFIG().CameraConfig.START_TIMEOUT
             )
 
             logger.info(
@@ -105,7 +127,7 @@ class AsyncCamera:
                 "Camera not responding during power-up.") from e
 
     # Let the main loop handle the logging and execeptions
-    async def __aexit__(self, *args):
+    async def __aexit__(self, *args: Any) -> None:
         """Tear down camera hardware resources asynchronously.
 
         Stops the camera, closes the device, and shuts down the thread pool
@@ -113,14 +135,34 @@ class AsyncCamera:
         the main loop can handle logging.
         """
         if hasattr(self, "_cam") and self._cam:
-            await self.loop.run_in_executor(self.executor, self._cam.stop)
-            await self.loop.run_in_executor(self.executor, self._cam.close)
+            await self.loop.run_in_executor(self._executor, self._cam.stop)
+            await self.loop.run_in_executor(self._executor, self._cam.close)
             self._cam = None
 
-        if hasattr(self, "executor") and self.executor:
-            self.executor.shutdown()
+        if hasattr(self, "_executor") and self._executor:
+            self._executor.shutdown()
 
-    async def get_frame_async(self, shm: shared_memory.SharedMemory | None = None, timeout=0.1) -> None | np.ndarray:
+    async def reload(self) -> Self:
+        """Hot reload after changing attributes.
+
+        Tears down existing hardware resources, reinitialises the camera
+        with the updated configuration, and cleans up on failure before
+        re-raising.
+
+        ALWAYS call after changing attributes to reload internal context.
+        Not doing so will lead to unpredictable behaviour.
+
+        :returns: ``self``
+        :raises Exception: Re-raises any exception during reload
+        """
+        await self.__aexit__()
+        try:
+            return await self.__aenter__()
+        except Exception:
+            await self.__aexit__()
+            raise
+
+    async def get_frame_async(self, shm: shared_memory.SharedMemory | None = None, timeout: float = 0.1) -> None | np.ndarray[tuple[int, ...], np.dtype[np.uint8]]:
         """
         Fetch a frame asynchronously from `self._cam`
 
@@ -132,20 +174,21 @@ class AsyncCamera:
 
         while True:
             if not self._cam:
-                raise AttributeError("Please Use the AysncCamera's aysnc context manager to initilize hardware resources before perfoming any operations.")
+                raise AttributeError(
+                    "Please Use the AysncCamera's aysnc context manager to initilize hardware resources before perfoming any operations.")
 
             try:
                 async with self._capture_semaphore:
                     # type: ignore
                     frame: np.ndarray = await asyncio.wait_for(
                         self.loop.run_in_executor(
-                            self.executor, self._cam.capture_array),
+                            self._executor, self._cam.capture_array),
                         timeout=timeout,
                     )
-                
+
                 if shm:
                     # Copy BGR888 data (H, W, 3) to shared buffer
-                    shared_buffer = np.ndarray(
+                    shared_buffer: np.ndarray[tuple[int, ...], np.dtype[np.uint8]] = np.ndarray(
                         (self.frame_height, self.frame_width, 3), dtype=np.uint8, buffer=shm.buf)
                     np.copyto(shared_buffer, frame)
 
@@ -157,14 +200,14 @@ class AsyncCamera:
                 logger.warning(
                     f"Camera frame capture timed out ({e}), retrying...")
                 # Give some grace
-                await asyncio.sleep(Config.CameraConfig.CAPTURE_RETRY_SLEEP_SECONDS)
+                await asyncio.sleep(GLOBAL_CONFIG().CameraConfig.CAPTURE_RETRY_SLEEP_SECONDS)
 
             except Exception as e:
                 logger.warning(
                     f"Unexpected error during frame capture ({e}), continuing...")
-                await asyncio.sleep(Config.CameraConfig.CAPTURE_ERROR_SLEEP_SECONDS)
+                await asyncio.sleep(GLOBAL_CONFIG().CameraConfig.CAPTURE_ERROR_SLEEP_SECONDS)
 
-    async def buffer_frames_async(self, num_frames=5, timeout=1.0):
+    async def buffer_frames_async(self, num_frames: int = 5, timeout: float = 1.0) -> list[np.ndarray[tuple[int, ...], np.dtype[np.uint8]] | None]:
         """
         Buffers `num_frames` frames asynchronously.
 
@@ -175,7 +218,7 @@ class AsyncCamera:
         """
         return [await asyncio.wait_for(self.get_frame_async(), timeout) for _ in range(num_frames)]
 
-    async def stream(self, shm_name, sender: Connection, *args: Connection):
+    async def stream(self, shm_name: str, sender: PipeConnection, *args: PipeConnection) -> NoReturn:
         """
         asynchronous indefinite yield camera IOstream.
 
@@ -199,7 +242,8 @@ class AsyncCamera:
                 shm.close()
 
     @staticmethod
-    def camera_process_context_manager(shm, sender):
+    # pyright: ignore[reportReturnType]
+    def camera_process_context_manager(shm: str, sender: PipeConnection) -> NoReturn: # pyright: ignore[reportReturnType]
         """Subprocess entry point for streaming camera frames.
 
         Creates an :class:`AsyncCamera` instance within a fresh asyncio
@@ -209,8 +253,10 @@ class AsyncCamera:
         :param shm: Name of the shared memory block for frame data.
         :param sender: Multiprocessing :class:`Connection` used to signal new frames.
         """
-        async def _run(shm, sender):
+        async def _run(shm: str, sender: PipeConnection) -> NoReturn:
             async with AsyncCamera() as camera:
+                # NoReturn implies _run is NoReturn
                 await camera.stream(shm, sender)
 
+        # calling _run here implies the whole function is NoReturn (asyncio.run essentially awaits the coroutine but from a sync caller)
         asyncio.run(_run(shm, sender))

@@ -1,11 +1,11 @@
 """Entry point for ``python -m piclient.obstacle_challenge``."""
 
 import asyncio
-from piclient.obstacle_challenge import run_obstacle_challenge
+from .runner import run_obstacle_challenge
 from piclient.core import configure_logging, logger
 
 if __name__ == "__main__":
-    configure_logging(verbose=True)
+    configure_logging(level_ = "WARNING")
     try:
         asyncio.run(run_obstacle_challenge())
     except KeyboardInterrupt:

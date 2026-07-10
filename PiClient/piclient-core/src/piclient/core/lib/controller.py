@@ -3,6 +3,7 @@
 Provides :class:`PD`, a simple proportional-derivative controller.
 """
 
+
 from .. import logger
 from .exporter import export
 
@@ -19,32 +20,32 @@ class PD:
     :ivar previous_error: Error from the previous :meth:`tick` call.
     """
 
-    def __init__(self, kp, kd):
+    def __init__(self, kp: float, kd: float) -> None:
         """Initialise the PD controller.
 
         :param kp: Proportional gain.
         :param kd: Derivative gain.
         """
-        self.KP = kp
-        self.KD = kd
+        self.KP: float = kp
+        self.KD: float = kd
         self.previous_error = 0
 
-    def tick(self, target, value=None):
+    def tick(self, value: float, target: float | None = None) -> float:
         """Compute one PD iteration.
 
-        If *value* is ``None``, *target* is treated as the error directly
+        If *target* is ``None``, *value* is treated as the error directly
         (e.g. when tracking a difference signal).
 
-        :param target: Desired setpoint, or the error signal if *value* is ``None``.
-        :param value: Current measured value (optional).
+        :param value: Current measured value
+        :param target: Target setpoint. If set to ``None`` *value* is treated as error directly (equavivlent to ``target=0``)
         :returns: Control output (proportional + derivative).
         :rtype: float
         """
-        error = target if value is None else target - value
+        error: float = value if target is None else target - value
         proportional = self.KP * error
-        derivative = self.KD * (error - self.previous_error)
+        derivative: float = self.KD * (error - self.previous_error)
 
-        self.previous_error = error
+        self.previous_error: float = error
         logger.info(
             f"PD output: Proportional {proportional:.3f}, Derivative {derivative:.3f}, Total {(proportional + derivative):.3f}")
         return proportional + derivative

@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from ..lib import export
 import numpy as np
 import cv2
-from typing import Tuple
 
 
 @export
@@ -28,7 +27,7 @@ class VisionObject:
     contour: np.ndarray
     color: str
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Compute bounding-box and centroid properties after dataclass init."""
         # Added custom type stub, default type stubs use Sequence[int]
         self.bbox: cv2.typing.Rect = cv2.boundingRect(self.contour)
@@ -46,15 +45,15 @@ class Walls:
     Distances are expressed as the fraction of black pixels in the
     left and right regions of interest, divided by ROI area.
 
-    :ivar left: Normalised distance to the left wall (0–1).
-    :ivar right: Normalised distance to the right wall (0–1).
+    :ivar left: Normalised distance to the left wall (0-1).
+    :ivar right: Normalised distance to the right wall (0-1).
     :ivar area: Total pixel area of the ROI used for normalisation.
     """
     left: float
     right: float
     area: float
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Normalise wall distances by dividing by ROI area."""
-        self.left = self.left / self.area # Can only be 0 - 1
+        self.left = self.left / self.area  # Can only be 0 - 1
         self.right = self.right / self.area

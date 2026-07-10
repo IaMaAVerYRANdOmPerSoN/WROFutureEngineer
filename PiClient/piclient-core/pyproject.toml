@@ -9,13 +9,13 @@ packages = ["src/piclient/core"]
 
 [project]
 name = "piclient"
-version = "0.0.1"
+version = "0.1.0"
 authors = [
     { name = "Michael Xie", email = "wenmike.xie@gmail.com" },
     { name = "Elvis Wang" },
     { name = "Ryan Rao" },
 ]
-description = "Apostla team WRO FE 2026 - shared library"
+description = "Apostla team WRO FE 2026 shared library"
 
 requires-python = ">=3.10"
 dependencies = [

@@ -9,11 +9,11 @@ packages = ["src/piclient/open_challenge"]
 
 [project]
 name = "piclient-open-challenge"
-version = "0.0.1"
+version = "0.1.0"
 authors = [
     { name = "Michael Xie", email = "wenmike.xie@gmail.com" },
 ]
-description = "Apostla team WRO FE 2026 - Open Challenge runner"
+description = "Apostla team WRO FE 2026 Open Challenge runner"
 
 requires-python = ">=3.10"
 dependencies = [

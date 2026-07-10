@@ -1,3 +1,40 @@
 {
-    "python.analysis.autoImportCompletions": true
+    "python.analysis.autoImportCompletions": true,
+    "python.analysis.typeCheckingMode": "strict",
+    "python.analysis.generateWithTypeAnnotation": true,
+    "python.analysis.includeVenvInWorkspaceSymbols": false,
+    "python.analysis.typeEvaluation.deprecateTypingAliases": true,
+    "python.analysis.autoFormatStrings": true,
+    "python.analysis.completeFunctionParens": true,
+    "python.analysis.diagnosticMode": "workspace",
+    "python.analysis.diagnosticsSource": "Pylance",
+    "python.analysis.disableTaggedHints": false,
+    "python.analysis.enableParallelIndexing": true,
+    "python.analysis.enableTroubleshootMissingImports": true,
+    "python.analysis.importFormat": "relative",
+    "python.analysis.inlayHints.callArgumentNames": "off",
+    "python.analysis.inlayHints.functionReturnTypes": true,
+    "python.analysis.inlayHints.pytestParameters": true,
+    "python.analysis.inlayHints.variableTypes": true,
+    "python.analysis.languageServerMode": "full",
+    "python.analysis.logLevel": "Warning",
+    "python.analysis.typeEvaluation.disableBytesTypePromotions": false,
+    "python.analysis.typeEvaluation.enableReachabilityAnalysis": true,
+    "python.analysis.typeEvaluation.strictDictionaryInference": true,
+    "python.analysis.typeEvaluation.strictListInference": true,
+    "python.analysis.typeEvaluation.strictSetInference": true,
+    "python.analysis.exclude": [
+        "**/node_modules",
+        "**/__pycache__",
+        "**/.*",
+        "**/.venv",
+        "PiClient/utils"
+    ],
+    "python.analysis.extraPaths": [
+        "piclient-core/src",
+        "piclient-cli/src",
+        "piclient-open_challenge/src",
+        "piclient-obstacle_challenge/src"
+    ],
+    "python-envs.defaultEnvManager": "ms-python.python:venv"
 }
