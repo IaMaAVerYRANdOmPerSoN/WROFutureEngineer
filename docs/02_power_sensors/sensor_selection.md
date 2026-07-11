@@ -17,17 +17,17 @@ Our robot needs sensing for:
 |--------|---------|------------|--------------------------|
 |        |         |            |                          |
 
-## Sensor 1: [Name]
-- Purpose:
-- What information it provides:
-- Why it was selected:
+## Sensor 1: [Camera]
+- Purpose: Detecting different colors, detecting objects (pillars, parking lot, walls)
+- What information it provides: color, pixels
+- Why it was selected: Selected because simple to use and does its job well
 - Advantages:
 - Limitations:
 - Alternatives considered:
 - Why alternatives were not selected:
 
-## Sensor 2: [Name]
-- Purpose:
+## Sensor 2: [LiDAR]
+- Purpose: measure precise distances and create accurate, 3D representations of objects and environments
 - What information it provides:
 - Why it was selected:
 - Advantages:
