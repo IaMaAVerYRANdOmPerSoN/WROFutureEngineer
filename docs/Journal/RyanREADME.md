@@ -1,6 +1,33 @@
 
 # WRO Future Engineers 2026
 
+## Major Problems
+ 
+### 1. Differential Gear
+The most persistent issue throughout the build. The differential failed multiple times across different designs and causes:
+- Online differential design failed under load ([Week 11](#week-11-mar-11-18))
+- First custom design broke during testing ([Week 11](#week-11-mar-11-18))
+- Middle axle broke during assembly ([Week 16](#week-16-apr-20-27))
+- Melted from running the robot too quickly ([Week 17](#week-17-apr-28-may-5))
+- Continued to drag on the ground after reprinting ([Week 16](#week-16-apr-20-27))
+- Still not working after multiple iterations ([Week 18](#week-18-may-6-13))
+- Finally fixed then broke again ([Week 20](#week-20-may-22-29), [Week 23](#week-23-june-14-21))
+### 2. Camera
+- Camera error first appeared and persisted for three weeks ([Week 12](#week-12-mar-19-26), [Week 13](#week-13-mar-27-apr-3))
+- Confirmed as a hardware fault — I2C read error on the OV5647 sensor (error -121), empty I2C bus at address 0x36 ([Week 15](#week-15-apr-12-19))
+- OS re-flash had no effect; resolved by borrowing a second camera from a teammate ([Week 15](#week-15-apr-12-19))
+### 3. Raspberry Pi
+- Could not connect to the robot after reflashing the SD card ([Week 18](#week-18-may-6-13))
+- Concluded the Raspberry Pi had broken due to unknown reasons ([Week 18](#week-18-may-6-13))
+### 4. Power System
+- Deans-T male connector melted during wiring ([Week 14](#week-14-apr-4-11))
+- Step-down voltage regulator short circuited due to damaged wires caught in the motor system ([Week 19](#week-19-may-14-21))
+- Port for the step-down regulator broke as a result ([Week 19](#week-19-may-14-21))
+
+---
+
+# Journal
+
 ---
 
 ## Week 1 (Dec 22–29)
@@ -142,7 +169,7 @@
 
 ---
 
-## Week 16 (Apr 28–May 5)
+## Week 17 (Apr 28–May 5)
 - Coach pointed out that the "Hybrid" state in the open challenge was not needed — having three states instead of two makes the code harder to follow and debug.
 - Coach also found a bug where the robot could get stuck switching back and forth between "Turn" and "Follow Wall" repeatedly if the walls were not detected right after a corner.
 - Removed the Hybrid state from the code.
@@ -153,7 +180,7 @@ changes.
 
 ---
 
-## Week 17 (May 6–13)
+## Week 18 (May 6–13)
 - Differential melted because we ran the robot too quickly.
 - Fixed the differential and made it upgraded it to run on quicker speeds.
 - Reflashed SD card due to connection issues. However, we stil couldn't connect to our robot.
@@ -161,13 +188,57 @@ changes.
 
 ---
 
-## Week 18 (May 14-21)
+## Week 19 (May 14-21)
 - Tried another differential, it still doesn't work...
 - Decided that if we cannot create our own differential by next week, we will buy one off amazon
 - Regulator short circuted due to damaged wires caused by getting caught in the motor system
     - Port for the step down regulator broke
 
 
-## Week 19 (May 22-29)
+## Week 20 (May 22-29)
 - Fixed differential... IT WORKS!
 - Fixing the step down voltage regulator that short circuited
+
+## Week 21 (May 30-June 5)
+- Fixing open challenge issues
+
+## Week 22 (June 6-13)
+- Still working on open challenge
+- Exams were coming, most of our time this week was spent preparing for exams
+
+## Week 23 (June 14-21)
+- Our primary coder Michael left to China
+- The code is very complicated, so we had problems using and navigating through Real VNC
+- Differential broke again
+
+## Week 24 (June 22-29)
+- Still completing open challenge
+    - PD values were not tested too much, when switching cases, the robot would sometimes crash into the inner walls
+    - Lap counting is still an issue
+- Completed open challenge
+- Differential still having issues
+- Wire leading to motor disconnected
+    - Had to saulder it back on
+
+---
+ 
+## Week 25 (June 28–July 5)
+ 
+- The gear connecting to the motor wears out after 1-2 days of use. Taped it as a temporary fix while looking for a better solution.
+- Suggested biasing the corner turn to improve how the robot turns.
+- PCB shipped and on its way to Toronto.
+- Coach noted recent commits were just file moves with no code changes, and asked for a document explaining how the code is organized.
+- Created auto-generated code documentation hosted online.
+- Updated the config system so settings can be changed without touching the code.
+- Coach asked for a software diagram to be added to the main README.
+---
+ 
+## Week 26 (July 6–12)
+ 
+- Updated the vision and open challenge code with new tuning values.
+- New values tested and confirmed working.
+- Started testing obstacle challenge; forgot to bring the obstacles.
+ 
+
+
+

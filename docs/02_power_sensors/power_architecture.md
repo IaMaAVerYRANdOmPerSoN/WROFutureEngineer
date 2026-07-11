@@ -31,16 +31,16 @@ Explain how the robot is powered and why this power system was selected.
 |          |                   |                   |              |
 
 ## Design Rationale
-- Why this battery was selected: 7.4V sits well in the operating range
-- Why this voltage level was selected:
-- Why this regulator setup was selected:
-- Why this design is safe and reliable:
+- Why this battery was selected: Lightweight, compact, supplies a sufficient voltage
+- Why this voltage level was selected: 7.4V sits well in the operating range
+- Why this regulator setup was selected: We have a step down voltage regulator
+- Why this design is safe and reliable: 
 
 ## Runtime Considerations
-- Estimated average current draw:
-- Estimated peak current draw:
-- Expected runtime under testing conditions:
-- Factors that reduce runtime:
+- Estimated average current draw: ~3.5A–4.5A
+- Estimated peak current draw: ~16A–18A average
+- Expected runtime under testing conditions: Runtime ≈ 2.2Ah ÷ 4A = 0.55 hours (~33 minutes)
+- Factors that reduce runtime: Aggressive acceleration and high-speed driving, Frequent steering corrections, Heavy computational loads on the Raspberry Pi (computer vision), Low battery temperatures
 
 ## Risks and Mitigation
 - Voltage drop:
