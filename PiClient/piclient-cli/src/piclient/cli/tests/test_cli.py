@@ -47,7 +47,7 @@ class TestTypedArgumentParser(unittest.TestCase):
 
     def test_parse_args_with_mixed_env_toml_and_cli(self):
         # Simulate environment variable
-        os.environ['WRO__GeneralConfig__LEVEL'] = 'INFO'
+        os.environ['WRO__GenERalCONfIG__LEVEL'] = 'INFO'
         os.environ['WRO__VisionConfig__LOWER_BLACK'] = '[5, 5, 5]'
 
         # Simulate TOML file
@@ -111,3 +111,5 @@ class TestTOMLFileLoading(unittest.TestCase):
             os.remove("./test_data/test_config.toml")
         if os.path.exists("./test_data/invalid_config.toml"):
             os.remove("./test_data/invalid_config.toml")
+        if os.path.exists("./test_data"):
+            os.rmdir("./test_data")

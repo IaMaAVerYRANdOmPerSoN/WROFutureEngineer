@@ -9,7 +9,7 @@ from typing import NoReturn, Self
 from ..lib import GLOBAL_CONFIG, export
 from multiprocessing import shared_memory
 import asyncio
-from multiprocessing.connection import PipeConnection
+from multiprocessing.connection import Connection as PipeConnection
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
 from .. import logger

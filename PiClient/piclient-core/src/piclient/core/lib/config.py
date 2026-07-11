@@ -140,7 +140,7 @@ class Config(Freezeable):
     def get_annotation(self, path: str, sep: str = ".") -> type:
         """Get the type annotation of ``self<sep>a<sep>b<sep>c`` given ``path == 'a<sep>b<sep>c'``."""
         *parents, leaf = path.split(sep)
-        root = self._get_nested_attr(sep.join(parents), sep)
+        root: object = self._get_nested_attr(sep.join(parents), sep)
         annotation = get_annotations(type(root)).get(leaf, None)
         if annotation is None:
             raise TypeError(
@@ -228,7 +228,7 @@ class Config(Freezeable):
                 continue
 
             path = env_key[len(prefix):]
-            path = conversion_map[path.split("__")[0]] + "__" + "__".join(
+            path = conversion_map[path.split("__")[0].upper()] + "__" + "__".join(
                 path.split("__")[1:]) if len(path.split("__")) > 1 else conversion_map[path]
             annotation = self.get_annotation(path, sep="__")
             caster = type(self).get_caster(annotation)

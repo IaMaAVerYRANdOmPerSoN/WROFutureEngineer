@@ -17,8 +17,7 @@ import aioserial
 
 from .. import logger
 from ..lib import GLOBAL_CONFIG, export
-
-from multiprocessing.connection import PipeConnection
+from multiprocessing.connection import Connection as PipeConnection
 
 
 @export

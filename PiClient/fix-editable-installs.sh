@@ -2,9 +2,7 @@
 set -e
 
 VENV="${1:-.venv}"
-SITE_PKGS="$VENV/lib/python"*"/site-packages"
-
-for pth in "$SITE_PKGS"/_editable_impl_piclient*.pth; do
+for pth in $VENV/lib/python*/site-packages/_editable_impl_*.pth; do
     [ -f "$pth" ] || continue
     sed -i 's|/src/piclient$|/src|' "$pth"
     echo "Fixed: $(basename "$pth")"

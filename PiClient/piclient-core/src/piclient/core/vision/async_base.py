@@ -12,7 +12,8 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from collections import deque
 from collections.abc import AsyncGenerator
-from multiprocessing.connection import PipeConnection
+from multiprocessing.connection import Connection as PipeConnection
+    
 from typing import Any, Self
 
 
@@ -159,9 +160,9 @@ class AsyncMultiprocessingVisionProcessor(VisionProcessor):
         """
         async def _run() -> None:
             if loop:
-                async with cls(executor_size, loop) as vision:
+                async with cls(executor_size = executor_size, loop = loop) as vision:
                     await vision.comprehensive_analysis(shm, frameReceiver, data_sender)
             else:
-                async with cls(executor_size) as vision:
+                async with cls(executor_size = executor_size) as vision:
                     await vision.comprehensive_analysis(shm, frameReceiver, data_sender)
         asyncio.run(_run())

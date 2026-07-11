@@ -30,8 +30,7 @@ class VisionProcessor:
     # class-level defaults (overridden per-instance via __init__)
     _DEFAULT_PERSPECTIVE_TRANSFORM: np.ndarray[tuple[int, ...], np.dtype[np.float32 | np.float64]] = np.array(
         GLOBAL_CONFIG().VisionConfig.PERSPECTIVE_TRANSFORM, dtype=np.float32)
-    _DEFAULT_INITIAL_ROI: tuple[slice[int, int, int], slice[int, int,
-                                                            int], slice[int, int, int]] = GLOBAL_CONFIG().VisionConfig.INITIAL_ROI
+    _DEFAULT_INITIAL_ROI: tuple[slice, slice, slice] = GLOBAL_CONFIG().VisionConfig.INITIAL_ROI
     _DEFAULT_LOWER_BLACK: np.ndarray[tuple[int, ...], np.dtype[np.uint8]] = np.array(
         GLOBAL_CONFIG().VisionConfig.LOWER_BLACK, dtype=np.uint8)
     _DEFAULT_UPPER_BLACK: np.ndarray[tuple[int, ...], np.dtype[np.uint8]] = np.array(
@@ -53,7 +52,7 @@ class VisionProcessor:
             tuple[int, ...],
             np.dtype[np.float32 | np.float64]
         ] | None = None,
-        initial_roi: tuple[slice[int, int, int], slice[int, int, int], slice[int, int, int]] | None = None,
+        initial_roi: tuple[slice, slice, slice] | None = None,
         lower_black: np.ndarray[tuple[int, ...],
                                 np.dtype[np.uint8]] | None = None,
         upper_black: np.ndarray[tuple[int, ...],
@@ -81,7 +80,7 @@ class VisionProcessor:
                 src, dst)  # type: ignore
         else:
             self.perspective_transform = self._DEFAULT_PERSPECTIVE_TRANSFORM
-        self.initial_roi: tuple[slice[int, int, int], slice[int, int, int], slice[int, int, int]] = (
+        self.initial_roi: tuple[slice, slice, slice] = (
             initial_roi if initial_roi is not None else self._DEFAULT_INITIAL_ROI
         )
         self.lower_black: np.ndarray[tuple[int, ...], np.dtype[np.uint8]] = (

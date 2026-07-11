@@ -7,7 +7,7 @@ wall-distance measurement.
 
 from typing import Any
 
-from piclient.core.vision.data import Walls
+from .data import Walls
 
 from .. import logger
 
@@ -16,7 +16,7 @@ from .async_base import AsyncMultiprocessingVisionProcessor
 from ..lib import GLOBAL_CONFIG, export
 
 from multiprocessing import shared_memory
-from multiprocessing.connection import PipeConnection
+from multiprocessing.connection import Connection as PipeConnection
 
 import numpy as np
 
