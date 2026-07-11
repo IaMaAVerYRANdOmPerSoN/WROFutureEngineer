@@ -1,0 +1,5 @@
+-e git+https://github.com/IaMaAVerYRANdOmPerSoN/WROFutureEngineer.git@9a41f12ac018ca5b3d8393b220ba67d5e52f9af9#egg=piclient&subdirectory=PiClient/piclient-core
+-e git+https://github.com/IaMaAVerYRANdOmPerSoN/WROFutureEngineer.git@9a41f12ac018ca5b3d8393b220ba67d5e52f9af9#egg=piclient_cli&subdirectory=PiClient/piclient-cli
+-e git+https://github.com/IaMaAVerYRANdOmPerSoN/WROFutureEngineer.git@9a41f12ac018ca5b3d8393b220ba67d5e52f9af9#egg=piclient_obstacle_challenge&subdirectory=PiClient/piclient-obstacle_challenge
+-e git+https://github.com/IaMaAVerYRANdOmPerSoN/WROFutureEngineer.git@9a41f12ac018ca5b3d8393b220ba67d5e52f9af9#egg=piclient_open_challenge&subdirectory=PiClient/piclient-open_challenge
+sentry-sdk>=2.64.0

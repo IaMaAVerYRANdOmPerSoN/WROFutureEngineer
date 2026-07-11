@@ -6,8 +6,8 @@ helping to tune gains and visualise correction signals.
 
 from utils import cv2
 from utils.tools.base_tool import BaseTool
-from src.modules.lib.controller import PD
-from src.modules.lib.config import Config
+from src.core.lib.controller import PD
+from src.core.lib.config import Config
 
 
 class ControlTool(BaseTool):
@@ -16,6 +16,7 @@ class ControlTool(BaseTool):
     Computes wall-following, corner-turn, and obstacle-avoidance
     corrections for both challenge types and overlays them on the frame.
     """
+
     def __init__(self):
         super().__init__(name="control", description="View control status and diagnostics")
         self.open_challenge_pd_straight = PD(
@@ -36,7 +37,7 @@ class ControlTool(BaseTool):
         controllers for both the Open and Obstacle challenges.
 
         :param data: Vision pipeline output tuple.
-        :returns: Dict mapping correction names to float values.
+        :returns: dict mapping correction names to float values.
         """
         zone, walls, obstacles, corner_lines, wall_dists, obstacle_dists = data
         open_challenge_straight_correction = self.open_challenge_pd_straight.tick(
