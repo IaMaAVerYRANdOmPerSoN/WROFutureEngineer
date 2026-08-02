@@ -5,23 +5,24 @@ transform, and contour-finding utilities.
 """
 
 
-from ..lib import GLOBAL_CONFIG, export
-import numpy as np
+from collections.abc import Sequence, Callable
+
 import cv2
+import numpy as np
+
+from loguru import logger
+from ..lib import GLOBAL_CONFIG, export
 from .data import VisionObject
-from .. import logger
-from collections.abc import Sequence
 
 
 @export
 class VisionProcessor:
     """Base class for vision processing pipelines.
 
-    Handles HSV conversion, ROI cropping, perspective transforms,
-    and contour extraction from colour masks.
+    Handles HSV conversion, perspective transforms, and contour
+    extraction from colour masks.
 
     :ivar perspective_transform: Homography matrix for contour warping.
-    :ivar initial_roi: Region-of-interest slice applied during preprocessing.
     :ivar lower_black: Lower HSV bound for black/line detection.
     :ivar upper_black: Upper HSV bound for black/line detection.
     :ivar use_transform: Whether to apply perspective transform to contours.
@@ -30,7 +31,8 @@ class VisionProcessor:
     # class-level defaults (overridden per-instance via __init__)
     _DEFAULT_PERSPECTIVE_TRANSFORM: np.ndarray[tuple[int, ...], np.dtype[np.float32 | np.float64]] = np.array(
         GLOBAL_CONFIG().VisionConfig.PERSPECTIVE_TRANSFORM, dtype=np.float32)
-    _DEFAULT_INITIAL_ROI: tuple[slice, slice, slice] = GLOBAL_CONFIG().VisionConfig.INITIAL_ROI
+    _DEFAULT_INITIAL_ROI: tuple[slice, slice,
+                                slice] = GLOBAL_CONFIG().CameraConfig.INITIAL_ROI
     _DEFAULT_LOWER_BLACK: np.ndarray[tuple[int, ...], np.dtype[np.uint8]] = np.array(
         GLOBAL_CONFIG().VisionConfig.LOWER_BLACK, dtype=np.uint8)
     _DEFAULT_UPPER_BLACK: np.ndarray[tuple[int, ...], np.dtype[np.uint8]] = np.array(
@@ -77,27 +79,37 @@ class VisionProcessor:
                                                    np.dtype[np.float32 | np.float64]] = perspective_transform
         elif src and dst:
             self.perspective_transform = self.get_perspective_transform(
-                src, dst)  # type: ignore
+                src, dst)  # pyright: ignore[reportAttributeAccessIssue]
         else:
             self.perspective_transform = self._DEFAULT_PERSPECTIVE_TRANSFORM
+
         self.initial_roi: tuple[slice, slice, slice] = (
-            initial_roi if initial_roi is not None else self._DEFAULT_INITIAL_ROI
+            initial_roi
+            if initial_roi is not None
+            else self._DEFAULT_INITIAL_ROI
         )
         self.lower_black: np.ndarray[tuple[int, ...], np.dtype[np.uint8]] = (
-            lower_black if lower_black is not None else self._DEFAULT_LOWER_BLACK
+            lower_black
+            if lower_black is not None
+            else self._DEFAULT_LOWER_BLACK
         )
         self.upper_black: np.ndarray[tuple[int, ...], np.dtype[np.uint8]] = (
-            upper_black if upper_black is not None else self._DEFAULT_UPPER_BLACK
+            upper_black
+            if upper_black is not None
+            else self._DEFAULT_UPPER_BLACK
         )
 
     def _preprocess(self, frame: np.ndarray[tuple[int, ...], np.dtype[np.uint8]]) -> np.ndarray[tuple[int, ...], np.dtype[np.uint8]]:
-        """Convert a BGR frame to HSV and apply the initial ROI.
+        """Convert a BGR frame to HSV.
 
         :param frame: Raw BGR frame as a numpy array.
-        :returns: Preprocessed HSV frame cropped to :attr:`initial_roi`.
+        :returns: Preprocessed HSV frame.
         """
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)[self.initial_roi].astype(np.uint8)
-        return frame
+        return cv2.cvtColor(frame, cv2.COLOR_BGR2HSV).astype(np.uint8)
+
+    def preprocess(self, frame: np.ndarray[tuple[int, ...], np.dtype[np.uint8]]) -> np.ndarray[tuple[int, ...], np.dtype[np.uint8]]:
+        """Public wrapper for preprocessing a frame before vision analysis."""
+        return self._preprocess(frame)
 
     # Applying cv2.perspectiveTransform is much more efficient than warping whole frame
     def _perspective_transform(self, contours: Sequence[np.ndarray], colors: Sequence[str]) -> tuple[VisionObject, ...]:
@@ -111,7 +123,16 @@ class VisionProcessor:
             return tuple(VisionObject(contour=contour, color=color) for contour, color, in zip(contours, colors))
         return tuple(VisionObject(contour=cv2.perspectiveTransform(contour, self.perspective_transform), color=color) for contour, color in zip(contours, colors))
 
-    def _find_blocks(self, masks: list[np.ndarray], colors: list[str]) -> tuple[VisionObject, ...]:
+    @staticmethod
+    def simplify_contour(contour: np.ndarray[tuple[int, int], np.dtype[np.int32]], epsilon_factor: float = 0.015) -> np.ndarray[tuple[int, int], np.dtype[np.int32]]:
+        """Simplifies a contour using the Ramer-Douglas-Peucker algorithm."""
+        epsilon = epsilon_factor * cv2.arcLength(contour, True)
+        vertices: np.ndarray[tuple[int, int], np.dtype[np.int32]] = cv2.approxPolyDP(contour, epsilon, True).astype(
+            # Simplify geometry to reduce vertices for performance
+            np.int32).reshape(-1, 2)
+        return vertices
+
+    def _find_blocks(self, masks: Sequence[np.ndarray], colors: Sequence[str], simplify: bool = True, key: Callable[[np.ndarray], float] = cv2.contourArea, min_area: int = 300, max_results: int = 10) -> tuple[VisionObject, ...]:
         """Extract contours from binary masks and return sorted :class:`VisionObject` instances.
 
         Filters small contours, sorts by area (largest first), and limits
@@ -119,6 +140,10 @@ class VisionProcessor:
 
         :param masks: List of binary masks (numpy arrays).
         :param colors: List of colour labels matching each mask.
+        :param simplify: If ``True``, simplify contours to reduce vertices.
+        :param key: Optional sorting key function (default is contour area).
+        :param min_area: Minimum contour area to keep (default 300).
+        :param max_results: Maximum number of contours to return (default 10).
         :returns: tuple of :class:`VisionObject` instances, may be empty.
         """
         contours: list[np.ndarray] = []
@@ -137,15 +162,16 @@ class VisionProcessor:
 
         # Filter out small contours that are likely noise, tuned for 512x384 resolution
         contours = [
-            contour for contour in contours if cv2.contourArea(contour) > 120]
-        contours.sort(key=lambda contour: cv2.contourArea(
-            contour), reverse=True)  # Biggest object first
-        # Limit to 10 largest contours to reduce noise
-        contours = contours[:10]
+            self.simplify_contour(contour) if simplify else contour
+            for contour in contours
+            if cv2.contourArea(contour) > min_area
+        ]
+        contours.sort(key=key, reverse=True)  # Biggest object first
+        # Limit to max_results largest contours to reduce noise
+        contours = contours[:max_results if max_results else None]
 
         logger.info(f"Detected {len(contours)} objects.")
         return self._perspective_transform(contours, detected_colors)
-        # Okay so I this is a pragmatic solution because I only have to change a single method to apply perspective transforms globally. Also way faster then warping whole frame.
 
     @staticmethod
     def get_perspective_transform(src: np.ndarray, dst: np.ndarray) -> cv2.typing.MatLike | np.ndarray[tuple[int, ...], np.dtype[np.float32 | np.float64]]:

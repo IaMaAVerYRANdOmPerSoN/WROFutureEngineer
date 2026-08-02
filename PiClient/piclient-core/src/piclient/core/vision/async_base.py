@@ -5,16 +5,16 @@ context management, pipe-based data reading, and subprocess scaffolding
 to :class:`VisionProcessor`.
 """
 
-from .. import logger
-from .base import VisionProcessor
-from ..lib import export
+from typing import Any, Self, NoReturn
+
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
-from collections import deque
-from collections.abc import AsyncGenerator
 from multiprocessing.connection import Connection as PipeConnection
-    
-from typing import Any, Self
+
+from loguru import logger
+from ..lib import export
+from ..utils import async_pipe_reader as utils_async_pipe_reader, async_pipe_reader_fifo as utils_async_pipe_reader_fifo
+from .base import VisionProcessor
 
 
 @export
@@ -31,6 +31,8 @@ class AsyncMultiprocessingVisionProcessor(VisionProcessor):
     """
 
     loop: asyncio.AbstractEventLoop
+    async_pipe_reader = staticmethod(utils_async_pipe_reader)
+    async_pipe_reader_fifo = staticmethod(utils_async_pipe_reader_fifo)
 
     def __init__(
         self,
@@ -87,7 +89,7 @@ class AsyncMultiprocessingVisionProcessor(VisionProcessor):
             await self.__aexit__()
             raise
 
-    async def comprehensive_analysis(self, *args: Any, **kwargs: Any) -> None:
+    async def comprehensive_analysis(self, *args: Any, **kwargs: Any) -> NoReturn:
         """Run the full vision analysis pipeline (abstract).
 
         Subclasses must override this method.
@@ -96,73 +98,42 @@ class AsyncMultiprocessingVisionProcessor(VisionProcessor):
         """
         raise NotImplementedError("Comprehensive analysis is abstract")
 
-    @staticmethod
-    async def async_pipe_reader(receiver: PipeConnection) -> AsyncGenerator[Any, Any]:
-        """Async generator that yields data from a multiprocessing pipe.
-
-        On Linux, uses ``loop.add_reader`` for efficient event-driven
-        consumption with a deque cache. Falls back to polling on Windows.
-
-        :param receiver: Multiprocessing :class:`Connection` to read from.
-        :yields: Objects received from the pipe (LIFO order).
-        """
-        loop: asyncio.AbstractEventLoop = asyncio.get_running_loop()
-        local_cache: deque[Any] = deque(maxlen=3)
-
-        try:
-            data_event = asyncio.Event()
-
-            def yielder() -> None:
-                data_event.set()
-
-            loop.add_reader(receiver.fileno(), yielder)
-
-            try:
-                while True:
-                    await data_event.wait()
-
-                    while receiver.poll():
-                        local_cache.append(await loop.run_in_executor(None, receiver.recv))
-
-                    for _ in range(len(local_cache)):
-                        yield local_cache.pop()  # Last In First Out
-
-                    data_event.clear()
-            finally:
-                loop.remove_reader(receiver.fileno())
-        except NotImplementedError:  # Windows doesn't support file descriptors
-            while True:
-                try:
-                    data = await loop.run_in_executor(None, receiver.recv)
-                except (EOFError, OSError):
-                    break
-                yield data
-
     @classmethod
+    @logger.contextualize(process="VISION")
     def vision_process_context_manager(
         cls,
         shm: str,
-        frameReceiver: PipeConnection,
+        frame_receiver: PipeConnection,
         data_sender: PipeConnection,
         executor_size: int = 5,
         loop: asyncio.AbstractEventLoop | None = None
-    ) -> None:
+    ) -> NoReturn:  # pyright: ignore[reportReturnType]
         """Subprocess entry point for the vision pipeline.
 
         Creates an instance of this class, enters its async context,
         and runs :meth:`comprehensive_analysis`.
 
         :param shm: Name of the shared memory block for frame data.
-        :param frameReceiver: Pipe connection to receive frame-ready signals.
+        :param frame_receiver: Pipe connection to receive frame-ready signals.
         :param data_sender: Pipe connection to send vision results.
         :param executor_size: Thread-pool size.
         :param loop: Asyncio event loop (optional).
         """
-        async def _run() -> None:
+        async def _run() -> NoReturn:
             if loop:
-                async with cls(executor_size = executor_size, loop = loop) as vision:
-                    await vision.comprehensive_analysis(shm, frameReceiver, data_sender)
+                async with cls(executor_size=executor_size, loop=loop) as vision:
+                    await vision.comprehensive_analysis(shm, frame_receiver, data_sender)
             else:
-                async with cls(executor_size = executor_size) as vision:
-                    await vision.comprehensive_analysis(shm, frameReceiver, data_sender)
-        asyncio.run(_run())
+                async with cls(executor_size=executor_size) as vision:
+                    await vision.comprehensive_analysis(shm, frame_receiver, data_sender)
+        try:
+            asyncio.run(_run())
+        except Exception as e:
+            logger.critical(
+                f"Vision subprocess crashed: {type(e).__name__}: {e}", exc_info=True)
+            raise
+        except BaseException as e:
+            # Catch segfaults and other non-Exception errors
+            logger.critical(
+                f"Vision subprocess fatal error: {type(e).__name__}: {e}", exc_info=True)
+            raise

@@ -23,5 +23,5 @@ jobs:
 
     - name: test piclient-cli
       run: |
-        cd PiClient
-        python -m unittest discover -s piclient-cli/src/piclient/cli/tests
+        cd tests
+        python -m unittest discover -s . -p "test_*.py"

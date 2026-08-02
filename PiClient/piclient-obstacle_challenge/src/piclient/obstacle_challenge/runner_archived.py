@@ -1,39 +1,72 @@
-"""Open Challenge runner.
+"""Obstacle Challenge runner.
 
 Sets up shared memory, camera and vision subprocesses, then runs the
-main control loop for the WRO open challenge course.
+main control loop for the WRO obstacle challenge course.
 """
 
-from typing import Literal
-
-import cv2
 import time
 import multiprocessing as mp
-import numpy as np
 from multiprocessing import shared_memory
 
-from loguru import logger
+import cv2
+import numpy as np
 
-from piclient.core.interface import AsyncCamera
-from piclient.core.interface import Client, DriveCommandExecutor
+from loguru import logger
+from piclient.core.interface import AsyncCamera, Client, DriveCommandExecutor
 from piclient.core.lib import GLOBAL_CONFIG, PD, export
-from piclient.core.vision import OpenChallengeAsyncMultiprocessingVisionProcessor
+from piclient.core.vision import (
+    ObstacleChallengeAsyncMultiprocessingVisionProcessor,
+    WallsAndObstacles,
+)
+
+from .transition_determinants import (
+    is_straight,
+    should_final_turn,
+    should_final_straight,
+    should_straight,
+    should_turn,
+    should_avoid_obstacle,
+    ChallengeState,
+    TypedTranisitionManager,
+)
+
+
+manager = TypedTranisitionManager(
+    hysteresis_values=[GLOBAL_CONFIG().SharedChallengeConfig.HYSTERESIS] * 5,
+    priorities=[2, 1, 3, 4, 0],
+    obstacle_avoidance=should_avoid_obstacle,
+    straight=should_straight,
+    turn=should_turn,
+    final_turn=should_final_turn,
+    final_straight=should_final_straight,
+)
+
+
+def get_wall_error(walls_and_obstacles: WallsAndObstacles) -> float:
+    """Return the wall-following error as a finite scalar."""
+    left_distance = float(walls_and_obstacles.walls.left)
+    right_distance = float(walls_and_obstacles.walls.right)
+
+    if not np.isfinite(left_distance) or not np.isfinite(right_distance):
+        return 0.0
+
+    return right_distance - left_distance
 
 
 @export
-@logger.contextualize(process="MAIN")
-async def run_open_challenge() -> None:
+@logger.catch(reraise=True)
+async def run_obstacle_challenge() -> None:
     """
-    asynchronous runner for the *open challenge*
+    asynchronous runner for the *obstacle challenge*
     """
 
     wall_follow = PD(
-        *GLOBAL_CONFIG().OpenChallengeConfig.WALL_FOLLOW_KPKD)
+        *GLOBAL_CONFIG().ObstacleChallengeConfig.WALL_FOLLOW_KPKD)
     corner_turn = PD(
-        *GLOBAL_CONFIG().OpenChallengeConfig.CORNER_TURN_KPKD)
+        *GLOBAL_CONFIG().ObstacleChallengeConfig.CORNER_TURN_KPKD)
+    obstacle_avoid = PD(
+        *GLOBAL_CONFIG().ObstacleChallengeConfig.OBSTACLE_AVOID_KPKD)
 
-    # Counter for number of frames where a turn is suspected when in the stratight state, vice versa for the turn state
-    hysteresis_counter = 0
     turn_counter = 0
     start_time = None  # Start time for the final straight
     last_turn_time = 0  # Time of the last detected turn
@@ -42,8 +75,7 @@ async def run_open_challenge() -> None:
     frame_count = 0  # Frame counter (resets every second)
     fps = 0
 
-    state: Literal["Straight", "Turn",
-                   "Final Turn", "Final Straight"] = "Straight"
+    state: ChallengeState = "straight"
 
     # Create the shared memory block and spawn processes
     shm = None
@@ -78,7 +110,7 @@ async def run_open_challenge() -> None:
         data_receiver, data_sender = mp.Pipe(duplex=False)
         vision_process = mp.Process(
             name="Vision",
-            target=OpenChallengeAsyncMultiprocessingVisionProcessor.vision_process_context_manager,
+            target=ObstacleChallengeAsyncMultiprocessingVisionProcessor.vision_process_context_manager,
             args=(
                 shm.name,
                 cam_receiver,
@@ -101,7 +133,9 @@ async def run_open_challenge() -> None:
 
             try:
                 async with DriveCommandExecutor(client) as drive:
-                    async for walls in OpenChallengeAsyncMultiprocessingVisionProcessor.async_pipe_reader(data_receiver):
+                    async for data in ObstacleChallengeAsyncMultiprocessingVisionProcessor.async_pipe_reader(data_receiver):
+                        walls_and_obstacles: WallsAndObstacles = data[0]
+                        target: tuple[int, int] | None = data[1]
 
                         frame_count += 1
                         now = time.perf_counter()
@@ -110,12 +144,12 @@ async def run_open_challenge() -> None:
                             frame_count = 0
                             fps_start_time = now
 
-                        turn_correction = wall_follow.tick(
-                            walls.right - walls.left)
-                        corner_turn_correction = corner_turn.tick(
-                            walls.right - walls.left)
-                        is_turn_detected = walls.center > GLOBAL_CONFIG(
-                        ).SharedChallengeConfig.CENTER_FILL_THRESHOLD
+                        wall_error = get_wall_error(walls_and_obstacles)
+
+                        turn_correction = wall_follow.tick(wall_error)
+                        corner_turn_correction = corner_turn.tick(wall_error)
+
+                        is_turn_detected = not is_straight(walls_and_obstacles)
 
                         if (
                             is_turn_detected
@@ -124,56 +158,54 @@ async def run_open_challenge() -> None:
                             turn_counter += 1
                             last_turn_time = time.perf_counter()
 
-                            if turn_counter >= GLOBAL_CONFIG().SharedChallengeConfig.LAP_LENGTH_IN_TURNS:
-                                state = "Final Turn"
+                        next_state: ChallengeState | None = manager.check_transitions(
+                            walls_and_obstacles,
+                            state,
+                            target,
+                            last_turn_time,
+                            turn_counter,
+                            start_time,
+                        )
+                        if next_state is not None:
+                            state = next_state
+
+                        if state == "final_straight" and start_time is None:
+                            start_time = time.perf_counter()
 
                         match state:
-                            case "Straight":
-                                if is_turn_detected:
-                                    hysteresis_counter += 1
-                                    if hysteresis_counter >= GLOBAL_CONFIG().SharedChallengeConfig.HYSTERESIS:
-                                        state = "Turn"
-                                        hysteresis_counter = 0
-                                else:
-                                    hysteresis_counter = 0
+                            case "obstacle_avoidance":
+                                if target is None:  # 1st priority is to avoid obstacles
+                                    continue  # Since target is None, we don't want to send a drive command, so we continue to the next iteration of the loop
 
                                 drive.submit(
-                                    GLOBAL_CONFIG().OpenChallengeConfig.STRAIGHT_SPEED,
+                                    GLOBAL_CONFIG().ObstacleChallengeConfig.OBSTACLE_AVOID_SPEED,
+                                    obstacle_avoid.tick(
+                                        0, target[0]) * 90 + 90,
+                                    GLOBAL_CONFIG().SharedChallengeConfig.DRIVE_COMMAND_DURATION
+                                )
+
+                            case "straight":
+                                drive.submit(
+                                    GLOBAL_CONFIG().ObstacleChallengeConfig.STRAIGHT_SPEED,
                                     turn_correction * 90 + 90,
-                                    GLOBAL_CONFIG().SharedChallengeConfig.DRIVE_COMMAND_DURATION,
+                                    GLOBAL_CONFIG().SharedChallengeConfig.DRIVE_COMMAND_DURATION
                                 )
 
-                            case "Turn":
-                                if not is_turn_detected:
-                                    hysteresis_counter += 1
-                                    if hysteresis_counter >= GLOBAL_CONFIG().SharedChallengeConfig.HYSTERESIS:
-                                        state = "Straight"
-                                        hysteresis_counter = 0
-                                else:
-                                    hysteresis_counter = 0
-
+                            case "turn":
                                 drive.submit(
-                                    GLOBAL_CONFIG().OpenChallengeConfig.TURN_SPEED,
+                                    GLOBAL_CONFIG().ObstacleChallengeConfig.TURN_SPEED,
                                     corner_turn_correction * 90 + 90,
                                     GLOBAL_CONFIG().SharedChallengeConfig.DRIVE_COMMAND_DURATION,
                                 )
 
-                            case "Final Turn":
-                                if not is_turn_detected:
-                                    hysteresis_counter += 1
-                                    if hysteresis_counter >= GLOBAL_CONFIG().SharedChallengeConfig.HYSTERESIS:
-                                        state = "Final Straight"
-                                        hysteresis_counter = 0
-                                else:
-                                    hysteresis_counter = 0
-
+                            case "final_turn":
                                 drive.submit(
-                                    GLOBAL_CONFIG().OpenChallengeConfig.TURN_SPEED,
+                                    GLOBAL_CONFIG().ObstacleChallengeConfig.TURN_SPEED,
                                     corner_turn_correction * 90 + 90,
                                     GLOBAL_CONFIG().SharedChallengeConfig.DRIVE_COMMAND_DURATION,
                                 )
 
-                            case "Final Straight":
+                            case "final_straight":
                                 start_time = time.perf_counter() if not start_time else start_time
                                 now = time.perf_counter()
 
@@ -182,14 +214,14 @@ async def run_open_challenge() -> None:
                                     break
 
                                 drive.submit(
-                                    GLOBAL_CONFIG().OpenChallengeConfig.STRAIGHT_SPEED,
+                                    GLOBAL_CONFIG().ObstacleChallengeConfig.STRAIGHT_SPEED,
                                     turn_correction * 90 + 90,
                                     GLOBAL_CONFIG().SharedChallengeConfig.DRIVE_COMMAND_DURATION,
                                 )
 
                             case _:
                                 logger.error(f"Unrecognized state: {state}")
-                                state = "Straight"
+                                state = "straight"  # Reset to a safe state
 
                         h, w, c = GLOBAL_CONFIG().CameraConfig.OUTPUT_SHAPE
                         debug_frame = np.ndarray((h, w, c), dtype=np.uint8, buffer=shm.buf)
@@ -197,32 +229,34 @@ async def run_open_challenge() -> None:
                         cv2.line(debug_frame, (w // 2, h), (int(w / 2 - turn_correction *
                                  # Draws the turning vector
                                                                 w / 2), h - 50), (0, 255, 0), 2)
-                        cv2.putText(debug_frame, f"State: {state} | Turns: {turn_counter} | FPS: {fps:.1f} | PD: {(turn_correction if state == 'Straight' or state == 'Final Straight' else corner_turn_correction):.3f}", (
+                        cv2.putText(debug_frame, f"State: {state} | Turns: {turn_counter} | FPS: {fps:.1f} | PD: {(turn_correction if state == 'straight' or state == 'final_straight' else corner_turn_correction):.3f}", (
                             # Info on the top
                             5, 10), cv2.FONT_HERSHEY_PLAIN, 0.6, (255, 255, 255), 1)
 
-                        l_roi = GLOBAL_CONFIG().VisionConfig.LEFT_WALL_ROI
-                        r_roi = GLOBAL_CONFIG().VisionConfig.RIGHT_WALL_ROI
                         c_roi = GLOBAL_CONFIG().VisionConfig.CENTER_WALL_ROI
 
-                        cv2.rectangle(  # Draws left ROI
-                            debug_frame,
-                            (0, l_roi[0].start),
-                            (l_roi[1].stop, l_roi[0].stop),
-                            (255, 0, 0), 2
-                        )
-                        cv2.rectangle(  # Draws right ROI
-                            debug_frame,
-                            (r_roi[1].start, r_roi[0].start),
-                            (w, r_roi[0].stop),
-                            (0, 0, 255), 2
-                        )
                         cv2.rectangle(  # Draws center ROI
                             debug_frame,
                             (c_roi[1].start, c_roi[0].start),
                             (c_roi[1].stop, c_roi[0].stop),
                             (0, 255, 0), 2
                         )
+
+                        if walls_and_obstacles.obstacles is not None:
+                            for vision_object in walls_and_obstacles.obstacles:
+                                # Draws obstacles in yellow
+                                cv2.drawContours(
+                                    debug_frame, [vision_object.contour], -1, (0, 255, 255), 2)
+
+                        for wall in [walls_and_obstacles.walls.left_raw, walls_and_obstacles.walls.right_raw]:
+                            if wall is None or wall.contour.size == 0:
+                                continue
+                            # Draws walls in cyan
+                            cv2.drawContours(
+                                debug_frame, [wall.contour], -1, (255, 255, 0), 2)
+
+                        cv2.circle(debug_frame, (target[0], target[1]), 5, (
+                            0, 0, 255), -1) if target is not None else None  # Draws target in red
 
                         cv2.imshow("Debug", debug_frame)
                         cv2.waitKey(1)  # Shows frame for 1 ms

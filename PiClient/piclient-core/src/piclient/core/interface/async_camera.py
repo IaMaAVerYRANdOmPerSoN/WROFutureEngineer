@@ -5,20 +5,24 @@ library that supports non-blocking frame capture, shared memory streaming,
 and subprocess-safe context management.
 """
 
-from typing import NoReturn, Self
-from ..lib import GLOBAL_CONFIG, export
-from multiprocessing import shared_memory
+from typing import Any, NoReturn, Self
+
 import asyncio
-from multiprocessing.connection import Connection as PipeConnection
-import numpy as np
 from concurrent.futures import ThreadPoolExecutor
-from .. import logger
-from typing import Any
+from multiprocessing import shared_memory
+from multiprocessing.connection import Connection as PipeConnection
+
+import numpy as np
+from loguru import logger
+
+from ..lib import GLOBAL_CONFIG
+from ..lib.exporter import export
+
 
 picamera2: Any = None
 
 try:
-    import picamera2  # pyright: ignore[reportMissingImports]
+    import picamera2 # pyright: ignore[reportMissingImports, reportMissingTypeStubs]
 except ImportError:
     # Probably not on Pi
     logger.warning("picamera2 import failed, are you running on a Raspberry Pi? "
@@ -28,6 +32,12 @@ except ImportError:
 
 
 _CAM_DEFAULTS = GLOBAL_CONFIG().CameraConfig
+
+
+def _slice_length(axis: slice, total: int) -> int:
+    start = 0 if axis.start is None else axis.start
+    stop = total if axis.stop is None else axis.stop
+    return stop - start
 
 
 @export
@@ -51,6 +61,7 @@ class AsyncCamera:
         config: dict[str, Any] = _CAM_DEFAULTS.FORMAT,
         sensor_config: dict[str, Any] = _CAM_DEFAULTS.SENSOR_CONFIG,
         controls_config: dict[str, Any] = _CAM_DEFAULTS.CONTROLS_CONFIG,
+        initial_roi: tuple[slice, slice, slice] = _CAM_DEFAULTS.INITIAL_ROI,
         executor_threads: int = _CAM_DEFAULTS.EXECUTOR_THREADS,
         max_concurrent_captures: int = _CAM_DEFAULTS.MAX_CONCURRENT_CAPTURES
     ) -> None:
@@ -65,11 +76,14 @@ class AsyncCamera:
         self.config: dict[str, Any] = config
         self.sensor_config: dict[str, Any] = sensor_config
         self.controls_config: dict[str, Any] = controls_config
+        self.initial_roi: tuple[slice, slice, slice] = initial_roi
         self.executor_threads: int = executor_threads
         self.max_concurrent_captures: int = max_concurrent_captures
         self._cam = None
 
-        self.frame_width, self.frame_height = self.config["size"]
+        capture_width, capture_height = self.config["size"]
+        self.frame_width = _slice_length(self.initial_roi[1], capture_width)
+        self.frame_height = _slice_length(self.initial_roi[0], capture_height)
 
         try:
             self.loop: asyncio.AbstractEventLoop = asyncio.get_running_loop()
@@ -126,7 +140,6 @@ class AsyncCamera:
             raise ConnectionError(
                 "Camera not responding during power-up.") from e
 
-    # Let the main loop handle the logging and execeptions
     async def __aexit__(self, *args: Any) -> None:
         """Tear down camera hardware resources asynchronously.
 
@@ -186,8 +199,10 @@ class AsyncCamera:
                         timeout=timeout,
                     )
 
+                frame = frame[self.initial_roi]
+
                 if shm:
-                    # Copy BGR888 data (H, W, 3) to shared buffer
+                    # Copy cropped BGR888 data (H, W, 3) to shared buffer
                     shared_buffer: np.ndarray[tuple[int, ...], np.dtype[np.uint8]] = np.ndarray(
                         (self.frame_height, self.frame_width, 3), dtype=np.uint8, buffer=shm.buf)
                     np.copyto(shared_buffer, frame)
@@ -218,9 +233,9 @@ class AsyncCamera:
         """
         return [await asyncio.wait_for(self.get_frame_async(), timeout) for _ in range(num_frames)]
 
-    async def stream(self, shm_name: str, sender: PipeConnection, *args: PipeConnection) -> NoReturn:
+    async def stream(self, shm_name: str, *senders: PipeConnection) -> NoReturn:
         """
-        asynchronous indefinite yield camera IOstream.
+        Asynchronous indefinite yield camera IOstream.
 
         :param self: The instance of AsyncCamera.
         :yields: `tuple[tuple[tuple[float, float, float]]]`, an `vres * hres * 3` array representing the image in YUV colorspace.
@@ -233,30 +248,39 @@ class AsyncCamera:
             while True:
                 await self.get_frame_async(shm=shm)
                 # Signal that a new frame is ready
-                sender.send(True)
-                if args:
-                    for conn in args:
-                        conn.send(True)
+                for conn in senders:
+                    conn.send(True)
+
         finally:
             if shm:
                 shm.close()
 
     @staticmethod
-    # pyright: ignore[reportReturnType]
-    def camera_process_context_manager(shm: str, sender: PipeConnection) -> NoReturn: # pyright: ignore[reportReturnType]
+    @logger.contextualize(process="CAMERA")
+    def camera_process_context_manager(shm: str, *senders: PipeConnection) -> NoReturn: # pyright: ignore[reportReturnType]
         """Subprocess entry point for streaming camera frames.
 
         Creates an :class:`AsyncCamera` instance within a fresh asyncio
         event loop and streams frames into the shared memory block named
-        *shm*, signalling *sender* when each frame is ready.
+        *shm*, signalling *senders* when each frame is ready.
 
         :param shm: Name of the shared memory block for frame data.
-        :param sender: Multiprocessing :class:`Connection` used to signal new frames.
+        :param senders: Multiprocessing :class:`Connection` objects used to signal new frames.
         """
-        async def _run(shm: str, sender: PipeConnection) -> NoReturn:
+        async def _run(shm: str, *senders: PipeConnection) -> NoReturn:
             async with AsyncCamera() as camera:
                 # NoReturn implies _run is NoReturn
-                await camera.stream(shm, sender)
+                await camera.stream(shm, *senders)
 
         # calling _run here implies the whole function is NoReturn (asyncio.run essentially awaits the coroutine but from a sync caller)
-        asyncio.run(_run(shm, sender))
+        try:
+            asyncio.run(_run(shm, *senders))
+        except Exception as e:
+            logger.critical(
+                f"Camera subprocess crashed: {type(e).__name__}: {e}", exc_info=True)
+            raise
+        except BaseException as e:
+            # Catch segfaults and other non-Exception errors
+            logger.critical(
+                f"Camera subprocess fatal error: {type(e).__name__}: {e}", exc_info=True)
+            raise

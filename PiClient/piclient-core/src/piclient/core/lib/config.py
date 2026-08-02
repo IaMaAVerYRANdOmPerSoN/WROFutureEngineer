@@ -3,20 +3,30 @@
 Contains nested dataclasses for camera, serial client, vision processing,
 and challenge-specific tuning parameters.
 """
-# File is too long, will most likely move defaults elseware and create a abstract config class,
+# TODO: File is too long, will most likely move defaults elseware and create a abstract config class,
 # and a runtime config class that inherits from the abstract config class and adds the ability to load from toml/env/cli args
-from dataclasses import dataclass, field, is_dataclass
+
 from typing import Any, Literal, Self, get_origin
+
+import ast
+from dataclasses import dataclass, field, is_dataclass
 from collections.abc import Callable
 from inspect import get_annotations
-import ast
-import numpy as np
-from .exporter import export
+from tomllib import load as load_toml
 from os import environ
 
-from tomllib import load as load_toml
+import numpy as np
+
+from .exporter import export
 
 
+def _slice_length(axis: slice, total: int) -> int:
+    start = 0 if axis.start is None else axis.start
+    stop = total if axis.stop is None else axis.stop
+    return stop - start
+
+
+@export
 class Freezeable:
     """Base class that can be frozen to prevent mutation."""
 
@@ -244,7 +254,7 @@ class Config(Freezeable):
         Controls logging level and which challenge to run.
         """
         LEVEL: Literal["CRITICAL", "ERROR", "WARNING",
-                       "SUCCESS", "INFO", "DEBUG"] = "WARNING"
+                       "SUCCESS", "INFO", "DEBUG"] = "SUCCESS"
         CHALLENGE: Literal["open", "obstacle"] = "open"
 
     @dataclass
@@ -252,16 +262,21 @@ class Config(Freezeable):
         """Camera hardware and frame-capture settings.
 
         Controls picamera2 format, resolution, thread pool size,
-        timeouts, and sensor/control parameters.
+        timeouts, sensor/control parameters, and the initial crop ROI.
         """
         FORMAT: dict[str, Any] = field(default_factory=lambda: {
             "format": "BGR888",
             # Camera API expects (width, height); NumPy/OpenCV arrays usually use (height, width).
             "size": (512, 384)
         })
+        INITIAL_ROI: tuple[slice, slice, slice] = np.s_[
+            384 // 3: 384 - 384 // 8, :, :]
         OUTPUT_WIDTH: int = 512
         OUTPUT_HEIGHT: int = 384
         OUTPUT_CHANNELS: int = 3
+        OUTPUT_SHAPE: tuple[int, int, int] = (
+            OUTPUT_HEIGHT, OUTPUT_WIDTH, OUTPUT_CHANNELS)
+        SHM_SIZE: int = OUTPUT_WIDTH * OUTPUT_HEIGHT * OUTPUT_CHANNELS
         EXECUTOR_THREADS: int = 3  # Number of executor threads used to capture frames
         MAX_CONCURRENT_CAPTURES: int = 3
         BUFFER_COUNT: int = 1
@@ -280,11 +295,19 @@ class Config(Freezeable):
             "FrameDurationLimits": (33333, 33333),
             "AeEnable": True,  # Enables automatic exposure
         })
+        FPS: float = None # pyright: ignore[reportAssignmentType]
+
+        def __post_init__(self):
+            object.__setattr__(self, "OUTPUT_WIDTH", _slice_length(self.INITIAL_ROI[1], self.FORMAT["size"][0]))
+            object.__setattr__(self, "OUTPUT_HEIGHT", _slice_length(self.INITIAL_ROI[0], self.FORMAT["size"][1]))
+            object.__setattr__(self, "OUTPUT_SHAPE", (
+                self.OUTPUT_HEIGHT, self.OUTPUT_WIDTH, self.OUTPUT_CHANNELS))
+            object.__setattr__(self, "FPS", 1 // (self.CONTROLS_CONFIG["FrameDurationLimits"][0] * 1e-6))
+            # Convert microseconds to seconds
 
     @dataclass
     class ClientConfig(Freezeable):
         """Serial client communication settings.
-
         Defines the serial port, baud rate, timeouts, TID range,
         servo limits, and motor parameters.
         """
@@ -324,31 +347,53 @@ class Config(Freezeable):
         # 384 - 384 // 8 = 336
         # 336 - 128 = 208
 
-        INITIAL_ROI: tuple[slice, slice, slice] = np.s_[
-            384 // 3: 384 - 384 // 8, :, :]
         LEFT_WALL_ROI: tuple[slice, slice] = np.s_[
-            208 // 12: 208 - 208 // 5, :512 // 5]
+            208 // 5: 208 - 208 // 5, :512 // 3]  # // 5, 5, 5 original
         RIGHT_WALL_ROI: tuple[slice, slice] = np.s_[
-            208 // 12: 208 - 208 // 5, 512 - 512 // 5:]
+            208 // 5: 208 - 208 // 5, 512 - 512 // 3:]
+        CENTER_WALL_ROI: tuple[slice, slice] = np.s_[
+            0: 208//12, 512 // 2 - 512 // 10: 512 // 2 + 512 // 10]
+
+        # Placeholder HSV thresholds for obstacles
+        LOWER_RED_OBSTACLE: np.ndarray[tuple[int, ...], np.dtype[np.uint8]] = field(
+            default_factory=lambda: np.array([0, 0, 0], dtype=np.uint8))
+        UPPER_RED_OBSTACLE: np.ndarray[tuple[int, ...], np.dtype[np.uint8]] = field(
+            default_factory=lambda: np.array([0, 0, 0], dtype=np.uint8))
+        LOWER_GREEN_OBSTACLE: np.ndarray[tuple[int, ...], np.dtype[np.uint8]] = field(
+            default_factory=lambda: np.array([0, 0, 0], dtype=np.uint8))
+        UPPER_GREEN_OBSTACLE: np.ndarray[tuple[int, ...], np.dtype[np.uint8]] = field(
+            default_factory=lambda: np.array([0, 0, 0], dtype=np.uint8))
+        OBSTACLE_ROI: tuple[slice, slice] = np.s_[
+            None: None, None: None]  # Everything
+
 
     @dataclass
-    class OpenChallengeConfig(Freezeable):
-        """Tuning parameters for the Open Challenge.
+    class SharedChallengeConfig(Freezeable):
+        """Shared tuning parameters for both challenges.
 
         Includes PD gains, speeds, hysteresis thresholds, shared memory
         settings, and lap-length constants.
         """
-        WALL_FOLLOW_KPKD: tuple[float, float] = (0.50, 0.0)
-        CORNER_TURN_KPKD: tuple[float, float] = (0.55, 0.0)
-        STRAIGHT_SPEED: float = -0.4
-        TURN_SPEED: float = -0.33
-        TURN_DURATION: float = 1.0
-        DRIVE_COMMAND_DURATION: float = 0.2
         SHM_NAME: str = "camera_frame"
-        SHM_SIZE: int = 512*384*3
-        TURN_HYSTERESIS: int = 6  # Number of frames deciding before changing states
+        DRIVE_COMMAND_DURATION: float = 0.2
         LAP_LENGTH_IN_TURNS: int = 4*3  # 4 turns per lap, 3 laps total
-        TURN_DETECTION_THRESHOLD: float = 0.1
+        TURN_DURATION: float = 3
+        HYSTERESIS: int = 4  # Number of frames deciding before changing states
+        TURN_COOLDOWN: float = 2.0  # How long it needs to take
+        TURN_DETECTION_THRESHOLD: float = 0.12  # used to be 0.1
+        # Amount of fill needed for a turn to be counted
+        CENTER_FILL_THRESHOLD: float = 0.65
+
+    @dataclass
+    class OpenChallengeConfig(Freezeable):
+        """Tuning parameters for the Open Challenge.
+        Includes PD gains, speeds, hysteresis thresholds, shared memory
+        settings, and lap-length constants.
+        """
+        WALL_FOLLOW_KPKD: tuple[float, float] = (0.7, 0.5)
+        CORNER_TURN_KPKD: tuple[float, float] = (0.75, 0.3)
+        STRAIGHT_SPEED: float = -0.4
+        TURN_SPEED: float = -0.32
 
     @dataclass
     class ObstacleChallengeConfig(Freezeable):
@@ -357,16 +402,12 @@ class Config(Freezeable):
         Includes PD gains for wall-following, corner turning, and obstacle
         avoidance, along with speeds and shared memory settings.
         """
-        WALL_FOLLOW_KPKD: tuple[float, float] = (1, 0.2)
-        CORNER_TURN_KPKD: tuple[float, float] = (1.2, 0.2)
-        OBSTACLE_AVOID_KPKD: tuple[float, float] = (0.8, 0.1)
-        STRAIGHT_SPEED: float = 0.5
-        TURN_SPEED: float = 0.4
-        HYBRID_SPEED: float = 0.4
-        DRIVE_COMMAND_DURATION: float = 0.1
-        SHM_NAME: str = "camera_frame"
-        SHM_SIZE: int = 512*384*3
-        LAP_LENGTH_IN_TURNS: int = 4*3  # 4 turns per lap, 3 laps total
+        WALL_FOLLOW_KPKD: tuple[float, float] = (0.65, 0.35)
+        CORNER_TURN_KPKD: tuple[float, float] = (0.7, 0.3)
+        OBSTACLE_AVOID_KPKD: tuple[float, float] = (0.7, 0.2)
+        STRAIGHT_SPEED: float = -0.4
+        TURN_SPEED: float = -0.32
+        OBSTACLE_AVOID_SPEED: float = 0.3
 
     @dataclass
     class LiDARConfig(Freezeable):

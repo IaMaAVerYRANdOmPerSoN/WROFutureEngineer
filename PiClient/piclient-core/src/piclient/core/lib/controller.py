@@ -1,10 +1,10 @@
-"""Control library.
+"""
+Control library.
 
 Provides :class:`PD`, a simple proportional-derivative controller.
 """
 
-
-from .. import logger
+from loguru import logger
 from .exporter import export
 
 

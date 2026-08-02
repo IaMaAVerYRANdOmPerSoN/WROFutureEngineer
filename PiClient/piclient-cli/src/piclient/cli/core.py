@@ -5,18 +5,21 @@ Provides the ``main()`` function wired to the ``wro`` console script
 ``python -m piclient.cli``.
 """
 
+from typing import NoReturn
+
+import argparse
 import asyncio
 import os
 import sys
-import argparse
-from .argument_parser import TypedArgumentParser
 
-from typing import NoReturn
+from loguru import logger
 
-from piclient.open_challenge import run_open_challenge
-from piclient.obstacle_challenge import run_obstacle_challenge
-from piclient.core import configure_logging, logger
+from piclient.core import configure_logging
 from piclient.core.lib import export, GLOBAL_CONFIG
+from piclient.obstacle_challenge import run_obstacle_challenge
+from piclient.open_challenge import run_open_challenge
+
+from .argument_parser import TypedArgumentParser
 
 
 def _parse_args() -> argparse.Namespace:
@@ -78,21 +81,21 @@ def main() -> NoReturn:
 
     exitcode = 1
     try:
-        if getattr(parsed_args, "GeneralConfig.CHALLENGE", "open") == "obstacle":
-            asyncio.run(run_obstacle_challenge())
-        elif getattr(parsed_args, "GeneralConfig.CHALLENGE", "open") == "open":
-            asyncio.run(run_open_challenge())
-        else:
-            logger.warning("Nothing to run!")
-        exitcode = 0
+        with logger.catch(reraise=True):
+            if getattr(parsed_args, "GeneralConfig.CHALLENGE", "open") == "obstacle":
+                asyncio.run(run_obstacle_challenge())
+            elif getattr(parsed_args, "GeneralConfig.CHALLENGE", "open") == "open":
+                asyncio.run(run_open_challenge())
+            else:
+                logger.warning("Nothing to run!")
+            exitcode = 0
     except KeyboardInterrupt:
-        logger.error(
-            "SIGINT received, shutting down... (Send SIGINT [CTRL+C] again to force)")
+        logger.error("SIGINT received, shutting down... (Send SIGINT [CTRL+C] again to force)")
         exitcode = 0
     except Exception:
-        logger.critical("A FATAL EXCEPTION HAS OCCURRED")
-        logger.exception("Traceback:")
+        logger.critical("Robot Crashed Unexpectedly (See above for Traceback)")
         exitcode = 1
+        raise
     finally:
         logger.info(f"Cleaning up with exitcode {exitcode}...")
         logger.remove()

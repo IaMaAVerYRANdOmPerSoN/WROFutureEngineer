@@ -3,19 +3,27 @@
 This package provides the core logging configuration and module-level imports for the WRO Future Engineer robot.
 """
 
-import sys
-from typing import Literal
-from loguru import logger
-from . import lib  # Shut up pylance
-from . import *
+from typing import Literal, TYPE_CHECKING
 
-LOG_FORMAT = (
-    "<blue>[{time:HH:mm:ss:SSS}]</blue> | "
-    "<cyan>{line:03}: {function: <18}</cyan> | "
-    "<level>{level: <8}</level> | "
-    "<level>{message}</level>"
-)
-"""str: Default loguru format string with coloured time, line, function, and level fields."""
+import sys
+from loguru import logger
+if TYPE_CHECKING:
+    from loguru import Record
+
+from . import *
+from . import lib  # Because pyright is stupid and doesn't understand * imports
+
+
+def format_fn(record: "Record") -> str:
+    location = record["file"].name + ":" + str(record["line"])
+    return (
+        "<blue>{elapsed.seconds}.{elapsed.microseconds:06d}</blue> | "
+        f"<cyan>{location: <25}</cyan> | "
+        "<level>{level: <8}</level> | "
+        "<level>{message}</level>"
+        f"{'{extra}' if record['extra'] else ''}\n"
+        f"{'{exception}' if record['exception'] else ''}"
+    )
 
 
 # Logging configuration before configure_logging() is called; ensures consistent formatting.
@@ -26,9 +34,13 @@ logger.add(
     enqueue=True,
     rotation="5 MB",
     retention="10 days",
-    format=LOG_FORMAT,
+    backtrace=True,
+    diagnose=True,
+    format=format_fn,
+    colorize=True,
 )
-logger.add(sys.stderr, level="WARNING", format=LOG_FORMAT)
+logger.add(sys.stderr, level="WARNING", backtrace=True,
+           diagnose=True, format=format_fn)
 
 
 def configure_logging(level: Literal["CRITICAL", "ERROR", "WARNING", "SUCCESS", "INFO", "DEBUG"]) -> None:
@@ -40,9 +52,13 @@ def configure_logging(level: Literal["CRITICAL", "ERROR", "WARNING", "SUCCESS", 
         enqueue=True,
         rotation="5 MB",
         retention="10 days",
-        format=LOG_FORMAT,
+        backtrace=True,
+        diagnose=True,
+        format=format_fn,
+        colorize=True,
     )
-    logger.add(sys.stderr, level=level, format=LOG_FORMAT)
+    logger.add(sys.stderr, level=level, backtrace=True,
+               diagnose=True, format=format_fn, colorize=True)
 
     if level == "DEBUG":
         logger.add(
@@ -51,7 +67,10 @@ def configure_logging(level: Literal["CRITICAL", "ERROR", "WARNING", "SUCCESS", 
             enqueue=True,
             rotation="1 MB",
             retention="3 days",
-            format=LOG_FORMAT,
+            backtrace=True,
+            diagnose=True,
+            format=format_fn,
+            colorize=True,
         )
     elif level == "INFO":
         logger.add(
@@ -60,7 +79,10 @@ def configure_logging(level: Literal["CRITICAL", "ERROR", "WARNING", "SUCCESS", 
             enqueue=True,
             rotation="1 MB",
             retention="3 days",
-            format=LOG_FORMAT,
+            backtrace=True,
+            diagnose=True,
+            format=format_fn,
+            colorize=True,
         )
 
 

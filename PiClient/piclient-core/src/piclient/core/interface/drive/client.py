@@ -5,17 +5,18 @@ Arduino over async serial, and :class:`DriveCommandExecutor` for
 coalescing drive commands with latest-wins semantics.
 """
 
-from _asyncio import Future, Task
+from typing import Any, Literal, NoReturn, Self
 
-import aioserial
 import asyncio
 import re
-from loguru import logger
 from itertools import cycle
 from collections.abc import Coroutine
-from typing import Any, Literal, NoReturn, Self
-from ..lib import GLOBAL_CONFIG, export
 from collections import defaultdict
+
+import aioserial
+
+from loguru import logger
+from ...lib import GLOBAL_CONFIG, export
 
 
 @export
@@ -69,11 +70,7 @@ class Client:
         self._wait_re: re.Pattern[str] = re.compile(wait_re_pattern)
         self.is_connected = False
 
-        try:
-            self.loop: asyncio.AbstractEventLoop = loop if loop else asyncio.get_running_loop()
-        except RuntimeError:
-            logger.warning(
-                "No event loop currently running in thread, are you building docs?")
+        self.loop: asyncio.AbstractEventLoop = loop if loop else asyncio.get_event_loop()
 
         self._pending_requests: defaultdict[str, asyncio.Future[tuple[str, str]]] = defaultdict(
             asyncio.Future)  # {TID: future} -> {TID: response}
@@ -109,7 +106,8 @@ class Client:
             tid, message = parts[0], parts[1]
 
             if tid in self._pending_requests:
-                future: Future[tuple[str, str]] = self._pending_requests[tid]
+                future: asyncio.Future[tuple[str, str]
+                                       ] = self._pending_requests[tid]
                 if not future.done():
                     future.set_result((tid, message))
 
@@ -125,11 +123,11 @@ class Client:
         self._serial = aioserial.AioSerial(
             self.port, self.baud, timeout=self.timeout)
 
-        loop: asyncio.AbstractEventLoop = asyncio.get_running_loop()
+        loop: asyncio.AbstractEventLoop = asyncio.get_event_loop()
         loop.set_exception_handler(lambda loop, context: None)
 
         if not hasattr(self, "_listener_task"):
-            self._listener_task: Task[NoReturn] = asyncio.create_task(
+            self._listener_task: asyncio.Task[NoReturn] = asyncio.create_task(
                 self._serial_listener())
             logger.info("Serial Listener Started")
         else:
@@ -360,97 +358,3 @@ class Client:
         command: str = f'SET_LED {state}'
         response: str = await self._request(command)
         return response == '200 OK'
-
-
-@export
-class DriveCommandExecutor:
-    """
-    A fully-async, single-consumer executor for drive commands.
-
-    The control loop calls `submit()` (non-blocking) with the latest desired
-    drive command; a dedicated background coroutine `await`s each command to
-    completion sequentially. This guarantees execution without ever blocking
-    the producer, and without `asyncio.create_task` fire-and-forget (which can
-    be garbage collected before it runs, or pile up faster than the serial
-    link drains).
-
-    Commands coalesce latest-wins: if newer commands arrive while one is in
-    flight, only the freshest is kept, so the robot always acts on the most
-    recent steering target instead of replaying a stale backlog. It's a single
-    long-lived task on the event loop -> no threads, no pools, no GIL contention.
-    """
-
-    def __init__(self, client: Client) -> None:
-        """
-        :param client: The `Client` whose `drive_motors` the worker will call.
-        """
-        self._client: Client = client
-        self._pending: tuple[float, float, float] | None = None
-        self._wakeup = asyncio.Event()
-        self._worker_task: Task[NoReturn] | None = None
-
-    async def __aenter__(self) -> Self:
-        self._worker_task = asyncio.create_task(self._worker())
-        logger.info("Drive command executor started")
-        return self
-
-    async def __aexit__(self, *args: Any) -> None:
-        if self._worker_task:
-            self._worker_task.cancel()
-            try:
-                await self._worker_task
-            except asyncio.CancelledError:
-                pass
-            logger.info("Drive command executor stopped")
-
-    async def reload(self) -> Self:
-        """Hot reload after changing attributes.
-
-        Tears down existing hardware resources, reinitialises the worker
-        with the updated configuration, and cleans up on failure before
-        re-raising.
-
-        ALWAYS call after changing attributes to reload internal context.
-        Not doing so will lead to unpredictable behaviour.
-
-        :returns: ``self``
-        :raises Exception: Re-raises any exception during reload
-        """
-        await self.__aexit__()
-        try:
-            return await self.__aenter__()
-        except Exception:
-            await self.__aexit__()
-            raise
-
-    def submit(self, speed: float, angle: float, duration: float) -> None:
-        """
-        Hand the worker the latest drive command. Non-blocking; latest-wins.
-
-        :param speed: Normalized motor speed in [-1, 1] (see `Client.set_motor_speed`).
-        :param angle: Servo angle in degrees.
-        :param duration: Motor run duration in seconds.
-        """
-        self._pending = (speed, angle, duration)
-        self._wakeup.set()
-
-    async def _worker(self) -> NoReturn:
-        """Background coroutine that consumes drive commands sequentially.
-
-        Waits on :attr:`_wakeup`, pops the latest pending command, and
-        awaits :meth:`Client.drive_motors`. Runs until cancelled.
-        """
-        while True:
-            await self._wakeup.wait()
-            self._wakeup.clear()
-
-            command: tuple[float, float, float] | None = self._pending
-            self._pending = None
-            if command is None:
-                continue
-
-            try:
-                speed, angle, duration = command
-                await self._client.drive_motors(speed, int(angle), duration)
-            except Exception as e:
-                logger.error(f"Drive command {command} failed: {e}")

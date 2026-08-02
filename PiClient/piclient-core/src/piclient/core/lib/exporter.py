@@ -1,6 +1,15 @@
+"""
+Exporter module for managing the `__all__` attribute of modules, packages, and subpackages.
+This module provides the `export` decorator and the `export_globals` function to facilitate the automatic population of the `__all__` attribute, which defines the public API of a module.
+
+(not really, becuase python doesn't have a concept of public/private, but it does make it easier to manage what gets imported with `from module import *`)
+"""
+
+from typing import Any, TypeVar
+
 import inspect
 import sys
-from typing import Any, TypeVar
+
 
 _T = TypeVar("_T", bound=Any)
 

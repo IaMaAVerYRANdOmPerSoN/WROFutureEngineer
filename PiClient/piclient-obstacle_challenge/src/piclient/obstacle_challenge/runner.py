@@ -1,125 +1,123 @@
-"""Obstacle Challenge runner.
-
-Sets up shared memory, camera and vision subprocesses, then runs the
-main control loop for the WRO obstacle challenge course.
+"""
+Runner for the obstacle challenge.
 """
 
-import asyncio
-from typing import Literal
-from piclient.core import logger
-from piclient.core.interface import Client, AsyncCamera
-from piclient.core.vision import AsyncMultiprocessingVisionProcessor
-from piclient.core.lib import PD, GLOBAL_CONFIG, export
-import multiprocessing as mp
-from multiprocessing import shared_memory
+import cv2
+import numpy as np
+from functools import partial
+from pathlib import Path
+from time import time
+from loguru import logger
+
+from piclient.core.interface import AsyncCamera, DriveCommandExecutor, Client, Recorder
+from piclient.core.lib import ProcessContextManager, GLOBAL_CONFIG, export
+from piclient.core.vision import ObstacleChallengeAsyncMultiprocessingVisionProcessor, WallsAndObstacles
+
+from .obstacle_challenge import ObstacleChallengeStateMachine
+from .video_tools import DriveCommand, PickleLogWriter, build_log_record, default_output_paths, replay_video
+from .transition_determinants import (
+    TypedTranisitionManager,
+    should_avoid_obstacle,
+    should_straight,
+    should_turn,
+    should_final_turn,
+    should_final_straight
+)
 
 
 @export
+@logger.contextualize(process="MAIN")
 async def run_obstacle_challenge() -> None:
-    """Asynchronous runner for the *obstacle challenge*"""
+    run_started_at = int(time())
+    log_path, replay_path = default_output_paths(Path(f"WRO_recordings/recording_{run_started_at}.mp4"))
+    recording_path = log_path.with_suffix(".mp4")
+    recorder_callback = partial(Recorder.recorder_process_context_manager)
+    process_manager = ProcessContextManager(
+        camera_callback=AsyncCamera.camera_process_context_manager,
+        vision_callback=ObstacleChallengeAsyncMultiprocessingVisionProcessor.vision_process_context_manager,
+        recorder_callback=recorder_callback,
+    )
 
-    async with Client() as client:
-        config = GLOBAL_CONFIG().ObstacleChallengeConfig
-        wall_follow = PD(*config.WALL_FOLLOW_KPKD)
-        obstacle_avoid = PD(*config.OBSTACLE_AVOID_KPKD)
-        corner_turn_controller = PD(*config.CORNER_TURN_KPKD)
+    replay_generated = False
+    try:
+        async with Client() as client:
+            drive_executor = DriveCommandExecutor(client=client)
+            async with ObstacleChallengeStateMachine(
+                initial_state="straight",
+                drive_command_executor=drive_executor,
+                transition_manager=TypedTranisitionManager(
+                    hysteresis_values=[GLOBAL_CONFIG().SharedChallengeConfig.HYSTERESIS] * 5,
+                    priorities=[5, 3, 4, 2, 1],
+                    obstacle_avoidance=should_avoid_obstacle,
+                    straight=should_straight,
+                    turn=should_turn,
+                    final_turn=should_final_turn,
+                    final_straight=should_final_straight,
+                ),
+            ) as state_machine:
+                with PickleLogWriter(log_path) as log_writer:
+                    with process_manager as process_context:
+                        if process_context.output_stream is None:
+                            raise RuntimeError("Output stream is not initialized.")
 
-        # Starting code here
-        state: Literal["Straight", "Turn"] = "Straight"
-        camera_process, vision_process, shm = None, None, None
+                        frame_index = 0
+                        source_fps = GLOBAL_CONFIG().CameraConfig.FPS
+                        shm = process_context.shm
+                        frame_buffer = shm.buf if shm is not None else None
+                        h = GLOBAL_CONFIG().CameraConfig.OUTPUT_HEIGHT
+                        w = GLOBAL_CONFIG().CameraConfig.OUTPUT_WIDTH
+                        c = GLOBAL_CONFIG().CameraConfig.OUTPUT_CHANNELS
 
-        try:
+                        async for data in ObstacleChallengeAsyncMultiprocessingVisionProcessor.async_pipe_reader(process_context.output_stream):
+                            walls_and_obstacles: WallsAndObstacles = data[0]
+                            target: tuple[int, int] | None = data[1]
 
-            try:
-                shm = shared_memory.SharedMemory(
-                    create=True, size=GLOBAL_CONFIG().ObstacleChallengeConfig.SHM_SIZE, name="camera_frame")
-            except FileExistsError:
-                try:
-                    shm = shared_memory.SharedMemory(name="camera_frame")
-                    shm.close()
-                    shm.unlink()
-                    # Make sure it has exactly the size we need, and is empty
-                    shm = shared_memory.SharedMemory(
-                        create=True, size=GLOBAL_CONFIG().ObstacleChallengeConfig.SHM_SIZE, name="camera_frame")
-                except FileNotFoundError:
-                    # The shared memory segment disappeared between create and cleanup attempts, try again
-                    shm = shared_memory.SharedMemory(
-                        create=True, size=GLOBAL_CONFIG().ObstacleChallengeConfig.SHM_SIZE, name="camera_frame")
+                            state_machine.update(walls_and_obstacles, target)
+                            finished = state_machine.handle_state_actions()
 
-            cam_receiver, cam_sender = mp.Pipe(duplex=False)
-            camera_process = mp.Process(
-                target=AsyncCamera.camera_process_context_manager, args=(shm.name, cam_sender,))
-            camera_process.start()
-
-            data_receiver, data_sender = mp.Pipe(duplex=False)
-            vision_process = mp.Process(target=AsyncMultiprocessingVisionProcessor.vision_process_context_manager, args=(
-                shm.name, cam_receiver, data_sender,))
-            vision_process.start()
-
-            # Camera process dumps frames into shared memory, and sends a signal through cam_sender when a new frame is ready.
-            # Vision process listens on cam_receiver for the signal, then reads the frame from shared memory, processes it, and sends the results back through data_sender.
-            # Staticmethod data_yielder polls the data_receiver for data and yields it to the main loop.
-
-            async for zone, walls, obstacles, corner_lines, wall_x_diffs, obstacle_x_diffs, obstacle_path_x in AsyncMultiprocessingVisionProcessor.async_pipe_reader(data_receiver):
-
-                logger.debug(
-                    f"Zone: {zone}, Walls: {walls}, Obstacles: {obstacles}, Corner Lines: {corner_lines}, Wall Dists: {wall_x_diffs}, Obstacle Dists: {obstacle_x_diffs}, Obstacle Path X: {obstacle_path_x}")
-
-                match state:
-                    case "Straight":
-                        if corner_lines:
-                            state = "Turn"
-                        else:
-                            if obstacles:
-                                turn_correction = obstacle_avoid.tick(
-                                    obstacle_path_x, GLOBAL_CONFIG(
-                                    ).CameraConfig.FORMAT["size"][0] // 2
-                                    # Target -> cubic spline generated by vision, current value -> frame center, want to steer towards the target path
-                                    # Although is is probably wrong because the target is absolute relative to point where it is computed, and not
-                                    # to the current position, so kinematic PID is probably better but uh I can't really do that because we don't have
-                                    # an encoder
-                                    # In other words... just pray :3
-                                    # hey i mean at least it's recomputed every 5 frames
+                            log_writer.write(
+                                build_log_record(
+                                    frame_index=frame_index,
+                                    timestamp_s=frame_index / source_fps,
+                                    state=state_machine.current_state,
+                                    turn_counter=state_machine.turn_counter,
+                                    last_turn_time_s=state_machine.last_turn_time,
+                                    start_time_s=state_machine.start_time,
+                                    target=state_machine.target_position,
+                                    walls_and_obstacles=state_machine.walls_and_obstacles,
+                                    wall_error=state_machine.wall_error,
+                                    turn_correction=state_machine.turn_correction,
+                                    corner_turn_correction=state_machine.corner_turn_correction,
+                                    obstacle_avoidance_correction=state_machine.obstacle_avoidance_correction,
+                                    command=DriveCommand(*drive_executor.latest_command),
+                                    command_submitted=drive_executor.command_submitted,
+                                    finished=finished,
                                 )
-                                asyncio.create_task(client.drive_motors(
-                                    0.5, int(turn_correction), 0.1))
-                            else:
-                                turn_correction = wall_follow.tick(
-                                    wall_x_diffs["left"] - wall_x_diffs["right"])
-                                asyncio.create_task(client.drive_motors(
-                                    0.5, int(turn_correction), 0.1))
+                            )
+                            drive_executor.command_submitted = False
 
-                    case "Turn":
-                        if not corner_lines:
-                            state = "Straight"
-                        else:
-                            turn_correction = corner_turn_controller.tick(
-                                # Biggest corner line, 192 is frame center
-                                corner_lines[0].x_centroid - GLOBAL_CONFIG().CameraConfig.FORMAT["size"][0] // 2)
-                            asyncio.create_task(client.drive_motors(
-                                0.5, int(turn_correction), 0.1))
+                            debug_frame = np.ndarray((h, w, c), dtype=np.uint8, buffer=frame_buffer)
+                            if walls_and_obstacles.walls.left_raw is not None and walls_and_obstacles.walls.right_raw is not None:
+                                cv2.drawContours(debug_frame, [walls_and_obstacles.walls.left_raw.contour, walls_and_obstacles.walls.right_raw.contour], -1, (0, 255, 0), 2)
+                            if target is not None:
+                                cv2.circle(debug_frame, (*target,), 5, (0, 0, 255), -1)
+                            cv2.putText(debug_frame, f"FPS: {state_machine.fps:.2f}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+                            cv2.putText(debug_frame, f"State: {state_machine.current_state}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
 
-                    case _:
-                        logger.error(f"Invalid state {state}")
-                        state = "Straight"
-        finally:
-            logger.info(
-                "Terminating processes and cleaning up shared memory...")
+                            cv2.imshow("Obstacle Challenge Debug", debug_frame)
+                            if cv2.waitKey(1) & 0xFF == ord('q'):
+                                break
+
+                            if finished:
+                                break
+
+                            frame_index += 1
+
+        replay_video(recording_path, log_path, output_video=replay_path, display=False)
+        replay_generated = True
+    finally:
+        if not replay_generated and log_path.exists() and recording_path.exists():
             try:
-                if camera_process and camera_process.is_alive():
-                    camera_process.terminate()
-                    camera_process.join(timeout=1)
-
-                if vision_process and vision_process.is_alive():
-                    vision_process.terminate()
-                    vision_process.join(timeout=1)
-
-                if shm:
-                    shm.close()
-                    shm.unlink()
-
-                logger.info("Exited cleanly")
-            except Exception as e:
-                logger.error(f"Error during cleanup: {e}")
-                logger.warning(
-                    f"Leaked memory segments and processes may need to be cleaned up manually. Good luck finding them michael -_-")
+                replay_video(recording_path, log_path, output_video=replay_path, display=False)
+            except Exception:
+                logger.exception("Failed to generate obstacle-challenge replay")

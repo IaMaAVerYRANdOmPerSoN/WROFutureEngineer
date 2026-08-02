@@ -1,0 +1,42 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug Obstacle Challenge",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "piclient.cli",
+            "args": [
+                "--GeneralConfig.CHALLENGE", "obstacle",
+                "--GeneralConfig.LEVEL", "DEBUG",
+            ],
+            "subProcess": true,
+            "env": {
+                "PYTHONASYNCIODEBUG": "1"
+            },
+            "autoReload": {
+                "enable": true
+            },
+        },
+        {
+            "name": "Debug Obstacle Challenge with Static Video",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "piclient.obstacle_challenge.video_tools",
+            "args": [
+                "process",
+                "/home/apostla/Documents/github/WROFutureEngineer/PiClient/piclient-obstacle_challenge/test_data.mp4"
+            ],
+            "subProcess": true,
+            "env": {
+                "PYTHONASYNCIODEBUG": "1"
+            },
+            "autoReload": {
+                "enable": true
+            },
+        }
+    ]
+}

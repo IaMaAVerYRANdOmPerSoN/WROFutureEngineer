@@ -1,9 +1,14 @@
-from piclient.core.lib import export, Config
+"""
+Argument parser that automatically generates arguments from a nested dataclass configuration object.
+"""
 
-from argparse import ArgumentParser, Namespace
-import dataclasses
 from typing import Any
+
+import dataclasses
+from argparse import ArgumentParser, Namespace
 from collections.abc import Generator
+
+from piclient.core.lib import export, Config
 
 
 def _walk_config(
@@ -34,7 +39,7 @@ class TypedArgumentParser(ArgumentParser):
         for k, v in _walk_config(root):
             self.add_argument(f"--{k}", help=f"Default: {v}")
 
-    def parse_args( # pyright: ignore[reportIncompatibleMethodOverride]
+    def parse_args(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
         args: Any = None,
         namespace: Namespace | None = None,
@@ -51,5 +56,5 @@ class TypedArgumentParser(ArgumentParser):
             caster = type(self.root).get_caster(type_)
             setattr(parsed, attr, caster(raw_value))
             self.root.set_nested_attr(path=attr, value=getattr(parsed, attr))
-            
+
         return parsed

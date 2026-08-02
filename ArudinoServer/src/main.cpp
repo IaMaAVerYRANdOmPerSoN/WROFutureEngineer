@@ -24,15 +24,17 @@ Servo motor;
 class Server {
     private:
         Stream* _serial;
-        Hashtable<String, Request> CurrentProcesses;
+        Hashtable<String, Request> currentProcesses;
         SimpleVector<String> commands;
         Servo& _motor;
         Servo& _steering;
+        unsigned int _last_packet_time = millis();
 
         Request parseRequest() {
             Request req = {0, "", 0, 0, 0, 0, 1};
             
             if (_serial->available()) {
+                _last_packet_time = millis();
                 String line = _serial->readStringUntil('\n');
                 line.trim();
                 if (line.length() == 0) {
@@ -65,7 +67,6 @@ class Server {
             if (request.command == "PING") {
                 request.timeout = 0;
                 request.processed = 1;
-                digitalWrite(2, HIGH);
                 end("PING");
             } 
             else if (request.command == "SET_SERVO") {
@@ -74,21 +75,18 @@ class Server {
                 request.timeout = millis() + duration;
                 _serial->println(prefix + "WAITMS " + String(duration));
                 _steering.write(request.arg1);
-                digitalWrite(3, HIGH);
             } 
             else if (request.command == "INC_SERVO") {
                 unsigned long duration = (unsigned long)(request.arg1);
                 request.timeout = millis() + duration;
                 _serial->println(prefix + "WAITMS " + String(duration));
                 _steering.write(_steering.read() + request.arg1);
-                digitalWrite(4, HIGH);
             }
             else if (request.command == "SET_MOTOR") {
                 unsigned long duration = (unsigned long)(fabs(request.arg2) * 1000.0f + 0.5f);
                 request.timeout = millis() + duration;
                 _serial->println(prefix + "WAITMS " + String(duration));
                 _motor.writeMicroseconds(1500 + (int)(request.arg1 * 300.0f / 100.0f)); // Speed passed in percent
-                digitalWrite(5, HIGH);
             }
             else if (request.command == "SET_LED") {
                 request.timeout = 0;
@@ -106,39 +104,30 @@ class Server {
                 end("SERVO_ANGLE");
             }
             else {
-                digitalWrite(10, HIGH);
                 _serial->println(prefix + "404 ERR");
                 end("404 ERR");
             }
         }
 
         void end(String command) {
-            Request& request = CurrentProcesses[command];
+            Request& request = currentProcesses[command];
             String prefix = String(request.tid) + " ";
 
             if (command == "PING") {
                 _serial->println(prefix + "PONG");
-                digitalWrite(2, LOW);
             } else if (command == "SET_SERVO") {
-                digitalWrite(3, LOW);
                 _serial->println(prefix + "200 OK");
             } else if (command == "INC_SERVO") {
-                digitalWrite(4, LOW);
                 _serial->println(prefix + "200 OK");
             } else if (command == "SET_MOTOR") {
                 _motor.writeMicroseconds(1500); // Stop the motor
-                digitalWrite(5, LOW);
                 _serial->println(prefix + "200 OK");
             } else if (command == "SET_LED") {
                 // Keep the led's current state
                 _serial->println(prefix + "200 OK");
             } else if (command == "SERVO_ANGLE") {
                 _serial->println(prefix + _steering.read());
-            } else if (command == "M_ANGLE") {
-                _serial->println(prefix + _motor.GetCurrentMotorSpeed());
-            } else if (command == "404 ERR") {
-                digitalWrite(10, LOW);
-            }
+            } else if (command == "404 ERR") {}
         }
         
     public:
@@ -149,38 +138,41 @@ class Server {
             commands.push_back("SET_MOTOR");
             commands.push_back("SET_LED");
             commands.push_back("SERVO_ANGLE");
-            commands.push_back("M_ANGLE");
         }
 
-    void ProcessRequest() {
-        Request incoming = parseRequest();
-        if (incoming.tid != 0) {
-            CurrentProcesses[incoming.command] = incoming;
-            start(CurrentProcesses[incoming.command]);
-        }
+        void processRequest() {
+            Request incoming = parseRequest();
+            if (incoming.tid != 0) {
+                currentProcesses[incoming.command] = incoming;
+                start(currentProcesses[incoming.command]);
+            }
 
-        for (unsigned int i = 0; i < commands.size(); i++) {
-            String cmd = commands[i];
-            Request& req = CurrentProcesses[cmd];
-            
-            if (req.timeout != 0 && req.processed == 0 && millis() >= req.timeout) {
-                end(cmd);
-                req.processed = 1; 
+            for (auto &cmd : commands) {
+                Request& req = currentProcesses[cmd];
+                
+                if (req.timeout != 0 && req.processed == 0 && millis() >= req.timeout) {
+                    end(cmd);
+                    req.processed = 1; 
+                }
             }
         }
-    }
+        
+        bool isIdle(unsigned int idleTime) {
+            return (millis() - _last_packet_time) > idleTime;
+        }
+
+        void stop() {
+            for (auto &cmd : commands) {
+                end(cmd);
+            }
+            currentProcesses.clear();
+        }
 };
 
 Server* server;
 
 void setup() {
-    // these are all LEDs for testing
-    pinMode(2, OUTPUT);
-    pinMode(3, OUTPUT);
-    pinMode(4, OUTPUT);
-    pinMode(5, OUTPUT);
-    pinMode(6, OUTPUT);
-    pinMode(10, OUTPUT);
+    pinMode(6, OUTPUT); // LED
 
     Serial.begin(115200);
     Serial.setTimeout(SERIAL_TIMEOUT); // Keep parser responsive when lines arrive in chunks.
@@ -192,7 +184,10 @@ void setup() {
 }
 
 void loop() {
-    server->ProcessRequest();
+    server->processRequest();
+    if (server->isIdle(40)) { // 30fps is 33ms, so 40ms is a safe threshold for idle detection
+        server->stop();
+    }
 }
 
 

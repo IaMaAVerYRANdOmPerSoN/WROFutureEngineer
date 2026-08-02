@@ -4,13 +4,15 @@ Extends :class:`VisionProcessor` with wall-distance measurement using
 left/right regions of interest.
 """
 
-from .data import Walls
-from .base import VisionProcessor
-from ..lib import GLOBAL_CONFIG, export
-import numpy as np
+from typing import Any
+
 import cv2
 
-from typing import Any
+import numpy as np
+
+from ..lib import GLOBAL_CONFIG, export
+from .base import VisionProcessor
+from .data import OpenChallengeWalls
 
 
 @export
@@ -26,8 +28,9 @@ class OpenChallengeVisionProcessor(VisionProcessor):
 
     _DEFAULT_LEFT_WALL_ROI = GLOBAL_CONFIG().VisionConfig.LEFT_WALL_ROI
     _DEFAULT_RIGHT_WALL_ROI = GLOBAL_CONFIG().VisionConfig.RIGHT_WALL_ROI
+    _DEFAULT_CENTER_WALL_ROI = GLOBAL_CONFIG().VisionConfig.CENTER_WALL_ROI
 
-    def __init__(self, left_wall_roi: tuple[slice, slice] | None = None, right_wall_roi: tuple[slice, slice] | None = None, *args: Any, **kwargs: Any):
+    def __init__(self, left_wall_roi: tuple[slice, slice] | None = None, right_wall_roi: tuple[slice, slice] | None = None, center_wall_roi: tuple[slice, slice] | None = None, *args: Any, **kwargs: Any):
         """Initialise the Open Challenge vision processor.
 
         Forwards most arguments to :class:`VisionProcessor`.  Accepts
@@ -35,6 +38,7 @@ class OpenChallengeVisionProcessor(VisionProcessor):
 
         :param left_wall_roi: NumPy slice for the left wall (default from Config).
         :param right_wall_roi: NumPy slice for the right wall (default from Config).
+        :param center_wall_roi: NumPy slice for the center wall (default from Config).
         """
         super(OpenChallengeVisionProcessor, self).__init__(*args, **kwargs)
         self.left_wall_roi = (
@@ -47,26 +51,41 @@ class OpenChallengeVisionProcessor(VisionProcessor):
             if right_wall_roi is not None
             else self._DEFAULT_RIGHT_WALL_ROI
         )
+        self.center_wall_roi = (
+            center_wall_roi
+            if center_wall_roi is not None
+            else self._DEFAULT_CENTER_WALL_ROI
+        )
 
     def get_normalized_relative_wall_distances(self, frame: np.ndarray):
         """Compute normalised wall distances from a preprocessed frame.
 
         Applies colour thresholding to the left and right ROIs and counts
-        non-zero (black) pixels, returning a :class:`Walls` instance.
+        non-zero (black) pixels, returning a :class:`OpenChallengeWalls` instance.
 
         :param frame: Preprocessed HSV frame.
         :returns: Normalised wall distances.
-        :rtype: Walls
+        :rtype: OpenChallengeWalls
         """
         left_area = frame[self.left_wall_roi]
         right_area = frame[self.right_wall_roi]
+        center_area = frame[self.center_wall_roi]
 
         left_masked = cv2.inRange(
             left_area, self.lower_black, self.upper_black)
         right_masked = cv2.inRange(
             right_area, self.lower_black, self.upper_black)
+        center_masked = cv2.inRange(
+            center_area, self.lower_black, self.upper_black)
 
         left_pixels = cv2.countNonZero(left_masked)
         right_pixels = cv2.countNonZero(right_masked)
+        center_pixels = cv2.countNonZero(center_masked)
 
-        return Walls(left_pixels, right_pixels, left_area.shape[0] * left_area.shape[1])
+        return OpenChallengeWalls(
+            left_pixels,
+            right_pixels,
+            center_pixels,
+            area=left_area.shape[0] * left_area.shape[1],
+            center_area=center_area.shape[0] * center_area.shape[1],
+        )

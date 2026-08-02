@@ -4,21 +4,22 @@ Provides :class:`LiDARPacket` for parsed LD19 data and :class:`LiDAR`
 for async serial reading, packet parsing, and point-cloud extraction.
 """
 
-import asyncio
-from concurrent.futures import ThreadPoolExecutor
-
-from dataclasses import dataclass
-import struct
-import numpy as np
-from collections.abc import Generator, AsyncGenerator, Sequence
 from typing import Any, NoReturn, Self
 
-import aioserial
-
-from .. import logger
-from ..lib import GLOBAL_CONFIG, export
+import asyncio
+import struct
+from collections.abc import Generator, Sequence
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 from multiprocessing.connection import Connection as PipeConnection
 
+
+import aioserial
+import numpy as np
+
+from loguru import logger
+from ..lib import GLOBAL_CONFIG, export
+from ..utils import async_pipe_reader as utils_async_pipe_reader, async_pipe_reader_fifo as utils_async_pipe_reader_fifo
 
 @export
 @dataclass
@@ -296,35 +297,8 @@ class LiDAR:
             else:
                 logger.warning("LiDAR packet capture timed out")
 
-    @staticmethod
-    async def async_pipe_reader(receiver: PipeConnection) -> AsyncGenerator[Any, Any]:
-        loop: asyncio.AbstractEventLoop = asyncio.get_running_loop()
-
-        try:
-            data_event = asyncio.Event()
-
-            def yielder() -> None:
-                data_event.set()
-
-            loop.add_reader(receiver.fileno(), yielder)
-
-            try:
-                while True:
-                    await data_event.wait()
-
-                    while receiver.poll():
-                        yield receiver.recv()
-
-                    data_event.clear()
-            finally:
-                loop.remove_reader(receiver.fileno())
-        except NotImplementedError:
-            while True:
-                try:
-                    data: Any = await loop.run_in_executor(None, receiver.recv)
-                except (EOFError, OSError):
-                    break
-                yield data
+    async_pipe_reader = staticmethod(utils_async_pipe_reader)
+    async_pipe_reader_fifo = staticmethod(utils_async_pipe_reader_fifo)
 
     @staticmethod
     def lidar_process_context_manager(sender: PipeConnection) -> None:
