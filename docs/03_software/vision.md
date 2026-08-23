@@ -6,7 +6,7 @@
 
 ## Overview
 
-The vision pipeline reads camera frames and works out where the walls and obstacles are. It runs inside the vision process so it does not slow down the main control loop.
+The [`VisionProcessor`](https://apostla-api-reference.web.app/vision.html#piclient.core.vision.VisionProcessor) pipeline reads camera frames and works out where the walls and obstacles are. It runs inside the vision process so it does not slow down the main control loop.
 
 All frames are converted from BGR to HSV before any detection is done. HSV separates color from brightness, which makes detection more reliable under different lighting conditions.
 
@@ -14,9 +14,10 @@ All frames are converted from BGR to HSV before any detection is done. HSV separ
 
 ## Open Challenge
 
-For the open challenge there are no obstacles — just walls.
+For the open challenge there are no obstacles — just walls. [`OpenChallengeVisionProcessor`](https://apostla-api-reference.web.app/vision.html#piclient.core.vision.OpenChallengeVisionProcessor) produces the normalized wall measurements used by the controller.
 
 The vision code looks at three regions of the frame:
+
 - **Left ROI** — counts black pixels on the left side
 - **Right ROI** — counts black pixels on the right side
 - **Center ROI** — counts black pixels straight ahead
@@ -29,17 +30,17 @@ More black pixels in a region means the wall is closer. The difference between l
 
 ## Obstacle Challenge
 
-The obstacle challenge adds red and green pillars to the track.
+The obstacle challenge adds red and green pillars to the track. [`ObstacleChallengeVisionProcessor`](https://apostla-api-reference.web.app/vision.html#piclient.core.vision.ObstacleChallengeVisionProcessor) detects the walls and pillars and returns [`WallsAndObstacles`](https://apostla-api-reference.web.app/vision.html#piclient.core.vision.WallsAndObstacles) data containing [`VisionObject`](https://apostla-api-reference.web.app/vision.html#piclient.core.vision.VisionObject) instances.
 
-**Wall detection:** Walls are found as contours rather than pixel counts. The distance is measured as the gap between the wall's bounding box and the frame center.
+**Wall detection:** Walls are found as contours rather than pixel counts. The distance is measured as the gap between the wall's center of mass (moments) and the frame center.
 
 **Pillar detection:**
+
 - The frame is masked for red and green HSV ranges separately
 - The largest contour in each mask is taken as the detected pillar
 - Red requires two HSV masks because red wraps around the hue wheel (0° and 180°)
 
-**Steering target:** The code finds the shortest gap between the detected pillar and the nearest wall. The midpoint of that gap becomes the steering target for the avoidance maneuver.
-
+**Steering target:** A dynamic offset based on proximity to the pillar is used as the steering target. The robot steers toward the gap between the wall and pillar, with a larger offset when the pillar is closer. The control output from this target is integrated with 85% weight on the pillar target and 15% weight on the wall target. This allows the robot to steer toward the gap while still keeping a general awareness of the wall's position.
 **WRO rule:** Green pillars must be passed on the left. Red pillars must be passed on the right.
 
 ---
@@ -49,7 +50,7 @@ The obstacle challenge adds red and green pillars to the track.
 All thresholds are set in `piclient.toml` under `[VisionConfig]`. Tune these under competition lighting before a run using the tools in `utils/`.
 
 | Color | Notes |
-|-------|-------|
+| ----- | ------ |
 | Black (walls) | Low value, low saturation |
 | Red (pillars) | Two ranges needed due to hue wrap-around |
 | Green (pillars) | Single range around hue 40–80 |
@@ -61,9 +62,5 @@ All thresholds are set in `piclient.toml` under `[VisionConfig]`. Tune these und
 The `utils/` folder has interactive tools for tuning vision settings:
 
 ```bash
-python -m utils --tool contours control
+python PiClient/utils/color_threshold_tuner.py
 ```
-
-This opens live OpenCV windows where you can adjust HSV thresholds, ROI sizes, and see contours in real time without restarting the robot.
-
-> **Note:** The utils tools currently have outdated imports. Update any `from src.core.*` imports to `from piclient.core.*` before running.

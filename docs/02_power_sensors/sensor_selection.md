@@ -9,6 +9,7 @@ This document explains which sensors were selected for the robot, why they were 
 ## Sensing Requirements
 
 The robot needs to:
+
 - Detect walls and stay centered between them
 - Identify colored pillars (red and green) and pass on the correct side
 - Detect corner lines to know when to turn
@@ -19,10 +20,14 @@ The robot needs to:
 
 ## Sensor Summary
 
-| Sensor | Purpose | Why Chosen | Alternatives Considered |
-|--------|---------|------------|--------------------------|
-| OV5647 Camera | Color detection, wall and pillar detection, corner line detection | Lightweight, CSI-2 interface for low latency, well supported by picamera2 | USB webcam, Pi Camera Module 3 |
-| LD19 LiDAR | 360-degree distance measurement for wall detection | Lighting-independent, precise, wide field of view | Ultrasonic sensors, IR distance sensors |
+Our robot only uses a single sensor: An OV5647 camera with a wide angle lens. The camera is mounted on the front of the robot, facing forward, and captures frames at 640x480 resolution at up to 62.50 fps. The camera is the only data source for our system, and it is used for all sensing tasks. The camera's raw BGR arrays are first converted to HSV color space, then fed to downstream pipelines for object detection.
+
+We selected the OV5647 camera because it is the only sensor that can detect color, which is required for both the obstacle challenge (pillar colors) and the open challenge (corner line colors). The camera is also compact, lightweight, and fully supported by the `picamera2` library on Raspberry Pi OS Bullseye or later. The camera is elevated above the robot's body to give it a clear view of the track and obstacles.
+
+While the single-sensor approach may have limitations, it simplifies the design and reduces cost, weight, and complexity. The camera is sufficient for all sensing tasks when combined with robust computer vision algorithms.
+We considered adding a 2D LiDAR sensor to improve wall distance measurement, but it did not solve any existing problems and would have presented additional integration challenges.
+
+We also considered using the Pi Camera Module 3 Wide, which supports higher frame rates and resolutions, but it is significantly more expensive and was not necessary for our current design. The OV5647 camera provides adequate performance for our needs at a lower cost. The current camera is a performance bottleneck, but our system does not operate at speeds where the frequency of the control loop is a limiting factor. Despite only operating at the camera's maximum frame rate of 62.50 fps, the robot can still navigate the track effectively at the speeds required for the competition.
 
 ---
 
@@ -33,85 +38,52 @@ The robot needs to:
 **What it provides:** Raw image frames at 640x480 up to 62.50 fps, processed in HSV color space to detect objects by color and shape.
 
 **Why it was selected:**
-- Only sensor capable of distinguishing color, which is required for both the obstacle challenge pass direction and the open challenge turn direction
+
+- The camera can distinguish colors, which is essential for both challenges
 - CSI-2 interface provides lower latency than USB cameras
-- Well supported by the `picamera2` library on Raspberry Pi OS
+- Good support by the `picamera2` library on Raspberry Pi OS Bullseye or later
 - Lightweight and compact
 
 **Advantages:**
-- Can detect multiple object types in a single frame
-- High frame rate at the resolution we need
+
+- Can detect multiple instances of different object types in a single frame
 - No external power required beyond the Pi's CSI port
+- Fine-grained control over resolution, frame rate, exposure, and other camera settings through `picamera2`
+- Easy to process data with mature scientific Python libraries like OpenCV and NumPy
 
 **Limitations:**
+
 - Performance degrades under poor or inconsistent lighting
 - Requires HSV threshold tuning under competition lighting conditions
-- Cannot measure distance directly
+- Cannot measure distance directly; Distance must be inferred from pixel counts or object sizes, which is less reliable than direct distance measurements
 
 **Alternatives considered:**
-- **USB webcam** — higher latency due to USB overhead, more bandwidth contention with Arduino and LiDAR
+
+- **USB webcam** — higher latency due to USB overhead, more bandwidth contention with Arduino
 - **Pi Camera Module 3 Wide** — supports 120 fps at higher resolution, but significantly more expensive; considered as a future upgrade
 
 ---
 
-## LiDAR — LD19
+## Single Sensor Approach
 
-**Purpose:** The LiDAR provides precise 360-degree distance measurements used to detect walls and measure lateral distance from the robot to each side.
-
-**What it provides:** A full 360-degree sweep of distance readings at roughly 5–10Hz, parsed from binary packets into polar coordinates and converted to Cartesian.
-
-**Why it was selected:**
-- Completely unaffected by lighting conditions, unlike the camera
-- Provides reliable distance data to both walls simultaneously in a single scan
-- Compact and lightweight for its capability
-- Simple USB serial interface
-
-**Advantages:**
-- Works in any lighting condition
-- Provides distance to both walls at once
-- Does not require color calibration
-
-**Limitations:**
-- Cannot detect color — cannot distinguish pillar colors or corner line colors
-- Not yet integrated into the challenge runners; currently parsed but unused in control logic
-- Lower update rate compared to the camera
-
-**Alternatives considered:**
-- **Ultrasonic sensors** — only measure in a single direction; would need multiple sensors to cover both walls, adding wiring and processing complexity
-- **IR distance sensors** — narrow field of view, affected by surface color and reflectivity
-
----
-
-## Sensor Combination Strategy
-
-No single sensor is sufficient on its own:
-
-- The **camera alone** cannot reliably measure wall distance — pixel counting is an approximation affected by lighting and perspective
-- The **LiDAR alone** cannot detect color — it cannot identify pillar colors or corner line direction
-
-Together they cover each other's weaknesses. The LiDAR handles precise, lighting-independent wall distance measurement. The camera handles all color-dependent detection — pillars, corner lines, and starting direction.
-
-| Task | Primary Sensor |
-|------|---------------|
-| Wall following | LiDAR (planned) / Camera (current) |
-| Corner detection | Camera |
-| Pillar detection | Camera |
-| Starting direction | Camera |
-| Parking lot detection | Camera / LiDAR |
+It's easy to underestimate the difficulty of process/thread synchronization and data fusion when multiple sensors are used. At the same time, multiple sensors can provide redundancy and improve accuracy.
+It's a complex trade-off between cost, weight, complexity, and performance. Historically, a single camera has been sufficient for WRO FE robots, and we expect it to be sufficient for our robot as well.
+There isn't any problem that is strictly unsolvable with a single camera, and while adding ToF or LiDAR sensors might improve performance in some aspects, it would also introduce new problems and increase the complexity of the system.
+Adding LiDAR or ToF sensors would only be justified if there was a real constraint that the camera couldn't overcome, such as a requirement to detect objects in complete darkness. Since the camera is sufficient for our current design, we have chosen to keep the system simple and use only the camera.
 
 ---
 
 ## Trade-Offs
 
 | Trade-Off | Decision |
-|-----------|----------|
+| ----------- | ---------- |
 | Cost vs performance | OV5647 chosen over Pi Camera Module 3 — adequate performance at lower cost |
-| Accuracy vs complexity | LiDAR chosen over multiple ultrasonic sensors — single sensor, simpler wiring, better accuracy |
-| Range vs mounting | LiDAR mounted on top of robot for full 360-degree field of view despite raising the center of gravity |
-| Update rate vs processing | Camera capped at 62.50 fps at 640x480 — higher resolution reduces frame rate below what the control loop needs |
+| Weight vs functionality | OV5647 chosen over Pi Camera Module 3 — lighter weight while maintaining necessary functionality |
+| Throughput vs Accuracy | Camera capped at 62.50 fps at 640x480 — higher resolution reduces frame rate below what the control loop needs |
+| Redundancy vs complexity | Single camera chosen — simplifies design and reduces weight, cost, and complexity |
 
 ---
 
 ## Final Decision
 
-The OV5647 camera and LD19 LiDAR together cover all sensing requirements for the competition. The camera handles everything color-related, and the LiDAR handles precise distance measurement independently of lighting. Both are compact, lightweight, and compatible with the Raspberry Pi 5 without additional interface hardware.
+The OV5647 camera covers all sensing requirements for the competition. The camera is a lightweight, compact, and cost-effective solution that provides sufficient performance for both the open and obstacle challenges. While there are trade-offs in terms of accuracy and redundancy, the single-sensor approach simplifies the design and reduces potential points of failure.

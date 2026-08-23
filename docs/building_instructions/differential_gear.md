@@ -7,7 +7,7 @@ All parts are 3D printed. Print everything before starting.
 ## Parts List
 
 | Part | Quantity |
-|------|----------|
+| ---- | -------- |
 | Crown Wheel | 1 |
 | Large Gear | 2 |
 | Small Gear | 2 |
