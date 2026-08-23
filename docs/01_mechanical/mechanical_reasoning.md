@@ -1,49 +1,49 @@
-### Mechanical Reasoning
----
+# Mechanical Reasoning
 
-### Motor Selection
+
+## Motor Selection
 
 <table>
 <tr>
 <td width="50%" valign="top" style="border: 1px solid #888; border-radius: 6px; padding: 12px;">
 
-#### Generic DC motor
+### Generic DC motor
+
 A DC motor is simple, cheap, and easy to control with a basic circuit. It works well for basic speed control but spins unevenly at low speeds, which makes precise movement difficult.
- 
+
 </td>
 <td width="8%"></td>
 <td width="50%" valign="top" style="border: 1px solid #888; border-radius: 6px; padding: 12px;">
 
-#### Furitek Micro Komodo 1212 
+### Furitek Micro Komodo 1212
+
 A small but powerful brushless motor rated at 3450 KV and 120W. It needs a brushless ESC to run but spins smoothly at any speed with no jitter.
- 
+
 </td>
 </tr>
 </table>
 
----
- 
-#### Motor Choice
-The Micro Komodo spins smoothly at all speeds, which is important for our wall-following code to keep the robot at a steady distance from the walls. A regular DC motor would cause the robot to move unevenly at low speeds, leading to unpredicable movement.
- 
----
+## Motor Choice
 
+The Micro Komodo spins smoothly at all speeds, which is important for our wall-following code to keep the robot at a steady distance from the walls. A regular DC motor would cause the robot to move unevenly at low speeds, leading to unpredictable movement.
 
+## Size Reasoning
 
-#### Size Reasoning
-Our robot is 24cmx10cmx28cm because the robot has a high vertical length, the camera is able to capture imagery from a steeper view, enabling for a more accurate perspective transformation.
+Our robot measures 24 x 10 x 28 cm. The camera is mounted on a tall vertical mast, which provides a significant advantage over the terrain and enhances vertical resolution after perspective transforms are applied.
 
----
+## Drive System
 
-#### Drive System
-Using a rear wheel drive (RWD):
-- Provides a stronger grip on surfaces since the rear of the robot is heavier 
-- Since the front wheels are only used for steering, the car can turn more precisely
+The WRO Future Engineer rules do not allow differential drive or omnidirectional wheels, Thus narrowing the solution space to effectively 3 options: Rear-Wheel Drive (RWD), Front-Wheel Drive (FWD), and 4-Wheel Drive (4WD). Each of these options has its own advantages and disadvantages, which are summarized in the table below.
 
----
+| | **RWD** | **FWD** | **4WD** |
+| - | --- | --- | --- |
+| **Advantages** | Simplest design, fewer parts, lighter weight, better acceleration | Better traction on slippery surfaces | Maximum traction, better handling on rough terrain |
+| **Disadvantages** | Less stable at high speeds, more difficult to control | Not as stable as 4WD, can be prone to skidding, Complex steering mechanism | Extremely complex and difficult to design, test, and maintain, especially in a competition environment |
 
+We chose RWD because it is the simplest design, which makes it easier to build and maintain. It is also lighter than FWD or 4WD, which improves acceleration and reduces power consumption. The robot will not be moving at high speeds, so stability is not a major concern. With FWD and 4WD, the steering mechanism is extremely complex, especially considering that the vast majority of components are designed in-house and 3D printed. The complexity of FWD and 4WD would make it difficult to design, test, and maintain the robot in a competition environment. We couldn't make a reliable and robust 3D printed differential gear, let alone a complete FWD or 4WD system. RWD is the best option for our robot because it is the simplest option that satisfies our design constraints (We do not operate at speeds where RWD becomes problematic.) It is also the most reliable option, which is important in a competition environment.
 
-#### Servo Motor
-We selected a standard servo motor for steering because they provide precise control, equating to reliable turns.
+## Servo Motor
 
----
+We selected a standard servo motor for steering because it provides precise and repeatable control of the front wheels. Unlike a motor that would need additional position feedback and a more complicated control system, a servo can move directly to a commanded angle and hold that position. This makes it easier for the robot to follow the steering angles calculated by our control code and helps it make consistent turns.
+
+A servo motor also fits well with our focus on simplicity and reliability. Its compact size and straightforward interface make it easy to mount and connect to the robot's control system, while its position control reduces the risk of over- or under-steering. Reliable steering is especially important in a competition environment, where small errors in each turn can accumulate and cause the robot to leave the intended path.

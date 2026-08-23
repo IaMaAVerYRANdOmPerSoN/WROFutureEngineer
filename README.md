@@ -161,11 +161,11 @@ This section explains the software that runs on the Raspberry Pi, including how 
 Three processes run at the same time, camera, vision, and main control. The camera writes frames into shared memory, the vision process reads them and finds walls and obstacles, and the main process runs the state machine and sends commands to the Arduino. The system always uses the freshest data; stale frames and commands are dropped automatically.
 
 - **Camera Process**: Captures frames and writes them into shared memory
-    - [Architecture details](docs/software/architecture.md)
+    - [Architecture details](docs/03_software/architecture.md)
 - **Vision Process**: Reads frames and finds walls and obstacles
-    - [Vision details](docs/software/vision.md)
+    - [Vision details](docs/03_software/vision.md)
 - **Main Process**: Runs the state machine and sends drive commands to the Arduino
-    - [Runner details](docs/software/challenge_running.md)
+    - [Runner details](docs/03_software/challenge_running.md)
 
 <p align="center">
   <img src="docs/img/architecture.webp" width="750">
@@ -179,7 +179,7 @@ Three processes run at the same time, camera, vision, and main control. The came
 All settings are stored in `piclient.toml`. Nothing is hardcoded — speed, PD gains, HSV thresholds, serial ports, and ROI sizes are all in the config file. Once the robot starts, the config is locked and cannot be changed mid-run.
 
 - **Settings file**: `piclient.toml` at the root of the repo
-    - [Config details](docs/software/config.md)
+    - [Config details](docs/03_software/config.md)
 - **Override priority**: CLI flag > environment variable > piclient.toml > code defaults
 
 ---
@@ -187,22 +187,22 @@ All settings are stored in `piclient.toml`. Nothing is hardcoded — speed, PD g
 ## Vision
 
 - **Open Challenge**: Counts black pixels in left, right, and center regions. More black pixels means the wall is closer. Corner detection triggers when the center region fills up.
-    - [Open challenge vision details](docs/software/vision.md#open-challenge)
+    - [Open challenge vision details](docs/03_software/vision.md#open-challenge)
 - **Obstacle Challenge**: Finds red and green pillars using HSV color detection and calculates the gap between each pillar and the nearby wall. The midpoint of that gap becomes the steering target.
-    - [Obstacle challenge vision details](docs/software/vision.md#obstacle-challenge)
+    - [Obstacle challenge vision details](docs/03_software/vision.md#obstacle-challenge)
 
 ---
 
 ## Hardware Interfaces
 
 - **Camera**: Runs in its own process, writes frames directly into shared memory with no copying
-    - [Camera details](docs/software/hardware_interfaces.md#camera)
+    - [Camera details](docs/03_software/hardware_interfaces.md#camera)
 - **Arduino Client**: Sends serial commands with transaction IDs so multiple commands can be in flight at once
-    - [Arduino client details](docs/software/hardware_interfaces.md#arduino-client)
+    - [Arduino client details](docs/03_software/hardware_interfaces.md#arduino-client)
 - **DriveCommandExecutor**: Sits between the control loop and the Arduino — only the latest command is sent, stale commands are thrown away
-    - [DriveCommandExecutor details](docs/software/hardware_interfaces.md#drivecommandexecutor)
+    - [DriveCommandExecutor details](docs/03_software/hardware_interfaces.md#drivecommandexecutor)
 - **LiDAR**: Wired up and parses data but not yet connected to either challenge runner
-    - [LiDAR details](docs/software/hardware_interfaces.md#lidar)
+    - [LiDAR details](docs/03_software/hardware_interfaces.md#lidar)
 
 ---
 

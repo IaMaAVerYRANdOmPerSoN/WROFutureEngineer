@@ -13,7 +13,7 @@
 - Gear connecting to motor wears out after 1-2 days ([Week 25](#week-25-june-28july-5))
 - Purchased off-the-shelf differential was too large and hit the ground; new wheels bought to raise ride height ([Week 28](#week-28-aug-2-5), [Week 29](#week-29-aug-5-10))
 - Axle connectors too loose for the differential output ([Week 30](#week-30-aug-10-15))
-- Motor not producing enough torque after sharp turns ([Week 32](#week-32-aug-18-21))
+- Axle slipping in the differential gearbox (incorrectly identified as lack of torque) ([Week 32](#week-32-aug-18-21))
 
 ### 2. Camera
 - Error persisted for three weeks ([Week 12](#week-12-mar-19-26), [Week 13](#week-13-mar-27-apr-3))
@@ -21,7 +21,7 @@
 
 ### 3. Raspberry Pi
 - First Pi broke for unknown reasons ([Week 18](#week-18-may-6-13))
-- Second Pi broke — LED error code 4 long 3 short (RP1 not found) ([Week 32](#week-32-aug-18-21))
+- Second Pi broke — LED error code 4 long 3 short (RP1 not found), unknown cause ([Week 32](#week-32-aug-18-21))
 
 ### 4. Power System
 - Deans-T connector melted ([Week 14](#week-14-apr-4-11))
@@ -252,7 +252,7 @@
 ## Week 26 (July 6–12)
 
 - Vision and open challenge code updated with new tuning values; confirmed working.
-- Obstacle challenge testing started; obstacles forgotten.
+- Obstacle challenge testing started; obstacles excluded during preliminary testing.
 
 ---
 
@@ -325,5 +325,5 @@
 - Differential no longer dragging but motor does not have enough torque; spins but cannot move the robot after sharp turns.
 - Likely cause is too much gearbox friction or gears slipping under load.
 - Coach suggested updating ESC speed values for the new gear ratio and calibrating the ESC using the FuriCar app.
-- Speed constants already updated; camera frame rate limit of 62.2 fps is now the speed ceiling.
+- Speed constants already updated; camera frame rate limit of 62.5 fps is now the speed ceiling.
 - Root cause of torque issue still unknown; coach suggested trying the previous motor.
