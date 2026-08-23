@@ -383,16 +383,21 @@ class TestTransitionManager(unittest.TestCase):
         # no_arg has higher priority but is skipped because it can't bind (5,).
         self.assertEqual(tm.check_transitions(5), "with_arg") # pyright: ignore[reportCallIssue]
 
-class TestProcessManager(unittest.TestCase):
-    def test_process_context_manager_allocates_expected_shared_memory(self):
-        def camera_callback(shm_name: str, *senders: object) -> None:
+
+def camera_callback(shm_name: str, *senders: object) -> None:
             del shm_name, senders
 
-        def vision_callback(shm_name: str, *pipes: object) -> None:
-            del shm_name, pipes
 
-        def recorder_callback(shm_name: str, receiver: object) -> None:
-            del shm_name, receiver
+def vision_callback(shm_name: str, *pipes: object) -> None:
+    del shm_name, pipes
+
+
+def recorder_callback(shm_name: str, receiver: object) -> None:
+    del shm_name, receiver
+
+
+class TestProcessManager(unittest.TestCase):
+    def test_process_context_manager_allocates_expected_shared_memory(self):
 
         shm_name = "test_process_manager_shm"
         shm_size = 1024

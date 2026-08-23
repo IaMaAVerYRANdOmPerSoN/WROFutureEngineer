@@ -1,4 +1,6 @@
 name: Deploy documentation to firebase
+permissions:
+  contents: read
 
 on: [push]
 

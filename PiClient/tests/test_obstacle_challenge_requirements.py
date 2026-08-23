@@ -35,7 +35,7 @@ class TestObstacleChallengeConfig(unittest.TestCase):
         self.assertEqual(replay_path.name, "input_obstacle_challenge_replay.mp4")
 
     def test_frame_timestamp(self) -> None:
-        self.assertAlmostEqual(frame_timestamp(int(GLOBAL_CONFIG().CameraConfig.FPS // 2), GLOBAL_CONFIG().CameraConfig.FPS), 0.5)
+        self.assertAlmostEqual(frame_timestamp(GLOBAL_CONFIG().CameraConfig.FPS / 2, GLOBAL_CONFIG().CameraConfig.FPS), 0.5)
         self.assertAlmostEqual(frame_timestamp(0, GLOBAL_CONFIG().CameraConfig.FPS), 0.0)
 
 

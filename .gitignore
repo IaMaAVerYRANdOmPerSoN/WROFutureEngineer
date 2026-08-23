@@ -1,9 +1,13 @@
-# Python bytecode and other bs
+# Python bytecode
 __pycache__
 *.pyc
 *.pyo
 *.pyd
 _build
+
+# Python distribution / packaging
+dist
+*.whl
 
 # Logs
 logs

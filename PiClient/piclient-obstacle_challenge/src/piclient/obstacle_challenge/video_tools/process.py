@@ -170,7 +170,7 @@ def default_output_paths(input_video: Path) -> tuple[Path, Path]:
     )
 
 
-def frame_timestamp(frame_index: int, fps: float) -> float:
+def frame_timestamp(frame_index: float, fps: float) -> float:
     """Convert a frame index into elapsed seconds.
 
     A positive supplied frame rate is preferred; otherwise the configured
