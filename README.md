@@ -71,11 +71,11 @@ Example:
 This section explains the physical design of the robot, including chassis layout, steering, drivetrain, torque/speed reasoning, and mechanical improvements over time.
 
 - **Dimentions**: 24cm length 10cm wide 28cm high
-    - [Dimentions reasoning](../mechanical_reasoning.md#size-reasoning)
+    - [Dimentions reasoning](docs/01_mechanical/mechanical_reasoning.md#size-reasoning)
 - **Drive Motor**: Furitek Micro Komodo 1212 Stepper Motor
-    - [Motor reasoning](../mechanical_reasoning.md#motor-selectionmotor-selection)
+    - [Motor reasoning](docs/01_mechanical/mechanical_reasoning.md#motor-selectionmotor-selection)
 - **Steering Motor**: HS-5055MG 11.9g Metal Gear Digital Micro Servo
-    - [Steering reasoning](../mechanical_reasoning.md#servo-motor)
+    - [Steering reasoning](docs/01_mechanical/mechanical_reasoning.md#servo-motor)
 
 ### Images of Robot
 | | |
@@ -89,7 +89,7 @@ This section explains the physical design of the robot, including chassis layout
 ---
 
 - **Drive System**: We use rear wheel drive, means the motor's power is transmitted to the back wheels rather than the front.
-    - [Why RWD?](../mechanical_reasoning.md#drive-system)
+    - [Why RWD?](docs/01_mechanical/mechanical_reasoning.md#drive-system)
 
 ### Structural Design
 To get our current design, we took inspiration from our previous robot we used last year in Future Engineers.
@@ -128,37 +128,135 @@ This section explains how the robot is powered, what sensors are used, where the
 - [`docs/02_power_sensors/calibration.md`](docs/02_power_sensors/calibration.md)
 - [`docs/02_power_sensors/wiring.md`](docs/02_power_sensors/wiring.md)
 
+---
+
+### Power
+
+- **Battery**: Gens Ace 1300mAh 2S LiPo, 7.4V nominal, 45C discharge
+    - [Battery details](docs/02_power_sensors/power_architecture.md#battery)
+- **Voltage Regulation**: Step-down buck regulator converts 7.4V to 5V for the Raspberry Pi; ESC built-in BEC powers the servo independently
+    - [Regulator details](docs/02_power_sensors/power_architecture.md#design-rationale)
+- **Main Power Switch**: Smaller switch installed on the main battery rail after the original 20A switch was replaced for easier integration
+    - [Power design](docs/02_power_sensors/power_architecture.md#iterations)
+- **Estimated Runtime**: ~17 minutes at average load; enough for ~5 full competition runs per charge
+    - [Runtime details](docs/02_power_sensors/power_architecture.md#runtime-considerations)
+
+---
+
+### Sensors
+
+- **Camera (OV5647)**: Detects walls, corner lines, and colored pillars via CSI-2 at 640x480 up to 62.50 fps
+    - [Camera selection](docs/02_power_sensors/sensor_selection.md#camera--ov5647)
+- **LiDAR (LD19)**: 360-degree distance measurements for wall and obstacle detection over USB serial. Not yet integrated into the challenge runners.
+    - [LiDAR selection](docs/02_power_sensors/sensor_selection.md#lidar--ld19)
+
+---
+
+### Compute
+
+- **Raspberry Pi 5 (8GB)**: Main compute unit running the vision pipeline, control loop, and Arduino communication
+    - [Raspberry Pi details](docs/02_power_sensors/sensor_selection.md#raspberry-pi-5-8gb)
+- **Arduino Uno R3**: Handles PWM output to ESC and servo; receives drive commands from the Pi over USB serial
+    - [Arduino details](docs/02_power_sensors/sensor_selection.md#arduino-uno-r3)
+
+---
+
 ### Summary
-Write a short summary here:
-- battery:
-- voltage regulation:
-- main sensors:
-- sensor placement strategy:
-- calibration approach:
+- battery: Gens Ace 1300mAh 2S LiPo (7.4V, 45C)
+- voltage regulation: Buck regulator for Pi (5V); ESC BEC for servo
+- main sensors: OV5647 camera (CSI-2), LD19 LiDAR (USB serial)
+- sensor placement strategy: Camera mounted at front with downward tilt for field of view; LiDAR mounted on top for 360-degree wall detection
+- calibration approach: HSV color thresholds tuned under competition lighting using interactive tuning tools in `utils/`
 
 ---
 
 # 3. Software Architecture and Strategy
-This section explains how the code is structured and how the robot performs lane following, obstacle handling, and control.
 
-### Files
-- [`docs/03_software/software_architecture.md`](docs/03_software/software_architecture.md)
-- [`docs/03_software/state_machine.md`](docs/03_software/state_machine.md)
-- [`docs/03_software/lane_following.md`](docs/03_software/lane_following.md)
-- [`docs/03_software/obstacle_strategy.md`](docs/03_software/obstacle_strategy.md)
-- [`docs/03_software/algorithms.md`](docs/03_software/algorithms.md)
-- [`docs/03_software/edge_cases.md`](docs/03_software/edge_cases.md)
-- [`docs/03_software/tuning_validation.md`](docs/03_software/tuning_validation.md)
+# Software
 
-### Summary
-Write a short summary here:
-- main programming language:
-- code structure:
-- lane following method:
-- obstacle handling method:
-- important algorithms:
-- tuning process:
+This section explains the software that runs on the Raspberry Pi, including how the processes are structured, how the robot detects walls and obstacles, and how drive commands are sent to the Arduino.
 
+---
+
+## Architecture
+
+Three processes run at the same time, camera, vision, and main control. The camera writes frames into shared memory, the vision process reads them and finds walls and obstacles, and the main process runs the state machine and sends commands to the Arduino. The system always uses the freshest data; stale frames and commands are dropped automatically.
+
+- **Camera Process**: Captures frames and writes them into shared memory
+    - [Architecture details](docs/software/architecture.md)
+- **Vision Process**: Reads frames and finds walls and obstacles
+    - [Vision details](docs/software/vision.md)
+- **Main Process**: Runs the state machine and sends drive commands to the Arduino
+    - [Runner details](docs/software/challenge_running.md)
+
+<p align="center">
+  <img src="docs/img/architecture.webp" width="750">
+</p>
+<p align="center"><i>Full software architecture diagram.</i></p>
+
+---
+
+## Config
+
+All settings are stored in `piclient.toml`. Nothing is hardcoded — speed, PD gains, HSV thresholds, serial ports, and ROI sizes are all in the config file. Once the robot starts, the config is locked and cannot be changed mid-run.
+
+- **Settings file**: `piclient.toml` at the root of the repo
+    - [Config details](docs/software/config.md)
+- **Override priority**: CLI flag > environment variable > piclient.toml > code defaults
+
+---
+
+## Vision
+
+- **Open Challenge**: Counts black pixels in left, right, and center regions. More black pixels means the wall is closer. Corner detection triggers when the center region fills up.
+    - [Open challenge vision details](docs/software/vision.md#open-challenge)
+- **Obstacle Challenge**: Finds red and green pillars using HSV color detection and calculates the gap between each pillar and the nearby wall. The midpoint of that gap becomes the steering target.
+    - [Obstacle challenge vision details](docs/software/vision.md#obstacle-challenge)
+
+---
+
+## Hardware Interfaces
+
+- **Camera**: Runs in its own process, writes frames directly into shared memory with no copying
+    - [Camera details](docs/software/hardware_interfaces.md#camera)
+- **Arduino Client**: Sends serial commands with transaction IDs so multiple commands can be in flight at once
+    - [Arduino client details](docs/software/hardware_interfaces.md#arduino-client)
+- **DriveCommandExecutor**: Sits between the control loop and the Arduino — only the latest command is sent, stale commands are thrown away
+    - [DriveCommandExecutor details](docs/software/hardware_interfaces.md#drivecommandexecutor)
+- **LiDAR**: Wired up and parses data but not yet connected to either challenge runner
+    - [LiDAR details](docs/software/hardware_interfaces.md#lidar)
+
+---
+
+## Challenge Running
+
+### Open Challenge
+
+| State | Trigger | Action |
+|-------|---------|--------|
+| Straight | Default | Wall follow with PD controller |
+| Turn | Black fill detected ahead | Hard steer toward missing wall |
+| Final Turn | Last turn of last lap | Same as Turn |
+| Final Straight | After final turn | Drive to stop |
+
+- [Open challenge runner details](docs/software/runners.md#open-challenge)
+
+### Obstacle Challenge
+
+Same as the open challenge with one extra state. When a pillar is detected, the robot steers toward the gap between the pillar and the wall. Green pillars are passed on the left, red on the right.
+
+- [Obstacle challenge runner details](docs/software/runners.md#obstacle-challenge)
+
+---
+
+## Running the Robot
+
+```bash
+wro --GeneralConfig.CHALLENGE open
+wro --GeneralConfig.CHALLENGE obstacle
+```
+
+Full auto-generated API docs: https://apostla-api-reference.web.app/
 ---
 
 # 4. Systems Engineering and Design Decisions
