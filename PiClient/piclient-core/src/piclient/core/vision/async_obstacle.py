@@ -41,7 +41,7 @@ class ObstacleChallengeAsyncMultiprocessingVisionProcessor(ObstacleChallengeVisi
         """
         return await self.loop.run_in_executor(self._executor, super(ObstacleChallengeAsyncMultiprocessingVisionProcessor, self).get_walls_and_obstacles, frame)
 
-    async def get_target_async(self, walls_and_obstacles: WallsAndObstacles) -> tuple[int, int] | None:
+    async def get_target_async(self, walls_and_obstacles: WallsAndObstacles) -> tuple[float, float] | None:
         """Async wrapper around the synchronous target computation method.
 
         :param walls_and_obstacles: Walls and obstacles data.

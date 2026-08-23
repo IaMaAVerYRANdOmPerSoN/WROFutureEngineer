@@ -11,7 +11,7 @@ import cv2
 import numpy as np
 
 from piclient.core.lib import GLOBAL_CONFIG
-from piclient.core.vision import ObstacleChallengeWalls, VisionObject, WallsAndObstacles
+from piclient.core.vision import ObstacleChallengeWalls, VisionObject, WallsAndObstacles, ParkingLot
 
 from piclient.obstacle_challenge.transition_determinants import ChallengeState
 from piclient.obstacle_challenge.video_tools.records import DriveCommand, LogRecord
@@ -56,7 +56,7 @@ def make_walls_and_obstacles(*, center_pixels: float, obstacle_count: int = 0) -
             obstacle_list.append(make_vision_object(start_x + index * 10, start_y, 30, "red"))
         obstacles = tuple(obstacle_list)
 
-    return WallsAndObstacles(walls=walls, obstacles=obstacles)
+    return WallsAndObstacles(walls=walls, obstacles=obstacles, parking_lot=ParkingLot(closer=None, further=None, max_x=width, max_y=height))
 
 
 def make_drive_command(speed: float = 0.0, angle: float = 90.0, duration: float = 0.0) -> DriveCommand:

@@ -15,15 +15,18 @@ jobs:
         python-version: '3.x'
 
     - name: Install dependencies and activate venv
-      run: |
+      run: | # I really should add a requirements.txt for docs but this is fine for now
         cd PiClient
         python -m venv .venv
-        echo "$PWD/.venv/bin" >> $GITHUB_PATH
-        pip install -r requirements-dev.txt
+        source .venv/bin/activate
+        pip install ./piclient-cli ./piclient-core ./piclient-obstacle_challenge ./piclient-open_challenge
+        pip install sphinx furo
 
     - name: Build documentation
       run: |
-        cd PiClient/docs
+        cd PiClient
+        source .venv/bin/activate
+        cd docs
         make html
 
     - name: Install Firebase CLI
@@ -31,6 +34,9 @@ jobs:
 
     - name: Deploy to Firebase
       env:
-        FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+        JSON_CREDENTIALS: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}
       run: |
-        firebase deploy --token "$FIREBASE_TOKEN"
+        echo "$JSON_CREDENTIALS" > firebase-credentials.json
+        export GOOGLE_APPLICATION_CREDENTIALS=$PWD/firebase-credentials.json
+        firebase deploy
+        rm -f firebase-credentials.json

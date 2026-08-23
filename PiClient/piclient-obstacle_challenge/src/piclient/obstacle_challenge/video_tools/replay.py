@@ -19,6 +19,15 @@ PAD_ROWS = 700
 
 
 def load_log_records(log_path: Path) -> list[LogRecord]:
+    """Load valid :class:`LogRecord` objects from a pickle stream.
+
+    Records of other types are skipped with a warning, while end-of-file marks
+    the normal end of the append-only stream.
+
+    :param log_path: Pickle stream containing serialized telemetry records.
+    :returns: Valid records in their original stream order.
+    :rtype: list[LogRecord]
+    """
     records: list[LogRecord] = []
     with log_path.open("rb") as log_fp:
         while True:
@@ -35,6 +44,13 @@ def load_log_records(log_path: Path) -> list[LogRecord]:
 
 
 def _format_obstacles(obstacles: Sequence[VisionObject] | None) -> str:
+    """Format obstacle detections as an indented replay text block.
+
+    :param obstacles: Detected objects to describe, or ``None`` when no
+        obstacle result is available.
+    :returns: Human-readable obstacle details for an overlay.
+    :rtype: str
+    """
     if obstacles is None:
         return "    Obstacles: None\n"
     result = "    Obstacles: [\n"
@@ -52,6 +68,13 @@ def _format_obstacles(obstacles: Sequence[VisionObject] | None) -> str:
 
 
 def format_log_record(record: LogRecord) -> str:
+    """Format one telemetry record for display beneath a replay frame.
+
+    :param record: Telemetry snapshot to render.
+    :returns: Multiline text containing state, vision, correction, and command
+        information.
+    :rtype: str
+    """
     res = (
         f"Frame: {record.frame_index}\n"
         f"Replay Timestamp: {record.timestamp_s:.3f}s\n"
@@ -83,6 +106,16 @@ def format_log_record(record: LogRecord) -> str:
 
 
 def draw_replay_overlay(frame: np.ndarray, record: LogRecord) -> np.ndarray:
+    """Draw detections, target, steering, and telemetry over a camera frame.
+
+    The returned image includes additional black rows below the original frame
+    for the textual record details; the input array is never modified.
+
+    :param frame: Cropped BGR camera frame with the configured output shape.
+    :param record: Telemetry and vision data to visualize.
+    :returns: Copy of *frame* with graphical and textual annotations.
+    :rtype: numpy.ndarray
+    """
     # The caller should pass a frame that is already cropped to the
     # camera output shape.
     overlay = frame.copy()
@@ -106,7 +139,7 @@ def draw_replay_overlay(frame: np.ndarray, record: LogRecord) -> np.ndarray:
         2,
     )
 
-    cv2.circle(overlay, (*record.target,), 5, (0, 0, 255), -1) if record.target is not None else None
+    cv2.circle(overlay, (int(record.target[0]), int(record.target[1])), 5, (0, 0, 255), -1) if record.target is not None else None
 
     height, width = overlay.shape[:2]
     center_x = width // 2
@@ -135,7 +168,20 @@ def draw_replay_overlay(frame: np.ndarray, record: LogRecord) -> np.ndarray:
 
 
 def replay_video(video_path: Path, log_path: Path, output_video: Path | None = None, display: bool = False) -> Path:
-    """Replay a source video with synchronized overlay annotations."""
+    """Replay a source video with synchronized overlay annotations.
+
+    Each source frame is paired with its corresponding log record and written
+    to an output video. The output defaults to a replay filename beside the
+    source video.
+
+    :param video_path: Source video to decode.
+    :param log_path: Pickle telemetry stream produced during processing.
+    :param output_video: Destination video path, or ``None`` for the default.
+    :param display: Whether to show the replay interactively while rendering.
+    :returns: Path to the rendered replay video.
+    :rtype: pathlib.Path
+    :raises RuntimeError: If no records or the source video cannot be opened.
+    """
     records = load_log_records(log_path)
     if not records:
         raise RuntimeError(f"No log records found in {log_path}")

@@ -108,31 +108,50 @@ class VisionProcessor:
         return cv2.cvtColor(frame, cv2.COLOR_BGR2HSV).astype(np.uint8)
 
     def preprocess(self, frame: np.ndarray[tuple[int, ...], np.dtype[np.uint8]]) -> np.ndarray[tuple[int, ...], np.dtype[np.uint8]]:
-        """Public wrapper for preprocessing a frame before vision analysis."""
+        """Convert one camera frame into the representation used by vision stages.
+
+        This public wrapper delegates to :meth:`_preprocess`, preserving a
+        single extension point for subclasses while exposing the standard
+        preprocessing operation to callers.
+
+        :param frame: BGR camera frame as an unsigned 8-bit NumPy array.
+        :returns: HSV frame with the same spatial dimensions as *frame*.
+        :rtype: numpy.ndarray
+        """
         return self._preprocess(frame)
 
     # Applying cv2.perspectiveTransform is much more efficient than warping whole frame
-    def _perspective_transform(self, contours: Sequence[np.ndarray], colors: Sequence[str]) -> tuple[VisionObject, ...]:
+    def _perspective_transform(self, contours_and_colors: Sequence[tuple[str, np.ndarray]]) -> tuple[VisionObject, ...]:
         """Apply perspective transform to contours and wrap them in :class:`VisionObject`.
 
-        :param contours: List of OpenCV contours.
-        :param colors: List of colour labels matching each contour.
+        :param contours_and_colors: Sequence of ``(color, contour)`` pairs.
+            Each contour is an OpenCV array and each color labels it.
         :returns: tuple of :class:`VisionObject` instances.
         """
         if not self.use_transform:
-            return tuple(VisionObject(contour=contour, color=color) for contour, color, in zip(contours, colors))
-        return tuple(VisionObject(contour=cv2.perspectiveTransform(contour, self.perspective_transform), color=color) for contour, color in zip(contours, colors))
+            return tuple(VisionObject(contour=contour, color=color) for color, contour in contours_and_colors)
+        return tuple(VisionObject(contour=cv2.perspectiveTransform(contour, self.perspective_transform), color=color) for color, contour in contours_and_colors)
 
     @staticmethod
     def simplify_contour(contour: np.ndarray[tuple[int, int], np.dtype[np.int32]], epsilon_factor: float = 0.015) -> np.ndarray[tuple[int, int], np.dtype[np.int32]]:
-        """Simplifies a contour using the Ramer-Douglas-Peucker algorithm."""
+        """Reduce a contour to a smaller polygon using Ramer-Douglas-Peucker.
+
+        The approximation tolerance is proportional to the contour perimeter,
+        so the same factor scales with objects of different sizes.
+
+        :param contour: OpenCV contour represented by integer ``(x, y)`` points.
+        :param epsilon_factor: Perimeter multiplier used as approximation
+            tolerance; larger values produce fewer vertices.
+        :returns: Approximated contour reshaped as an ``(N, 2)`` array.
+        :rtype: numpy.ndarray
+        """
         epsilon = epsilon_factor * cv2.arcLength(contour, True)
         vertices: np.ndarray[tuple[int, int], np.dtype[np.int32]] = cv2.approxPolyDP(contour, epsilon, True).astype(
             # Simplify geometry to reduce vertices for performance
             np.int32).reshape(-1, 2)
         return vertices
 
-    def _find_blocks(self, masks: Sequence[np.ndarray], colors: Sequence[str], simplify: bool = True, key: Callable[[np.ndarray], float] = cv2.contourArea, min_area: int = 300, max_results: int = 10) -> tuple[VisionObject, ...]:
+    def _find_blocks(self, masks: Sequence[np.ndarray], colors: Sequence[str], simplify: bool = True, key: Callable[[tuple[str, np.ndarray]], float] = lambda x: cv2.contourArea(x[1]), min_area: int = 300, max_results: int = 10) -> tuple[VisionObject, ...]:
         """Extract contours from binary masks and return sorted :class:`VisionObject` instances.
 
         Filters small contours, sorts by area (largest first), and limits
@@ -146,24 +165,22 @@ class VisionProcessor:
         :param max_results: Maximum number of contours to return (default 10).
         :returns: tuple of :class:`VisionObject` instances, may be empty.
         """
-        contours: list[np.ndarray] = []
-        detected_colors: list[str] = []
+        contours: list[tuple[str, np.ndarray]] = []
 
         for mask, color in zip(masks, colors):
             detected_contours, * \
                 _ = cv2.findContours(
                     mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             if detected_contours:
-                contours.extend(detected_contours)
-                detected_colors.extend([color] * len(detected_contours))
-
+                contours.extend([(color, contour)
+                                for contour in detected_contours])
         if not contours:
             return tuple()
 
         # Filter out small contours that are likely noise, tuned for 512x384 resolution
         contours = [
-            self.simplify_contour(contour) if simplify else contour
-            for contour in contours
+            (color, self.simplify_contour(contour) if simplify else contour)
+            for color, contour in contours
             if cv2.contourArea(contour) > min_area
         ]
         contours.sort(key=key, reverse=True)  # Biggest object first
@@ -171,14 +188,15 @@ class VisionProcessor:
         contours = contours[:max_results if max_results else None]
 
         logger.info(f"Detected {len(contours)} objects.")
-        return self._perspective_transform(contours, detected_colors)
+        return self._perspective_transform(contours)
 
     @staticmethod
     def get_perspective_transform(src: np.ndarray, dst: np.ndarray) -> cv2.typing.MatLike | np.ndarray[tuple[int, ...], np.dtype[np.float32 | np.float64]]:
         """Compute a perspective-transform matrix from source to destination points.
 
-        :param: src: 4x2 matrix of source points.
-        :param: dst: 4x2 matrix of destination points.
+        :param src: Four source points defining the original quadrilateral.
+        :param dst: Four destination points defining the transformed
+            quadrilateral.
 
         :returns: 3x3 perspective transform matrix.
         :rtype: np.ndarray

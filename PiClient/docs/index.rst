@@ -10,7 +10,7 @@ Apostla documentation
    :maxdepth: 2
    :caption: Contents:
 
-   wrofutureengineer
+   cli
    open_challenge
    obstacle_challenge
    interface

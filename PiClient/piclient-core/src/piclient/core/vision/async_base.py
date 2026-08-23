@@ -120,6 +120,7 @@ class AsyncMultiprocessingVisionProcessor(VisionProcessor):
         :param loop: Asyncio event loop (optional).
         """
         async def _run() -> NoReturn:
+            """Run the configured vision analysis loop in this process."""
             if loop:
                 async with cls(executor_size=executor_size, loop=loop) as vision:
                     await vision.comprehensive_analysis(shm, frame_receiver, data_sender)

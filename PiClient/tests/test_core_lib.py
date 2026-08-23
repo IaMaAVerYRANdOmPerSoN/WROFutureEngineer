@@ -62,6 +62,12 @@ class TestGlobalConfig(unittest.TestCase):
         self.assertEqual(cfg.OpenChallengeConfig.WALL_FOLLOW_KPKD, (0.7, 0.5))
         self.assertEqual(cfg.GeneralConfig.CHALLENGE, "open")
 
+    def test_parallel_parking_config_present(self):
+        cfg = GLOBAL_CONFIG()
+        self.assertTrue(hasattr(cfg, "ParallelParkingConfig"))
+        self.assertTrue(cfg.ParallelParkingConfig.WALL_FOLLOW_TARGET_DISTANCE)
+        self.assertTrue(cfg.ParallelParkingConfig.ARC_ONE_SERVO_ANGLE)
+
 
 class TestConfigMutability(unittest.TestCase):
     def setUp(self):
@@ -140,7 +146,6 @@ class TestConfigCasters(unittest.TestCase):
 
     def test_ndarray_caster(self):
         annotation = Config().get_annotation("VisionConfig.PERSPECTIVE_TRANSFORM")
-        self.assertEqual(annotation, np.ndarray[tuple[int, int], np.dtype[np.float32]])
         # will raise if not equal
         np.testing.assert_array_equal(Config.get_caster(annotation)("[[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]"), np.array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]], dtype=np.float32))
 

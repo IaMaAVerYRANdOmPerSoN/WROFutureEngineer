@@ -35,6 +35,16 @@ _CAM_DEFAULTS = GLOBAL_CONFIG().CameraConfig
 
 
 def _slice_length(axis: slice, total: int) -> int:
+    """Return the number of positions selected on one camera axis.
+
+    Missing slice bounds are replaced with the corresponding edge of the
+    complete camera dimension.
+
+    :param axis: Slice selecting part of one camera dimension.
+    :param total: Full size of that dimension.
+    :returns: Number of selected positions.
+    :rtype: int
+    """
     start = 0 if axis.start is None else axis.start
     stop = total if axis.stop is None else axis.stop
     return stop - start
@@ -43,16 +53,21 @@ def _slice_length(axis: slice, total: int) -> int:
 @export
 class AsyncCamera:
     """
-    A native python asynchronus wrapper over the picamera2.Picamera2 class
+    A native Python asynchronous wrapper over :class:`picamera2.Picamera2`.
 
-    :ivar config: Camera format configuration dict (default: ``CameraGLOBAL_CONFIG().FORMAT``).
-    :ivar sensor_config: Sensor mode configuration dict (default: ``CameraGLOBAL_CONFIG().SENSOR_CONFIG``).
-    :ivar controls_config: Camera controls configuration dict (default: ``CameraGLOBAL_CONFIG().CONTROLS_CONFIG``).
-    :ivar _cam: Internal picamera2.Picamera2 instance for frame capture, initilized to none and created by ``__aenter__``
+    :ivar config: Camera format configuration dictionary, defaulting to
+        ``GLOBAL_CONFIG().CameraConfig.FORMAT``.
+    :ivar sensor_config: Sensor mode configuration dictionary, defaulting to
+        ``GLOBAL_CONFIG().CameraConfig.SENSOR_CONFIG``.
+    :ivar controls_config: Camera controls dictionary, defaulting to
+        ``GLOBAL_CONFIG().CameraConfig.CONTROLS_CONFIG``.
+    :ivar _cam: Internal :class:`picamera2.Picamera2` instance, initialized by
+        :meth:`__aenter__` and ``None`` before entry.
     :ivar frame_width: Infered width of frame from configuration values
     :ivar frame_height: Infered height of frame from configuration values
     :ivar loop: Asyncio event loop to run capture coroutines
-    :ivar _executor: Internal ``Concurent.futures.ThreadPoolExecutor`` created by __aenter__ for running synchronus picamera2 functions asynchronusly.
+    :ivar _executor: Internal :class:`concurrent.futures.ThreadPoolExecutor`
+        created by :meth:`__aenter__` for running blocking camera calls.
 
     """
 
@@ -95,12 +110,13 @@ class AsyncCamera:
 
     async def __aenter__(self) -> Self:
         """
-        Initializes hardware resources defined in __init__ asynchronously.
+        Initialize the configured camera hardware asynchronously.
 
-        :param self: The instance of `AsyncCamera`.
-        :raises: `ConnectionError` if an exception occurs or the camera times out.
+        :raises ConnectionError: If initialization fails or the camera times
+            out.
 
-        :returns: `self`: the instance of `AsyncCamera`
+        :returns: This initialized :class:`AsyncCamera` instance.
+        :rtype: AsyncCamera
         """
         self._executor = ThreadPoolExecutor(self.executor_threads)
         self._capture_semaphore = asyncio.Semaphore(
@@ -158,14 +174,15 @@ class AsyncCamera:
     async def reload(self) -> Self:
         """Hot reload after changing attributes.
 
-        Tears down existing hardware resources, reinitialises the camera
+        Tears down existing hardware resources and reinitializes the camera
         with the updated configuration, and cleans up on failure before
         re-raising.
 
         ALWAYS call after changing attributes to reload internal context.
         Not doing so will lead to unpredictable behaviour.
 
-        :returns: ``self``
+        :returns: This reinitialized :class:`AsyncCamera` instance.
+        :rtype: AsyncCamera
         :raises Exception: Re-raises any exception during reload
         """
         await self.__aexit__()
@@ -175,14 +192,17 @@ class AsyncCamera:
             await self.__aexit__()
             raise
 
-    async def get_frame_async(self, shm: shared_memory.SharedMemory | None = None, timeout: float = 0.1) -> None | np.ndarray[tuple[int, ...], np.dtype[np.uint8]]:
+    async def get_frame_async(self, shm: shared_memory.SharedMemory | None = None, timeout: float = 0.1) -> None | np.ndarray[tuple[int, int, int], np.dtype[np.uint8]]:
         """
-        Fetch a frame asynchronously from `self._cam`
+        Fetch one frame asynchronously from the configured camera.
 
-        :param self: The instance of `AsyncCamera`
-        :param timeout: The maximum roundtrip time, in seconds, before raising asyncio.TimeoutError
-        :returns: *np.ndarray* an array representing the captured frame, determined by the format passed to the constructor.
-        :raises: AttributeError when self._cam does is None, usually due to improper context management.
+        :param shm: Optional shared-memory destination. When supplied, the
+            cropped frame is copied there and ``None`` is returned.
+        :param timeout: Maximum capture time in seconds before retrying.
+        :returns: The cropped ``uint8`` frame when *shm* is not supplied;
+            otherwise ``None``.
+        :rtype: numpy.ndarray or None
+        :raises AttributeError: If the camera context has not been entered.
         """
 
         while True:
@@ -224,12 +244,13 @@ class AsyncCamera:
 
     async def buffer_frames_async(self, num_frames: int = 5, timeout: float = 1.0) -> list[np.ndarray[tuple[int, ...], np.dtype[np.uint8]] | None]:
         """
-        Buffers `num_frames` frames asynchronously.
+        Buffer *num_frames* frames asynchronously.
 
-        :param self: The instance of `AysncCamera`.
-        :param num_frames: The number of frames to buffer.
-        :param timeout: Global timeout for buffering frames.
-        :returns: `list[tuple[tuple[tuple[float, float, float]]]]`, where each element in the list represents a frame in YUV colorspace.
+        :param num_frames: Number of frames to capture.
+        :param timeout: Maximum time in seconds allowed for each capture.
+        :returns: List of captured ``uint8`` frames; a frame is ``None`` only
+            when the underlying capture method returns no array.
+        :rtype: list[numpy.ndarray | None]
         """
         return [await asyncio.wait_for(self.get_frame_async(), timeout) for _ in range(num_frames)]
 
@@ -237,9 +258,11 @@ class AsyncCamera:
         """
         Asynchronous indefinite yield camera IOstream.
 
-        :param self: The instance of AsyncCamera.
-        :yields: `tuple[tuple[tuple[float, float, float]]]`, an `vres * hres * 3` array representing the image in YUV colorspace.
-        :returns: `None`
+        :param shm_name: Name of the shared-memory block receiving frames.
+        :param senders: Pipe connections notified after each captured frame.
+        :yields: No values; this coroutine runs until cancelled or until an
+            unrecoverable capture error occurs.
+        :rtype: NoReturn
         """
 
         shm = None
@@ -268,6 +291,7 @@ class AsyncCamera:
         :param senders: Multiprocessing :class:`Connection` objects used to signal new frames.
         """
         async def _run(shm: str, *senders: PipeConnection) -> NoReturn:
+            """Create a camera in the child event loop and stream frames."""
             async with AsyncCamera() as camera:
                 # NoReturn implies _run is NoReturn
                 await camera.stream(shm, *senders)

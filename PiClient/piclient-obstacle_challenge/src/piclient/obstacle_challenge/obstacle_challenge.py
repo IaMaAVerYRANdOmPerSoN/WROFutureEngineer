@@ -32,7 +32,7 @@ def get_wall_error(walls_and_obstacles: WallsAndObstacles) -> float:
     return right_distance - left_distance
 
 
-def calculate_EMA(latest: float, accumulated: float | None, alpha: float =0.5) -> float:
+def calculate_EMA(latest: float, accumulated: float | None, alpha: float = 0.35) -> float:
     """Calculate the Exponential Moving Average of a series of values."""
     if accumulated is None:
         return latest
@@ -55,6 +55,23 @@ class ObstacleChallengeStateMachine(StateMachine[
     ],
     ChallengeState
 ]):
+    """Coordinate obstacle-challenge transitions, control, and telemetry.
+
+    The state machine consumes vision results, calculates wall-following and
+    obstacle-avoidance corrections, evaluates transitions, and submits the
+    command associated with the active state.
+
+    :cvar _DEFAULT_INITIAL_STATE: State used when no initial state is supplied.
+    :cvar _DEFAULT_WALL_FOLLOW_KPKD: Proportional and derivative gains for
+        wall following.
+    :cvar _DEFAULT_CORNER_TURN_KPKD: Gains used during corner turns.
+    :cvar _DEFAULT_OBSTACLE_AVOID_KPKD: Gains used during obstacle avoidance.
+    :ivar previous_state: State active during the previous update.
+    :ivar walls_and_obstacles: Latest vision result.
+    :ivar target_position: Latest obstacle target, or ``None``.
+    :ivar turn_counter: Number of completed turns.
+    :ivar fps: Recent processed-frame rate.
+    """
     _DEFAULT_INITIAL_STATE: ChallengeState = "straight"
     _DEFAULT_WALL_FOLLOW_KPKD: tuple[float, float] = GLOBAL_CONFIG(
     ).ObstacleChallengeConfig.WALL_FOLLOW_KPKD
@@ -84,6 +101,23 @@ class ObstacleChallengeStateMachine(StateMachine[
         obstacle_avoid_speed: float | None = None,
         drive_command_duration: float | None = None
     ) -> None:
+        """Initialize controllers, state, and command defaults.
+
+        :param initial_state: Initial challenge state, or ``None`` to use the
+            configured default.
+        :param transition_manager: Predicates and priorities used to select
+            the next state.
+        :param drive_command_executor: Asynchronous command sink.
+        :param wall_follow_kpkd: Optional proportional and derivative gains.
+        :param corner_turn_kpkd: Optional corner-turn gains.
+        :param obstacle_avoid_kpkd: Optional obstacle-avoidance gains.
+        :param wall_follow_speed: Optional straight-driving speed.
+        :param corner_turn_speed: Optional turning speed.
+        :param obstacle_avoid_speed: Optional obstacle-avoidance speed.
+        :param drive_command_duration: Optional command duration in seconds.
+        :returns: ``None``.
+        :rtype: None
+        """
 
         self.wall_follow = (
             PD(*wall_follow_kpkd)
@@ -132,13 +166,13 @@ class ObstacleChallengeStateMachine(StateMachine[
         self.corner_turn_correction: float = 90.0
         self.obstacle_avoidance_correction: float = 90.0
 
-        self.previous_turn_correction: float = 90.0
-        self.previous_corner_turn_correction: float = 90.0
-        self.previous_obstacle_avoidance_correction: float = 90.0
+        self.previous_correction: float = 90.0
 
         self.turn_counter = 0
         self.start_time = None  # Start time for the final straight
         self.last_turn_time = 0  # Time of the last detected turn
+        self._setup_start_time: float | None = None
+        self._setup_complete = False
 
         self.fps_start_time = perf_counter()
         self.frame_count = 0  # Frame counter (resets every second)
@@ -159,10 +193,17 @@ class ObstacleChallengeStateMachine(StateMachine[
         walls_and_obstacles: WallsAndObstacles,
         target_position: tuple[int, int] | None,
     ) -> None:
+        """Store vision data, update control corrections, and evaluate a turn.
+
+        :param walls_and_obstacles: Current wall and obstacle measurements.
+        :param target_position: Current obstacle target, or ``None``.
+        :returns: ``None``.
+        :rtype: None
+        """
         # calls _populate_transition_params and checks for transitions
         super().update(walls_and_obstacles, target_position)
 
-        if self.current_state == "final_straight" and self.start_time is None:
+        if self.current_state == "final_straight_and_parking" and self.start_time is None:
             self.start_time = perf_counter()
 
     def _populate_transition_params(
@@ -188,20 +229,17 @@ class ObstacleChallengeStateMachine(StateMachine[
             self.fps_start_time = now
 
         self.wall_error = get_wall_error(walls_and_obstacles)
-        self.turn_correction = calculate_EMA(self.wall_follow.tick(self.wall_error) * 90 + 90, self.previous_turn_correction)
-        self.corner_turn_correction = calculate_EMA(self.corner_turn.tick(self.wall_error) * 90 + 90, self.previous_corner_turn_correction)
-        self.previous_turn_correction = self.turn_correction
-        self.previous_corner_turn_correction = self.corner_turn_correction
+        self.turn_correction = calculate_EMA(-self.wall_follow.tick(
+            self.wall_error) * 90 + 90, self.previous_correction)
+        self.corner_turn_correction = calculate_EMA(-self.corner_turn.tick(
+            self.wall_error) * 90 + 90, self.previous_correction)
 
         if self.target_position is not None:
             frame_center = GLOBAL_CONFIG().CameraConfig.OUTPUT_WIDTH / 2
             obstacle_error = (
                 self.target_position[0] - frame_center) / frame_center
-            self.obstacle_avoidance_correction = calculate_EMA(self.obstacle_avoid.tick(obstacle_error) * 90 + 90, self.previous_obstacle_avoidance_correction)
-            self.previous_obstacle_avoidance_correction = self.obstacle_avoidance_correction
-        else:
-            self.obstacle_avoidance_correction = 90.0
-            self.previous_obstacle_avoidance_correction = 90.0
+            self.obstacle_avoidance_correction = calculate_EMA(
+                -self.obstacle_avoid.tick(obstacle_error) * 90 + 90, self.previous_correction)
 
         if (
             self.previous_state == "turn"
@@ -210,7 +248,7 @@ class ObstacleChallengeStateMachine(StateMachine[
         ):
             self.last_turn_time = perf_counter()
             self.turn_counter += 1
-        
+
         self.previous_state = self.current_state
 
         kwargs: dict[str, None] = {}
@@ -225,6 +263,13 @@ class ObstacleChallengeStateMachine(StateMachine[
         ), kwargs
 
     def _quick_drive_submit(self, speed: float, correction: float) -> None:
+        """Submit a command using the configured challenge duration.
+
+        :param speed: Signed speed for the active state.
+        :param correction: Steering correction in servo-angle coordinates.
+        :returns: ``None``.
+        :rtype: None
+        """
         self.drive_command_executor.submit(
             speed,
             correction,
@@ -232,33 +277,48 @@ class ObstacleChallengeStateMachine(StateMachine[
         )
 
     def handle_state_actions(self) -> bool:
+        """Execute the command for the active state and detect completion.
+
+        Straight, turning, and obstacle-avoidance states submit their current
+        correction. The final state returns ``True`` after its settling delay;
+        all other states return ``False``.
+
+        :returns: ``True`` when the obstacle challenge is complete.
+        :rtype: bool
+        """
+        super().handle_state_actions()
+
         match self.current_state:
             case "obstacle_avoidance":
-                if self.target_position is not None:  # 1st priority is to avoid obstacles
-                    self._quick_drive_submit(
-                        self.obstacle_avoid_speed,
-                        self.obstacle_avoidance_correction,
-                    )
+                self._quick_drive_submit(
+                    self.obstacle_avoid_speed,
+                    self.obstacle_avoidance_correction * 0.85 + self.turn_correction * 0.15,
+                )
+                self.previous_correction = self.obstacle_avoidance_correction * \
+                    0.85 + self.turn_correction * 0.15
 
             case "straight":
                 self._quick_drive_submit(
                     self.wall_follow_speed,
                     self.turn_correction,
                 )
+                self.previous_correction = self.turn_correction
 
             case "turn":
                 self._quick_drive_submit(
                     self.corner_turn_speed,
                     self.corner_turn_correction,
                 )
+                self.previous_correction = self.corner_turn_correction
 
             case "final_turn":
                 self._quick_drive_submit(
                     self.corner_turn_speed,
                     self.corner_turn_correction,
                 )
+                self.previous_correction = self.corner_turn_correction
 
-            case "final_straight":
+            case "final_straight_and_parking":
                 self.start_time = perf_counter() if not self.start_time else self.start_time
                 now = perf_counter()
 
@@ -270,9 +330,31 @@ class ObstacleChallengeStateMachine(StateMachine[
                     self.wall_follow_speed,
                     self.turn_correction,
                 )
+                self.previous_correction = self.turn_correction
 
             case _:
-                logger.error(f"Unrecognized state: {state}")
-                state = "straight"  # Reset to a safe state
+                logger.error(f"Unrecognized state: {self.current_state}")
 
         return False  # Return False to indicate that the challenge is not finished yet
+
+    def setup(self) -> bool:
+        """
+        Exit the parking lot before starting the main loop. This method is called repeatedly until it returns True, indicating that the setup is complete.
+        :return: True if the setup is complete and the state machine is ready to proceed, False otherwise.
+        """
+        now = perf_counter()
+        if self._setup_start_time is None:
+            self._setup_start_time = now
+            logger.info("Exiting parking lot...")
+
+        elapsed = now - self._setup_start_time
+
+        if elapsed < 0.8:
+            self._quick_drive_submit(
+                -0.35,
+                150,
+            )
+            return False
+
+        logger.success("Exiting parking lot complete. Starting main loop...")
+        return True

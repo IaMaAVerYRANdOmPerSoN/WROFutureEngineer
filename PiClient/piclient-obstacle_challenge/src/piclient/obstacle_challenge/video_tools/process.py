@@ -26,7 +26,7 @@ from ..obstacle_challenge import ObstacleChallengeStateMachine
 from ..transition_determinants import (
     TypedTranisitionManager,
     should_avoid_obstacle,
-    should_final_straight,
+    should_final_straight_and_parking,
     should_final_turn,
     should_straight,
     should_turn,
@@ -36,6 +36,12 @@ from .replay import replay_video
 
 
 class OfflineObstacleChallengeVisionProcessor(ObstacleChallengeAsyncMultiprocessingVisionProcessor):
+    """Process replayed frames with the obstacle-challenge vision pipeline.
+
+    This subclass reuses the production processor while replacing its pipe
+    reader with the FIFO reader used by offline frame playback.
+    """
+
     async_pipe_reader = staticmethod(AsyncMultiprocessingVisionProcessor.async_pipe_reader_fifo)
 
 
@@ -43,9 +49,30 @@ class VideoFileCameraSource:
     """Camera-process target that replays a video file into shared memory."""
 
     def __init__(self, video_path: Path) -> None:
+        """Create a frame source backed by *video_path*.
+
+        :param video_path: Input video to decode and publish into shared
+            memory.
+        :returns: ``None``.
+        :rtype: None
+        """
         self.video_path = video_path
 
     def __call__(self, shm_name: str, *senders: Connection) -> None:
+        """Decode frames and notify each vision-process pipe reader.
+
+        Frames are resized to the configured camera dimensions, copied into
+        the named shared-memory block, and followed by a notification on each
+        supplied connection. The video capture and shared-memory handle are
+        released when playback ends or an exception occurs.
+
+        :param shm_name: Name of the shared-memory block receiving frames.
+        :param senders: Pipe connections on which frame-ready notifications are
+            sent.
+        :raises RuntimeError: If the input video cannot be opened.
+        :returns: ``None`` after the final frame has been published.
+        :rtype: None
+        """
         capture = cv2.VideoCapture(str(self.video_path))
         if not capture.isOpened():
             raise RuntimeError(f"Could not open input video: {self.video_path}")
@@ -78,24 +105,64 @@ class RecordingDriveCommandExecutor:
     """In-memory stand-in used by offline source-video processing."""
 
     def __init__(self) -> None:
+        """Initialize an executor with a neutral command and clean status.
+
+        :returns: ``None``.
+        :rtype: None
+        """
         self.latest_command = DriveCommand(0.0, 90.0, 0.0)
         self.command_submitted = False
 
     async def __aenter__(self) -> "RecordingDriveCommandExecutor":
+        """Enter the async executor context without opening hardware.
+
+        :returns: This recording executor.
+        :rtype: RecordingDriveCommandExecutor
+        """
         return self
 
     async def __aexit__(self, *args: object) -> None:
+        """Leave the async context without releasing external resources.
+
+        :param args: Async context-manager exception information, accepted for
+            protocol compatibility.
+        :returns: ``None``.
+        :rtype: None
+        """
         return None
 
     async def reload(self) -> "RecordingDriveCommandExecutor":
+        """Return this executor without changing the recorded command.
+
+        :returns: This recording executor.
+        :rtype: RecordingDriveCommandExecutor
+        """
         return self
 
     def submit(self, speed: float, angle: float, duration: float) -> None:
+        """Record a motor command instead of sending it to hardware.
+
+        :param speed: Signed motor speed requested by the state machine.
+        :param angle: Steering angle in degrees.
+        :param duration: Requested command duration in seconds.
+        :returns: ``None``.
+        :rtype: None
+        """
         self.latest_command = DriveCommand(speed, angle, duration)
         self.command_submitted = True
 
 
 def default_output_paths(input_video: Path) -> tuple[Path, Path]:
+    """Return default telemetry and replay paths beside an input video.
+
+    The input suffix is replaced with ``_obstacle_challenge.pkl`` for the
+    telemetry stream and ``_obstacle_challenge_replay.mp4`` for the rendered
+    replay.
+
+    :param input_video: Source video path used to derive the output stem.
+    :returns: A ``(log_path, replay_path)`` tuple.
+    :rtype: tuple[pathlib.Path, pathlib.Path]
+    """
     stem = input_video.with_suffix("")
     return (
         stem.with_name(f"{stem.name}_obstacle_challenge.pkl"),
@@ -104,10 +171,30 @@ def default_output_paths(input_video: Path) -> tuple[Path, Path]:
 
 
 def frame_timestamp(frame_index: int, fps: float) -> float:
+    """Convert a frame index into elapsed seconds.
+
+    A positive supplied frame rate is preferred; otherwise the configured
+    camera frame rate is used as a fallback.
+
+    :param frame_index: Zero-based frame number.
+    :param fps: Source-video frames per second, or a non-positive value when
+        unavailable.
+    :returns: Elapsed time for the frame in seconds.
+    :rtype: float
+    """
     return frame_index / fps if fps > 0 else frame_index / GLOBAL_CONFIG().CameraConfig.FPS
 
 
 def build_transition_manager() -> TypedTranisitionManager:
+    """Construct the transition manager used for offline replay.
+
+    The manager uses the same production transition predicates and priorities
+    as the live obstacle challenge, with hysteresis taken from the global
+    challenge configuration.
+
+    :returns: Configured transition manager for obstacle-challenge states.
+    :rtype: TypedTranisitionManager
+    """
     return TransitionManager(
         hysteresis_values=[GLOBAL_CONFIG().SharedChallengeConfig.HYSTERESIS] * 5,
         priorities=[2, 1, 3, 4, 0],
@@ -115,12 +202,30 @@ def build_transition_manager() -> TypedTranisitionManager:
         straight=should_straight,
         turn=should_turn,
         final_turn=should_final_turn,
-        final_straight=should_final_straight,
+        final_straight_and_parking=should_final_straight_and_parking,
     )
 
 
 class OfflineObstacleChallengeStateMachine(ObstacleChallengeStateMachine):
+    """Run the obstacle state machine against decoded video frames.
+
+    Production state and transition logic is retained, while commands are
+    captured in memory and each processed frame is serialized for replay.
+
+    :ivar frame_index: Number of the most recently processed source frame.
+    :ivar output_stream: Async stream of vision results from the child process.
+    :ivar shm: Shared-memory block used by the replay camera.
+    """
+
     def __init__(self, input_video: Path, telemetry_log: Path) -> None:
+        """Create a state machine that records decisions from source video.
+
+        :param input_video: Video file supplied to the offline camera source.
+        :param telemetry_log: Pickle file receiving one :class:`LogRecord` per
+            processed frame.
+        :returns: ``None``.
+        :rtype: None
+        """
         self._frame_timestamp_s = 0.0
         self.frame_index = 0
         self._telemetry_log = telemetry_log
@@ -140,9 +245,21 @@ class OfflineObstacleChallengeStateMachine(ObstacleChallengeStateMachine):
 
     @property
     def recording_executor(self) -> RecordingDriveCommandExecutor:
+        """Return the in-memory executor receiving generated commands.
+
+        :returns: Offline command recorder associated with this state machine.
+        :rtype: RecordingDriveCommandExecutor
+        """
         return self._recording_executor
 
     async def __aenter__(self) -> Self:
+        """Start offline processing resources and open telemetry logging.
+
+        :returns: This initialized state machine.
+        :rtype: Self
+        :raises Exception: Re-raises initialization failures after cleaning up
+            the process manager and parent state machine.
+        """
         await super().__aenter__()
         try:
             self._process_manager.__enter__()
@@ -159,11 +276,27 @@ class OfflineObstacleChallengeStateMachine(ObstacleChallengeStateMachine):
             raise
 
     async def __aexit__(self, exc_type: type[BaseException], exc_value: BaseException, traceback: object) -> None:
+        """Close telemetry, process, and inherited state-machine resources.
+
+        :param exc_type: Exception class raised in the context, or ``None``.
+        :param exc_value: Exception instance raised in the context, or
+            ``None``.
+        :param traceback: Traceback for the context exception, or ``None``.
+        :returns: ``None``.
+        :rtype: None
+        """
         self._telemetry_writer.__exit__(exc_type, exc_value, traceback)
         self._process_manager.__exit__(exc_type, exc_value, traceback)
         await super().__aexit__(exc_type, exc_value, traceback)
 
     def _write_state_telemetry(self, timestamp_s: float, finished: bool) -> None:
+        """Serialize the current state and command as one log record.
+
+        :param timestamp_s: Current source-video timestamp in seconds.
+        :param finished: Whether this state-machine step completed the run.
+        :returns: ``None``.
+        :rtype: None
+        """
         walls_and_obstacles = self.walls_and_obstacles
         record = build_log_record(
             frame_index=self.frame_index,
@@ -191,6 +324,15 @@ class OfflineObstacleChallengeStateMachine(ObstacleChallengeStateMachine):
         target_position: tuple[int, int] | None,
         timestamp_s: float,
     ) -> bool:
+        """Advance the state machine for one vision result and log it.
+
+        :param walls_and_obstacles: Wall and obstacle detections for the frame.
+        :param target_position: Target point selected by vision, or ``None``.
+        :param timestamp_s: Source-video timestamp in seconds.
+        :returns: ``True`` when the challenge has completed; otherwise
+            ``False``.
+        :rtype: bool
+        """
         self._frame_timestamp_s = timestamp_s
         self.frame_index += 1
         with _video_clock(timestamp_s):
@@ -203,6 +345,15 @@ class OfflineObstacleChallengeStateMachine(ObstacleChallengeStateMachine):
 
 @contextmanager
 def _video_clock(timestamp_s: float):
+    """Temporarily replace controller clocks with a deterministic video clock.
+
+    The live transition code reads :func:`time.perf_counter`; this context
+    manager substitutes a constant source-video timestamp in both modules and
+    restores the original functions on exit.
+
+    :param timestamp_s: Timestamp returned by the temporary clock.
+    :yields: Control to the block using the deterministic clock.
+    """
     import piclient.obstacle_challenge.transition_determinants as transition_determinants
     import piclient.obstacle_challenge.obstacle_challenge as obstacle_challenge_module
 
@@ -219,11 +370,26 @@ def _video_clock(timestamp_s: float):
 
 
 def process_video(input_video: Path, output_log: Path, output_replay: Path, display: bool = False) -> Path:
-    """Run the obstacle challenge pipeline on a video file and render a replay."""
+    """Run obstacle-challenge processing on a video and render its replay.
+
+    The source is decoded through the production vision and state-machine
+    pipeline, telemetry is written to a pickle stream, and the resulting
+    records are rendered into an annotated replay video.
+
+    :param input_video: Source video to process.
+    :param output_log: Destination pickle file for frame telemetry.
+    :param output_replay: Destination MP4 path for the annotated replay.
+    :param display: Whether to display replay frames while rendering them.
+    :returns: Path to the rendered replay video.
+    :rtype: pathlib.Path
+    :raises RuntimeError: If the source video or required processing resources
+        cannot be opened.
+    """
     output_log.parent.mkdir(parents=True, exist_ok=True)
     output_replay.parent.mkdir(parents=True, exist_ok=True)
 
     async def _run() -> None:
+        """Process vision results until the source run reaches completion."""
         source_capture = cv2.VideoCapture(str(input_video))
         if not source_capture.isOpened():
             raise RuntimeError(f"Could not open input video: {input_video}")
@@ -262,6 +428,15 @@ def process_video(input_video: Path, output_log: Path, output_replay: Path, disp
 
 
 def main() -> None:
+    """Parse command-line arguments and process one source video.
+
+    Optional output paths default to files derived from the input video. The
+    ``--display`` flag enables interactive replay display.
+
+    :returns: ``None``.
+    :rtype: None
+    :raises SystemExit: If command-line parsing fails.
+    """
     import argparse
 
     parser = argparse.ArgumentParser(description="Obstacle-challenge source video processor.")

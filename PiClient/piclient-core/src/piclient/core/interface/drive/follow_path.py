@@ -65,6 +65,20 @@ class RelativePathFollower(DriveCommandExecutor):
         return super().submit(speed, angle, duration)
 
     def submit(self, speed: float, angle: float, duration: float) -> NoReturn:
+        """Reject direct motor commands while path following is active.
+
+        Path following must update its cached path and let its worker derive
+        motor commands. Direct submission would bypass that state and make
+        odometry inconsistent.
+
+        :param speed: Motor speed that would have been submitted.
+        :param angle: Steering angle that would have been submitted.
+        :param duration: Command duration that would have been submitted.
+        :raises NotImplementedError: Always, because callers must use
+            :meth:`submit_path` for this executor.
+        :returns: Never returns.
+        :rtype: NoReturn
+        """
         raise NotImplementedError(
             "Submitting individual drive commands during path following will lead to unpredictable behaviour. Use submit_path(), or a plain DriveCommandExecutor instead.")
 

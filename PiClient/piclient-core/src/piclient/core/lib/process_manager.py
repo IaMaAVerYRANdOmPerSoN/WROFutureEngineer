@@ -20,6 +20,15 @@ _S = TypeVar('_S', bound=str)  # TypeVar for shared memory name
 
 @export
 class ProcessContextManager:
+    """Manage camera, vision, and recorder subprocesses around shared memory.
+
+    Entering creates the configured shared-memory segment and starts the three
+    callback processes connected by multiprocessing pipes. Exiting terminates
+    those processes and releases the shared resources.
+
+    :cvar _DEFAULT_SHM_SIZE: Default shared-memory allocation in bytes.
+    :cvar _DEFAULT_SHM_NAME: Default shared-memory segment name.
+    """
     _DEFAULT_SHM_SIZE: int = GLOBAL_CONFIG().CameraConfig.SHM_SIZE
     _DEFAULT_SHM_NAME: str = GLOBAL_CONFIG().SharedChallengeConfig.SHM_NAME
     _STUB_RECORDER_CALLBACK = None
@@ -32,7 +41,9 @@ class ProcessContextManager:
         recorder_callback: Callable[[_S, "Connection[Any, Any]"], NoReturn | None] | None = None,
         shm_size: int | None = None,
         shm_name: _S = ...
-    ) -> None: ...
+    ) -> None:
+        """Declare the typed shared-memory-name overload for initialization."""
+        ...
 
     @overload
     def __init__(
@@ -42,7 +53,9 @@ class ProcessContextManager:
         recorder_callback: Callable[[str, "Connection[Any, Any]"], NoReturn] | None = None,
         shm_size: int | None = None,
         shm_name: None = None
-    ) -> None: ...
+    ) -> None:
+        """Declare the typed default-name overload for initialization."""
+        ...
 
     def __init__(
         self,
@@ -69,7 +82,30 @@ class ProcessContextManager:
         self.shm = None
         self.camera_process = None
         self.vision_process = None
+        self.recorder_process = None
         self.output_stream = None
+
+    @staticmethod
+    def _stop_process(process: mp.Process, *, timeout: float = 2.0, kill_timeout: float = 5.0) -> None:
+        """Terminate a subprocess, escalating to kill after a grace period.
+
+        :param process: Process to terminate.
+        :param timeout: Seconds to wait for graceful termination.
+        :param kill_timeout: Seconds to wait after forceful termination.
+        :returns: ``None``.
+        :rtype: None
+        """
+        logger.info(f"Terminating process {process.name} (PID: {process.pid})")
+        process.terminate()
+        process.join(timeout=timeout)
+        if process.is_alive():
+            logger.warning(
+                f"Process {process.name} (PID: {process.pid}) did not terminate gracefully, killing it.")
+            process.kill()
+            process.join(timeout=kill_timeout)
+            if process.is_alive():
+                logger.error(
+                    f"Process {process.name} (PID: {process.pid}) could not be killed. Manual cleanup may be required.")
 
     def __enter__(self):
         """Enter the process context manager."""
@@ -132,19 +168,17 @@ class ProcessContextManager:
 
         logger.info("Terminating processes and cleaning up shared memory...")
         try:
-            for process in mp.active_children():
+            for process in (self.camera_process, self.vision_process):
+                if process is not None:
+                    self._stop_process(process)
+
+            if self.recorder_process is not None:
                 logger.info(
-                    f"Terminating process {process.name} (PID: {process.pid})")
-                process.terminate()
-                process.join(timeout=2)
-                if process.is_alive():
-                    logger.warning(
-                        f"Process {process.name} (PID: {process.pid}) did not terminate gracefully, killing it.")
-                    process.kill()
-                    process.join(timeout=5)
-                    if process.is_alive():
-                        logger.error(
-                            f"Process {process.name} (PID: {process.pid}) could not be killed. Manual cleanup may be required.")
+                    f"Waiting for recorder process {self.recorder_process.name} (PID: {self.recorder_process.pid}) to exit cleanly")
+                # Wait indefinitely for the recorder process to finish since processing usually takes as long as runtime. The user can always terminate the recorder process with Ctrl+C if it hangs for too long.
+                # (hanging for a very long time is normal in this context.)
+                # TODO: Make CLI more interactive to avoid confusion.
+                self.recorder_process.join()
 
             if self.shm:
                 self.shm.close()

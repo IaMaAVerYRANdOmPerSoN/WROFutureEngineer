@@ -21,6 +21,21 @@ from .exporter import export
 
 
 def _slice_length(axis: slice, total: int) -> int:
+    """Return the number of elements selected by a one-dimensional slice.
+
+    This helper is used when converting camera ROI definitions into concrete
+    dimensions. It normalizes missing slice bounds against the full dimension size
+    so that slices such as ``slice(None, None, None)`` or partial windows resolve
+    to real element counts.
+
+    :param axis: A :class:`slice` describing the inclusive start and exclusive
+        stop for the desired interval. The value is normalized against *total*
+        when either bound is ``None``.
+    :param total: The full size of the axis being sliced, used when the slice
+        omits either bound.
+    :returns: The number of elements in the selected region.
+    :rtype: int
+    """
     start = 0 if axis.start is None else axis.start
     stop = total if axis.stop is None else axis.stop
     return stop - start
@@ -28,24 +43,78 @@ def _slice_length(axis: slice, total: int) -> int:
 
 @export
 class Freezeable:
-    """Base class that can be frozen to prevent mutation."""
+    """Base class that can prevent mutation after configuration is complete.
+
+    Instances remain mutable until :meth:`freeze` is called. Freezing also
+    traverses nested containers so that contained :class:`Freezeable`
+    instances become immutable with the parent.
+    """
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
-        self._frozen = False  # Flag to indicate if the dataclass is frozen
+        """Initialize a mutable instance with its freeze guard disabled.
+
+        Positional and keyword arguments are forwarded to the next class in
+        the method-resolution order after ``_frozen`` is initialized. This
+        allows the class to be used with dataclasses and other cooperative
+        base classes.
+
+        :param args: Positional arguments forwarded to the cooperative base
+            initializer.
+        :param kwargs: Keyword arguments forwarded to the cooperative base
+            initializer.
+        :returns: ``None``.
+        :rtype: None
+        """
+        # Flag to indicate if the dataclass is frozen
+        super().__setattr__("_frozen", False)
         super().__init__(*args, **kwargs)
 
     def __setattr__(self, name: str, value: Any) -> None:
-        if getattr(self, "_frozen", False) and name != "_frozen":
+        """Assign an attribute unless this instance has been frozen.
+
+        :param name: Attribute name to assign.
+        :param value: New value for the attribute.
+        :raises AttributeError: If :meth:`freeze` has already been called on
+            this instance.
+        :returns: ``None``.
+        :rtype: None
+        """
+        if getattr(self, "_frozen", False):
             raise AttributeError(
                 f"{type(self).__name__} is frozen and cannot be modified.")
         super().__setattr__(name, value)
 
     def freeze(self) -> None:
-        """Freeze the class to prevent further modifications."""
-        self._frozen = True
-        for _, attr in vars(self).items():
-            if isinstance(attr, Freezeable):
-                attr.freeze()
+        """Freeze this object and every nested :class:`Freezeable` object.
+
+        After this method returns, assignments to attributes on this object or
+        recursively contained ``Freezeable`` instances raise
+        :class:`AttributeError`.
+
+        :returns: ``None``.
+        :rtype: None
+        """
+        super().__setattr__("_frozen", True) # Allow calling freeze() multiple times without error
+        for _, value in vars(self).items():
+            self._freeze_recursively(value)
+
+    def _freeze_recursively(self, obj: Any = None) -> None:
+        """Recursively freeze nested freezeable values in a container.
+
+            :param obj: Value to inspect. Nested :class:`Freezeable` instances and
+            values inside lists, tuples, sets, and dictionaries are visited.
+        :returns: ``None``.
+        :rtype: None
+        """
+        if isinstance(obj, Freezeable):
+            obj.freeze()
+        elif isinstance(obj, (list, tuple, set)):
+            for item in obj:  # pyright: ignore[reportUnknownVariableType]
+                self._freeze_recursively(item)
+        elif isinstance(obj, dict):
+            for key, val in obj.items(): # pyright: ignore[reportUnknownVariableType]
+                self._freeze_recursively(key)
+                self._freeze_recursively(val)
 
 
 @export
@@ -109,11 +178,21 @@ class Config(Freezeable):
             lambda raw, dt=_dt: np.array(ast.literal_eval(raw), dtype=dt)
         )
 
+    casters[np.ndarray] = lambda raw: np.array(ast.literal_eval(raw))
+
     # Fucking hate Literals
     casters[Literal] = lambda x: x  # type: ignore
 
     def __init__(self) -> None:
-        """Initialise the configuration with nested dataclasses."""
+        """Create each dataclass-defined configuration section.
+
+        Public dataclass subclasses declared on the concrete configuration
+        class are instantiated and attached as attributes. The inherited
+        freeze guard is then initialized in its mutable state.
+
+        :returns: ``None``.
+        :rtype: None
+        """
         for name in dir(type(self)):
             if name.startswith("_"):
                 continue
@@ -124,6 +203,15 @@ class Config(Freezeable):
         super().__init__()  # Call Freezeable.__init__ to set _frozen flag
 
     def __repr__(self) -> str:
+        """Return a readable listing of every configured dataclass section.
+
+        Each public nested dataclass is rendered on its own line using its
+        normal representation. This is intended for diagnostics and logs, not
+        for serialization or round-tripping configuration values.
+
+        :returns: Newline-separated section names and values.
+        :rtype: str
+        """
         lines: list[str] = []
         for name in dir(type(self)):
             if name.startswith("_"):
@@ -134,35 +222,70 @@ class Config(Freezeable):
         return "\n".join(lines)
 
     def _get_nested_attr(self, path: str, sep: str = ".") -> Any:
-        """Get ``self<sep>a<sep>b<sep>c`` given ``path == 'a<sep>b<sep>c'``."""
+        """Resolve a nested configuration attribute from a dotted path.
+
+        :param path: Attribute path relative to this configuration object.
+        :param sep: Separator between path components; defaults to ``.``.
+        :returns: The value stored at the nested path.
+        :raises AttributeError: If any path component is absent.
+        """
         root = self
         for part in path.split(sep):
             root = getattr(root, part)
         return root
 
     def set_nested_attr(self, path: str, value: object, sep: str = ".") -> None:
-        """Set ``self<sep>a<sep>b<sep>c = value`` given ``path == 'a<sep>b<sep>c'``."""
+        """Set an existing nested configuration attribute from a path.
+
+        Unknown leaf attributes are ignored so command-line arguments can be
+        filtered against the configuration shape without creating new state.
+
+        :param path: Attribute path relative to this configuration object.
+        :param value: Replacement value for the existing leaf attribute.
+        :param sep: Separator between path components; defaults to ``.``.
+        :returns: ``None``.
+        :rtype: None
+        :raises AttributeError: If a parent path component is absent.
+        """
         *parents, leaf = path.split(sep)
         root: object = self._get_nested_attr(sep.join(parents), sep)
         setattr(root, leaf, value) if hasattr(
             root, leaf) else None  # Only set if attribute exists
 
     def get_annotation(self, path: str, sep: str = ".") -> type:
-        """Get the type annotation of ``self<sep>a<sep>b<sep>c`` given ``path == 'a<sep>b<sep>c'``."""
+        """Return the declared type of a nested configuration attribute.
+
+        :param path: Attribute path relative to this configuration object.
+        :param sep: Separator between path components; defaults to ``.``.
+        :returns: Runtime type annotation for the leaf attribute.
+        :rtype: type
+        :raises AttributeError: If a parent path component is absent.
+        :raises TypeError: If the leaf has no type annotation.
+        """
         *parents, leaf = path.split(sep)
         root: object = self._get_nested_attr(sep.join(parents), sep)
         annotation = get_annotations(type(root)).get(leaf, None)
         if annotation is None:
             raise TypeError(
-                f"No type annotation found for path '{path}'."
-                "If you have not extended the Config class, This is most likely an internal error."
-                "Please report this issue to the developers."
+                f"No type annotation found for path '{path}'. "
+                "If you have not extended the Config class, This is most likely an internal error; "
+                "Please report this issue to the developers. "
                 "If you have extended the Config class, please ensure that you have added a type annotation for this attribute."
             )
         return annotation
 
     @classmethod
     def get_caster(cls, type_: type) -> Callable[[str], object]:
+        """Find the string-to-value caster registered for a configuration type.
+
+        Generic aliases are reduced to their origin before lookup, allowing
+        callers to use annotations such as ``tuple[...]`` or ``dict[...]``.
+
+        :param type_: Type annotation whose textual input must be converted.
+        :returns: Callable that converts one string into the requested type.
+        :rtype: collections.abc.Callable[[str], object]
+        :raises TypeError: If no caster is registered for *type_*.
+        """
         origin: type = get_origin(type_) or type_
         caster: Callable[[str], object] | None = cls.casters.get(
             type_) or cls.casters.get(origin)
@@ -176,15 +299,19 @@ class Config(Freezeable):
         return caster
 
     def from_toml(self, path: str = "./piclient.toml") -> Self:
-        """Load a TOML configuration file and hydrate the internal global :class:`Config` object.
+        """Populate this configuration object from a TOML file.
 
-        Each top-level key in the TOML file should correspond to a nested
-        dataclass name inside :class:`Config` (e.g. ``CameraConfig``,
-        ``ClientConfig``).  The values under that key are unpacked as keyword
-        arguments to the dataclass constructor.
+        The TOML file is expected to contain one table per nested dataclass section,
+        such as ``CameraConfig`` or ``ClientConfig``. Each table is unpacked as
+        keyword arguments to the corresponding dataclass constructor and then
+        assigned onto the live :class:`Config` instance.
 
-        :returns: :class:`Config`
-        :raises: AttributeError if arguments are missing or do not match the type definition.
+        :param path: Filesystem path to the TOML configuration file to parse.
+        :returns: This same :class:`Config` instance after the values have been
+            hydrated.
+        :rtype: Config
+        :raises AttributeError: If a table name does not exist on the config or if
+            the values do not match the dataclass definition.
         """
 
         with open(path, "rb") as toml:
@@ -213,14 +340,17 @@ class Config(Freezeable):
         return self
 
     def from_env(self) -> Self:
-        """Load configuration from environment variables.
+        """Hydrate this configuration object from environment variables.
 
-        Environment variable names should be in the format
-        ``WRO__<K1>__<K2>__<K3> ... __<Ki>`` (note double underscores), where ``<Kn>``
-        corresponds to the nth-level nested attribute in the :class:`Config`
-        dataclass tree (underscores replace dots).
+        Variables are expected to follow the ``WRO__<SECTION>__<KEY>`` convention,
+        where each nested component corresponds to a dataclass section and field in
+        the :class:`Config` tree. The values are converted using the registered
+        caster for their declared type before being assigned to the matching
+        nested attributes.
 
-        :returns: :class:`Config`
+        :returns: This same :class:`Config` instance after applying environment
+            overrides.
+        :rtype: Config
         """
         conversion_map: dict[str, str] = {
             "GENERALCONFIG": "GeneralConfig",
@@ -292,18 +422,32 @@ class Config(Freezeable):
 
         CONTROLS_CONFIG: dict[str, Any] = field(default_factory=lambda: {
             # Frame duration in microseconds
-            "FrameDurationLimits": (33333, 33333),
+            "FrameDurationLimits": (16000, 16000),  # 62.5 FPS
             "AeEnable": True,  # Enables automatic exposure
         })
-        FPS: float = None # pyright: ignore[reportAssignmentType]
+        FPS: float = None  # pyright: ignore[reportAssignmentType]
 
         def __post_init__(self):
-            object.__setattr__(self, "OUTPUT_WIDTH", _slice_length(self.INITIAL_ROI[1], self.FORMAT["size"][0]))
-            object.__setattr__(self, "OUTPUT_HEIGHT", _slice_length(self.INITIAL_ROI[0], self.FORMAT["size"][1]))
+            """Derive output dimensions, shared-memory size, and camera FPS.
+
+            The derived values reflect the configured capture format and initial
+            ROI, ensuring consumers use the cropped frame dimensions rather
+            than stale defaults.
+
+            :returns: ``None``.
+            :rtype: None
+            """
+            object.__setattr__(self, "OUTPUT_WIDTH", _slice_length(
+                self.INITIAL_ROI[1], self.FORMAT["size"][0]))
+            object.__setattr__(self, "OUTPUT_HEIGHT", _slice_length(
+                self.INITIAL_ROI[0], self.FORMAT["size"][1]))
             object.__setattr__(self, "OUTPUT_SHAPE", (
                 self.OUTPUT_HEIGHT, self.OUTPUT_WIDTH, self.OUTPUT_CHANNELS))
-            object.__setattr__(self, "FPS", 1 // (self.CONTROLS_CONFIG["FrameDurationLimits"][0] * 1e-6))
+            object.__setattr__(self, "SHM_SIZE", self.OUTPUT_WIDTH *
+                               self.OUTPUT_HEIGHT * self.OUTPUT_CHANNELS)
             # Convert microseconds to seconds
+            object.__setattr__(
+                self, "FPS", 1 / (self.CONTROLS_CONFIG["FrameDurationLimits"][0] * 1e-6))
 
     @dataclass
     class ClientConfig(Freezeable):
@@ -324,8 +468,8 @@ class Config(Freezeable):
         MAX_SPEED: int = 100
         CONNECT_RETRIES: int = 5
         CONNECT_RETRY_SLEEP_SECONDS: float = 0.5
-        SERVO_MIN_ANGLE: int = 0
-        SERVO_MAX_ANGLE: int = 180
+        SERVO_MIN_ANGLE: int = 30
+        SERVO_MAX_ANGLE: int = 150
 
     @dataclass
     class VisionConfig(Freezeable):
@@ -334,7 +478,7 @@ class Config(Freezeable):
         Includes the perspective-transform homography matrix, HSV colour
         thresholds for wall/line detection, and region-of-interest slices.
         """
-        PERSPECTIVE_TRANSFORM: np.ndarray[tuple[int, ...], np.dtype[np.float32]] = field(default_factory=lambda: np.array([
+        PERSPECTIVE_TRANSFORM: np.ndarray[tuple[int, int], np.dtype[np.float32]] = field(default_factory=lambda: np.array([
             [1, 0, 0],
             [0, 1, 0],
             [0, 0, 1]
@@ -355,17 +499,21 @@ class Config(Freezeable):
             0: 208//12, 512 // 2 - 512 // 10: 512 // 2 + 512 // 10]
 
         # Placeholder HSV thresholds for obstacles
-        LOWER_RED_OBSTACLE: np.ndarray[tuple[int, ...], np.dtype[np.uint8]] = field(
-            default_factory=lambda: np.array([0, 0, 0], dtype=np.uint8))
-        UPPER_RED_OBSTACLE: np.ndarray[tuple[int, ...], np.dtype[np.uint8]] = field(
-            default_factory=lambda: np.array([0, 0, 0], dtype=np.uint8))
-        LOWER_GREEN_OBSTACLE: np.ndarray[tuple[int, ...], np.dtype[np.uint8]] = field(
-            default_factory=lambda: np.array([0, 0, 0], dtype=np.uint8))
-        UPPER_GREEN_OBSTACLE: np.ndarray[tuple[int, ...], np.dtype[np.uint8]] = field(
-            default_factory=lambda: np.array([0, 0, 0], dtype=np.uint8))
+        LOWER_RED_OBSTACLE: np.ndarray[tuple[int], np.dtype[np.uint8]] = field(
+            default_factory=lambda: np.array([112, 162, 142], dtype=np.uint8))
+        UPPER_RED_OBSTACLE: np.ndarray[tuple[int], np.dtype[np.uint8]] = field(
+            default_factory=lambda: np.array([125, 255, 195], dtype=np.uint8))
+        LOWER_GREEN_OBSTACLE: np.ndarray[tuple[int], np.dtype[np.uint8]] = field(
+            default_factory=lambda: np.array([35, 64, 111], dtype=np.uint8))
+        UPPER_GREEN_OBSTACLE: np.ndarray[tuple[int], np.dtype[np.uint8]] = field(
+            default_factory=lambda: np.array([44, 255, 179], dtype=np.uint8))
         OBSTACLE_ROI: tuple[slice, slice] = np.s_[
             None: None, None: None]  # Everything
 
+        LOWER_PARKING_LOT: np.ndarray[tuple[int], np.dtype[np.uint8]] = field(
+            default_factory=lambda: np.array([127, 137, 108], dtype=np.uint8))
+        UPPER_PARKING_LOT: np.ndarray[tuple[int], np.dtype[np.uint8]] = field(
+            default_factory=lambda: np.array([139, 255, 205], dtype=np.uint8))
 
     @dataclass
     class SharedChallengeConfig(Freezeable):
@@ -393,7 +541,21 @@ class Config(Freezeable):
         WALL_FOLLOW_KPKD: tuple[float, float] = (0.7, 0.5)
         CORNER_TURN_KPKD: tuple[float, float] = (0.75, 0.3)
         STRAIGHT_SPEED: float = -0.4
-        TURN_SPEED: float = -0.32
+        TURN_SPEED: float = -0.35
+
+    @dataclass
+    class ParallelParkingConfig(Freezeable):
+        """Tuning values for the end-of-challenge parallel parking maneuver."""
+        PARKING_SIDE: Literal["left", "right"] = "left"
+        WALL_FOLLOW_TARGET_DISTANCE: float = 0.2
+        WALL_FOLLOW_KPKD: tuple[float, float] = (0.7, 0.25)
+        WALL_FOLLOW_SPEED: float = 0.45
+        FRONTAL_BLACK_RATIO_THRESHOLD: float = 0.7
+        ARC_SPEED: float = -0.25
+        ARC_ONE_SERVO_ANGLE: float = 145.0
+        ARC_ONE_DURATION: float = 0.95
+        ARC_TWO_SERVO_ANGLE: float = 35.0
+        ARC_TWO_DURATION: float = 0.95
 
     @dataclass
     class ObstacleChallengeConfig(Freezeable):
@@ -404,10 +566,16 @@ class Config(Freezeable):
         """
         WALL_FOLLOW_KPKD: tuple[float, float] = (0.65, 0.35)
         CORNER_TURN_KPKD: tuple[float, float] = (0.7, 0.3)
-        OBSTACLE_AVOID_KPKD: tuple[float, float] = (0.7, 0.2)
-        STRAIGHT_SPEED: float = -0.4
-        TURN_SPEED: float = -0.32
-        OBSTACLE_AVOID_SPEED: float = 0.3
+        OBSTACLE_AVOID_KPKD: tuple[float, float] = (0.6, 0.25)
+        STRAIGHT_SPEED: float = 0.4
+        TURN_SPEED: float = 0.35
+        OBSTACLE_AVOID_SPEED: float = 0.35
+        # Base offset to avoid the obstacle. Positive values move the target point further away from the obstacle.
+        OBSTACLE_BASE_OFFSET: float = 0
+        # Scaling factor applied to proximity to increase offset as obstacle gets closer.
+        OBSTACLE_OFFSET_SCALING_FACTOR: float = 300
+        # Exponent applied to proximity to increase offset as obstacle gets closer.
+        OBSTACLE_SCALING_EXPONENT: float = 0.5
 
     @dataclass
     class LiDARConfig(Freezeable):
@@ -429,4 +597,14 @@ _GLOBAL_CONFIG: Config = Config()
 
 @export
 def GLOBAL_CONFIG() -> Config:  # Function to use the decorator
+    """Return the process-wide mutable :class:`Config` singleton.
+
+    The returned object is shared by all callers, so changing a nested value
+    changes the configuration observed by subsequent consumers. Callers may
+    invoke :meth:`Config.freeze` after applying overrides to prevent further
+    mutation.
+
+    :returns: The process-wide configuration instance.
+    :rtype: Config
+    """
     return _GLOBAL_CONFIG

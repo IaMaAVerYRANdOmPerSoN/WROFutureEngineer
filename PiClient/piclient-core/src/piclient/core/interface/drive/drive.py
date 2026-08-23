@@ -32,8 +32,12 @@ class DriveCommandExecutor:
     """
 
     def __init__(self, client: Client) -> None:
-        """
-        :param client: The `Client` whose `drive_motors` the worker will call.
+        """Create an executor that sends the newest command through a client.
+
+        :param client: :class:`Client` whose ``drive_motors`` method performs
+            the physical motor and steering operation.
+        :returns: ``None``.
+        :rtype: None
         """
         self._client: Client = client
         self._pending: tuple[float, float, float] | None = None
@@ -43,11 +47,29 @@ class DriveCommandExecutor:
         self.command_submitted: bool = False
 
     async def __aenter__(self) -> Self:
+        """Start the worker and verify the Arduino connection.
+
+        :returns: This initialized :class:`DriveCommandExecutor`.
+        :rtype: DriveCommandExecutor
+        :raises ConnectionError: If the client cannot complete its handshake.
+        """
+        logger.info("Starting drive command executor...")
         self._worker_task = asyncio.create_task(self._worker())
+
+        logger.info("Verifying connection...")
+        if not await self._client.verify_connection():
+            raise ConnectionError("Could not establish connection to the robot.")
+
         logger.info("Drive command executor started")
         return self
 
     async def __aexit__(self, *args: Any) -> None:
+        """Cancel the worker task and release executor resources.
+
+        :param args: Context-manager exception information, which is ignored.
+        :returns: ``None``.
+        :rtype: None
+        """
         if self._worker_task:
             self._worker_task.cancel()
             try:
@@ -80,10 +102,19 @@ class DriveCommandExecutor:
         """
         Hand the worker the latest drive command. Non-blocking; latest-wins.
 
-        :param speed: Normalized motor speed in [-1, 1] (see `Client.set_motor_speed`).
-        :param angle: Servo angle in degrees.
-        :param duration: Motor run duration in seconds.
+        :param speed: Normalized motor speed in ``[-1, 1]`` passed to
+            :meth:`Client.drive_motors`.
+        :param angle: Steering servo angle in degrees.
+        :param duration: Duration of the motor command in seconds.
+        :returns: ``None``. The command is stored and the worker is notified
+            without waiting for serial I/O.
+        :rtype: None
+        :raises RuntimeError: If the asynchronous context has not started the
+            worker.
         """
+        if not self._worker_task or self._worker_task.done():
+            raise RuntimeError("DriveCommandExecutor is not fully initialized. Use an asynchronous context manager, or call __aenter__().")
+
         self.latest_command = (speed, angle, duration)
         self.command_submitted = True
         self._pending = self.latest_command

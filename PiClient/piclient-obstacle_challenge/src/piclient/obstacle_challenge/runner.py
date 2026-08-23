@@ -2,11 +2,10 @@
 Runner for the obstacle challenge.
 """
 
-import cv2
-import numpy as np
 from functools import partial
 from pathlib import Path
 from time import time
+import traceback
 from loguru import logger
 
 from piclient.core.interface import AsyncCamera, DriveCommandExecutor, Client, Recorder
@@ -21,16 +20,26 @@ from .transition_determinants import (
     should_straight,
     should_turn,
     should_final_turn,
-    should_final_straight
+    should_final_straight_and_parking
 )
 
 
 @export
 @logger.contextualize(process="MAIN")
 async def run_obstacle_challenge() -> None:
+    """Run the live obstacle challenge and generate a replay recording.
+
+    The runner connects the camera, vision processor, drive executor, state
+    machine, recorder, and telemetry logger. After processing ends it renders
+    the collected telemetry over the recorded camera video.
+
+    :returns: ``None`` after the run and replay generation finish.
+    :rtype: None
+    :raises RuntimeError: If a required process output stream is unavailable.
+    """
     run_started_at = int(time())
-    log_path, replay_path = default_output_paths(Path(f"WRO_recordings/recording_{run_started_at}.mp4"))
-    recording_path = log_path.with_suffix(".mp4")
+    recording_path = Path(f"WRO_recordings/recording_{run_started_at}.mp4")
+    log_path, replay_path = default_output_paths(recording_path)
     recorder_callback = partial(Recorder.recorder_process_context_manager)
     process_manager = ProcessContextManager(
         camera_callback=AsyncCamera.camera_process_context_manager,
@@ -52,7 +61,7 @@ async def run_obstacle_challenge() -> None:
                     straight=should_straight,
                     turn=should_turn,
                     final_turn=should_final_turn,
-                    final_straight=should_final_straight,
+                    final_straight_and_parking=should_final_straight_and_parking,
                 ),
             ) as state_machine:
                 with PickleLogWriter(log_path) as log_writer:
@@ -62,11 +71,6 @@ async def run_obstacle_challenge() -> None:
 
                         frame_index = 0
                         source_fps = GLOBAL_CONFIG().CameraConfig.FPS
-                        shm = process_context.shm
-                        frame_buffer = shm.buf if shm is not None else None
-                        h = GLOBAL_CONFIG().CameraConfig.OUTPUT_HEIGHT
-                        w = GLOBAL_CONFIG().CameraConfig.OUTPUT_WIDTH
-                        c = GLOBAL_CONFIG().CameraConfig.OUTPUT_CHANNELS
 
                         async for data in ObstacleChallengeAsyncMultiprocessingVisionProcessor.async_pipe_reader(process_context.output_stream):
                             walls_and_obstacles: WallsAndObstacles = data[0]
@@ -96,18 +100,6 @@ async def run_obstacle_challenge() -> None:
                             )
                             drive_executor.command_submitted = False
 
-                            debug_frame = np.ndarray((h, w, c), dtype=np.uint8, buffer=frame_buffer)
-                            if walls_and_obstacles.walls.left_raw is not None and walls_and_obstacles.walls.right_raw is not None:
-                                cv2.drawContours(debug_frame, [walls_and_obstacles.walls.left_raw.contour, walls_and_obstacles.walls.right_raw.contour], -1, (0, 255, 0), 2)
-                            if target is not None:
-                                cv2.circle(debug_frame, (*target,), 5, (0, 0, 255), -1)
-                            cv2.putText(debug_frame, f"FPS: {state_machine.fps:.2f}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
-                            cv2.putText(debug_frame, f"State: {state_machine.current_state}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
-
-                            cv2.imshow("Obstacle Challenge Debug", debug_frame)
-                            if cv2.waitKey(1) & 0xFF == ord('q'):
-                                break
-
                             if finished:
                                 break
 
@@ -120,4 +112,7 @@ async def run_obstacle_challenge() -> None:
             try:
                 replay_video(recording_path, log_path, output_video=replay_path, display=False)
             except Exception:
-                logger.exception("Failed to generate obstacle-challenge replay")
+                logger.error(
+                    "Failed to generate obstacle-challenge replay\n{}",
+                    traceback.format_exc(),
+                )

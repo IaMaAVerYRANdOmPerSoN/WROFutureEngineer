@@ -11,7 +11,7 @@ from piclient.core.lib import GLOBAL_CONFIG
 
 from piclient.obstacle_challenge.transition_determinants import (
     should_avoid_obstacle,
-    should_final_straight,
+    should_final_straight_and_parking,
     should_final_turn,
     should_straight,
     should_turn,
@@ -59,5 +59,5 @@ class TestObstacleChallengeTransitions(unittest.TestCase):
             self.assertFalse(should_straight(turn_walls, state_turn, None, 0.0, 0, None))
             self.assertTrue(should_final_turn(turn_walls, state_straight, None, 0.0, cfg.LAP_LENGTH_IN_TURNS, None))
             self.assertFalse(should_final_turn(turn_walls, state_final_turn, None, 0.0, cfg.LAP_LENGTH_IN_TURNS, None))
-            self.assertTrue(should_final_straight(straight_walls, state_final_turn, None, 0.0, 0, 1.0))
-            self.assertFalse(should_final_straight(turn_walls, state_final_turn, None, 0.0, 0, 1.0))
+            self.assertTrue(should_final_straight_and_parking(straight_walls, state_final_turn, None, 0.0, 0, 1.0))
+            self.assertFalse(should_final_straight_and_parking(turn_walls, state_final_turn, None, 0.0, 0, 1.0))

@@ -69,6 +69,19 @@ class LiDAR:
         timeout: float = GLOBAL_CONFIG().LiDARConfig.SERIAL_TIMEOUT,
         packet_len: int = GLOBAL_CONFIG().LiDARConfig.PACKET_LEN,
     ) -> None:
+        """Create an asynchronous reader for an LD19 LiDAR serial stream.
+
+        The serial device is opened when the instance enters its asynchronous
+        context manager; construction only stores connection and packet-size
+        settings and initializes parser state.
+
+        :param port: Serial device path.
+        :param baud: Serial communication speed in bits per second.
+        :param timeout: Default serial read timeout in seconds.
+        :param packet_len: Expected encoded LD19 packet length in bytes.
+        :returns: ``None``.
+        :rtype: None
+        """
         self._serial: aioserial.AioSerial | None = None
         self.PORT: str = port
         self.BAUD: int = baud
@@ -215,6 +228,14 @@ class LiDAR:
                 )
 
     async def __aenter__(self, *args: Any) -> Self:
+        """Open the LiDAR serial device and start its packet listener.
+
+        :param args: Context-manager arguments accepted for compatibility;
+            they are ignored.
+        :returns: This initialized :class:`LiDAR` instance.
+        :rtype: LiDAR
+        :raises serial.SerialException: If the serial device cannot be opened.
+        """
         self._serial = aioserial.AioSerial(
             self.PORT, self.BAUD, timeout=self.DEFAULT_TIMEOUT)
 
@@ -229,6 +250,12 @@ class LiDAR:
         return self
 
     async def __aexit__(self, *args: Any) -> None:
+        """Stop the packet listener and close the LiDAR serial device.
+
+        :param args: Context-manager exception information, which is ignored.
+        :returns: ``None``.
+        :rtype: None
+        """
         if hasattr(self, "_listener_task"):
             self._listener_task.cancel()
             try:
@@ -280,12 +307,34 @@ class LiDAR:
             return False
 
     async def get_latest_packet(self) -> LiDARPacket | None:
+        """Return the most recently parsed packet without waiting for new data.
+
+        Access is serialized with the listener's data lock so callers receive
+        a complete packet rather than a partially updated reference.
+
+        :returns: Latest :class:`LiDARPacket`, or ``None`` before the first
+            valid packet has been parsed.
+        :rtype: LiDARPacket | None
+        """
         async with self._data_lock:
             if self._latest_packet is None:
                 return None
             return self._latest_packet
 
     async def stream_packets(self, sender: PipeConnection, timeout: float = 1.0) -> NoReturn:
+        """Forward newly captured LiDAR packets to a multiprocessing pipe forever.
+
+        The coroutine waits for each packet event, retrieves the latest packet,
+        and sends it through *sender*. It continues after capture timeouts so a
+        temporary lack of LiDAR data does not terminate the process.
+
+        :param sender: Pipe connection that receives :class:`LiDARPacket`
+            objects.
+        :param timeout: Maximum wait for one packet in seconds.
+        :returns: Never returns normally; it ends only when cancelled or when
+            an unrecoverable pipe error is raised.
+        :rtype: NoReturn
+        """
         pipe_executor = ThreadPoolExecutor(max_workers=2)
         loop: asyncio.AbstractEventLoop = asyncio.get_running_loop()
 
@@ -302,7 +351,14 @@ class LiDAR:
 
     @staticmethod
     def lidar_process_context_manager(sender: PipeConnection) -> None:
+        """Run the asynchronous LiDAR stream in a dedicated process.
+
+        :param sender: Pipe connection used to publish parsed packets.
+        :returns: ``None`` after the process's async runner exits.
+        :rtype: None
+        """
         async def _run(sender: PipeConnection) -> NoReturn:
+            """Create a LiDAR instance and stream packets to the child pipe."""
             async with LiDAR() as lidar:
                 await lidar.stream_packets(sender)
         asyncio.run(_run(sender))

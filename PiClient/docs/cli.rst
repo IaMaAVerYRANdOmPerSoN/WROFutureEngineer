@@ -1,4 +1,4 @@
-wrofutureengineer
+CLI
 =================
 
 .. automodule:: piclient.cli

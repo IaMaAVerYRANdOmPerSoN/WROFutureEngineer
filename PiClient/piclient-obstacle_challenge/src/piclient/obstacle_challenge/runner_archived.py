@@ -22,7 +22,7 @@ from piclient.core.vision import (
 from .transition_determinants import (
     is_straight,
     should_final_turn,
-    should_final_straight,
+    should_final_straight_and_parking,
     should_straight,
     should_turn,
     should_avoid_obstacle,
@@ -38,7 +38,7 @@ manager = TypedTranisitionManager(
     straight=should_straight,
     turn=should_turn,
     final_turn=should_final_turn,
-    final_straight=should_final_straight,
+    final_straight_and_parking=should_final_straight_and_parking,
 )
 
 
@@ -169,7 +169,7 @@ async def run_obstacle_challenge() -> None:
                         if next_state is not None:
                             state = next_state
 
-                        if state == "final_straight" and start_time is None:
+                        if state == "final_straight_and_parking" and start_time is None:
                             start_time = time.perf_counter()
 
                         match state:
@@ -205,7 +205,7 @@ async def run_obstacle_challenge() -> None:
                                     GLOBAL_CONFIG().SharedChallengeConfig.DRIVE_COMMAND_DURATION,
                                 )
 
-                            case "final_straight":
+                            case "final_straight_and_parking":
                                 start_time = time.perf_counter() if not start_time else start_time
                                 now = time.perf_counter()
 
@@ -229,7 +229,7 @@ async def run_obstacle_challenge() -> None:
                         cv2.line(debug_frame, (w // 2, h), (int(w / 2 - turn_correction *
                                  # Draws the turning vector
                                                                 w / 2), h - 50), (0, 255, 0), 2)
-                        cv2.putText(debug_frame, f"State: {state} | Turns: {turn_counter} | FPS: {fps:.1f} | PD: {(turn_correction if state == 'straight' or state == 'final_straight' else corner_turn_correction):.3f}", (
+                        cv2.putText(debug_frame, f"State: {state} | Turns: {turn_counter} | FPS: {fps:.1f} | PD: {(turn_correction if state == 'straight' or state == 'final_straight_and_parking' else corner_turn_correction):.3f}", (
                             # Info on the top
                             5, 10), cv2.FONT_HERSHEY_PLAIN, 0.6, (255, 255, 255), 1)
 

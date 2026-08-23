@@ -18,10 +18,12 @@ jobs:
       run: |
         cd PiClient
         python -m venv .venv
-        echo "$PWD/.venv/bin" >> $GITHUB_PATH
-        pip install -r requirements-dev.txt
+        source .venv/bin/activate
+        pip install ./piclient-cli ./piclient-core ./piclient-obstacle_challenge ./piclient-open_challenge
 
     - name: test piclient-cli
       run: |
+        cd PiClient
+        source .venv/bin/activate
         cd tests
         python -m unittest discover -s . -p "test_*.py"

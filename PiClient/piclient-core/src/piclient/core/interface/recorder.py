@@ -3,10 +3,11 @@ Provides class`Recorder`, which writes recorded test data from shm to disk.
 """
 
 from typing import Self, NoReturn
-from types import TracebackType
+from types import FrameType, TracebackType
 
 import asyncio
 import time
+import signal
 import multiprocessing.shared_memory as shm
 from os import makedirs
 from multiprocessing.connection import Connection as PipeConnection
@@ -20,7 +21,17 @@ from ..utils import async_pipe_reader as utils_async_pipe_reader, async_pipe_rea
 
 @export
 class Recorder:
-    """A class for recording video data."""
+    """Record camera frames from shared memory into an MP4 video.
+
+    The recorder consumes frame-ready notifications from a multiprocessing
+    pipe, skips frames whose checksum has not changed, and writes distinct
+    timestamped files below ``WRO_recordings``.
+
+    :ivar resolution: Frame shape as ``(height, width, channels)``.
+    :ivar fps: Output video frame rate.
+    :ivar writer: OpenCV writer used for the output file.
+    :ivar timestamp: Unix timestamp assigned when recording starts.
+    """
 
     _DEFAULT_RESOLUTION: tuple[int, int, int] = GLOBAL_CONFIG().CameraConfig.OUTPUT_SHAPE
     _DEFAULT_FPS: float = GLOBAL_CONFIG().CameraConfig.FPS
@@ -28,6 +39,16 @@ class Recorder:
     async_pipe_reader_fifo = staticmethod(utils_async_pipe_reader_fifo)
 
     def __init__(self, writer: cv2.VideoWriter=cv2.VideoWriter(), resolution: tuple[int, int] | None=None, fps: float | None = None) -> None:
+        """Initialize a recorder with an OpenCV writer and output settings.
+
+        :param writer: OpenCV video writer to open and populate on context
+            entry.
+        :param resolution: Output frame dimensions as ``(height, width)``;
+            defaults to the configured camera shape.
+        :param fps: Output frame rate; defaults to camera configuration.
+        :returns: ``None``.
+        :rtype: None
+        """
         self.resolution = (
             resolution 
             if resolution is not None 
@@ -41,7 +62,7 @@ class Recorder:
 
         self.timestamp = 0
         self.writer = writer
-        self.fourcc = self.writer.fourcc("H", "2", "6", "4")
+        self.fourcc = self.writer.fourcc(*"mp4v")
 
     def _write(self, frame: np.ndarray) -> None:
         """Write a frame to the video file.
@@ -60,12 +81,15 @@ class Recorder:
         """
         makedirs("WRO_recordings", exist_ok=True)
         self.timestamp = time.time()
+        frame_size = (self.resolution[1], self.resolution[0])
         self.writer.open(
-            f"WRO_recordings/recording_{int(self.timestamp)}.avi",
+            f"WRO_recordings/recording_{int(self.timestamp)}.mp4",
             self.fourcc,
             self.fps,
-            self.resolution[:2]
+            frame_size
         )
+        if not self.writer.isOpened():
+            raise RuntimeError("Failed to open VideoWriter.")
         return self
 
     def __exit__(self, exc_type: type[BaseException], exc_value: BaseException, traceback: TracebackType) -> None:
@@ -73,10 +97,13 @@ class Recorder:
         self.writer.release()
         
     async def record(self, shm_name: str, receiver: PipeConnection) -> NoReturn: # pyright: ignore[reportReturnType]
-        """record frames from shared memory and write them to the video file.
+        """Read frame notifications and write changed shared-memory frames.
 
-        :param shm_name: The name of the shared memory segment.
-        :param receiver: The pipe connection to read from.
+        :param shm_name: Name of the shared-memory segment containing frames.
+        :param receiver: Pipe connection that signals when a frame is ready.
+        :returns: Never returns during normal recording; cancellation or a
+            pipe error ends the loop.
+        :rtype: NoReturn
         """
         existing_shm = shm.SharedMemory(name=shm_name)
 
@@ -93,17 +120,38 @@ class Recorder:
 
     @staticmethod
     @logger.contextualize(process="RECORDER")
+    @logger.catch
     def recorder_process_context_manager(shm_name: str, receiver: PipeConnection) -> NoReturn: # pyright: ignore[reportReturnType]
+        """Run :meth:`record` as a signal-aware recorder subprocess.
+
+        :param shm_name: Name of the shared-memory segment containing frames.
+        :param receiver: Pipe connection that signals frame availability.
+        :returns: Never returns while recording normally.
+        :rtype: NoReturn
         """
-        Subproces entry point for recording video data from shared memory.
-        """
+        def _intercept_signal(signum: int, frame: FrameType | None) -> None:
+            """Convert a termination signal into the recorder's shutdown path.
+
+            :param signum: Operating-system signal number received.
+            :param frame: Current Python stack frame, if supplied by the signal
+                machinery.
+            :raises KeyboardInterrupt: Always, to stop the recorder loop.
+            """
+            logger.info(f"Stopping recorder subprocess...")
+            raise KeyboardInterrupt
+
+        signal.signal(signal.SIGINT, _intercept_signal)
+        signal.signal(signal.SIGTERM, _intercept_signal)
+
         async def _run() -> NoReturn:
+            """Create a recorder and run it until cancellation or shutdown."""
             recorder = Recorder()
-            with recorder:
-                await recorder.record(shm_name, receiver)
+            await recorder.record(shm_name, receiver)
 
         try:
             asyncio.run(_run())
+        except KeyboardInterrupt:
+            logger.info("Shutting down recorder subprocess...")
         except Exception as e:
             logger.critical(
                 f"Recorder subprocess crashed: {type(e).__name__}: {e}", exc_info=True)

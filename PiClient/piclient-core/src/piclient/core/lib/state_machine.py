@@ -2,6 +2,7 @@
 State machine implementation for managing the robot's states and transitions.
 """
 
+from abc import ABC, abstractmethod
 from typing import Any, Generic, ParamSpec, Self
 
 from .exporter import export
@@ -14,7 +15,17 @@ PExternal = ParamSpec("PExternal")
 PTransition = ParamSpec("PTransition")
 
 @export
-class StateMachine(Generic[HandlerParams, PExternal, PTransition, T]):
+class StateMachine(Generic[HandlerParams, PExternal, PTransition, T], ABC):
+    """Abstract asynchronous state machine for robot control behavior.
+
+    The machine stores the active state, delegates transition decisions to a
+    :class:`TransitionManager`, and delegates drive output to a
+    :class:`DriveCommandExecutor`. Subclasses provide state-specific actions.
+
+    :ivar current_state: State identifier currently being executed.
+    :ivar transition_manager: Object that evaluates state transitions.
+    :ivar drive_command_executor: Asynchronous drive command sink.
+    """
     def __init__(self, initial_state: T, transition_manager: TransitionManager[P, T], drive_command_executor: DriveCommandExecutor) -> None:
         """Initialize the state machine.
 
@@ -55,6 +66,7 @@ class StateMachine(Generic[HandlerParams, PExternal, PTransition, T]):
         """
         return args, kwargs
 
+    @abstractmethod
     def handle_state_actions(self, *args: HandlerParams.args, **kwargs: HandlerParams.kwargs) -> bool:
         """Handle actions based on the current state.
 
@@ -62,6 +74,23 @@ class StateMachine(Generic[HandlerParams, PExternal, PTransition, T]):
 
         :param args: Positional arguments to pass to the state action handlers.
         :param kwargs: Keyword arguments to pass to the state action handlers.
+        :return: True if the state machine has completed its setup and is ready to proceed, False otherwise.
         """
-        raise NotImplementedError(
-            "Subclasses should implement this method to handle state-specific actions.")
+        if not self._setup_complete and not self.setup(*args, **kwargs):
+            self._setup_complete = True
+        else:
+            return False
+
+    def setup(self, *args: HandlerParams.args, **kwargs: HandlerParams.kwargs) -> bool:
+        """
+        Perform any necessary operations before the core loop starts. This method can be overridden in subclasses to provide custom setup logic.
+        For example, a robot might need to exit a parking lot before starting the main loop. This method can be used to implement such behavior.
+        :param args: Positional arguments to pass to the setup method.
+        :param kwargs: Keyword arguments to pass to the setup method.
+        :return: True if the setup is complete and the state machine is ready to proceed, False otherwise.
+        """
+        # TODO: May want to overhaul this, we are getting closer to a state machine which can contain multiple sub-state machines.
+        # I'm not sure how to implement this yet, but it would be nice to have a state machine which can contain other state machines as states.
+        # Perhaps we just use the name of the StateMachine instance as the state name, and then we can have a transition manager which can handle
+        # nested transitions.
+        return True  # Default implementation does nothing and returns True, indicating that the setup is complete.

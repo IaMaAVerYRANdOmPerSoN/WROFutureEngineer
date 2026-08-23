@@ -21,6 +21,16 @@ T = TypeVar("T", bound=str)  # Typevar for state names
 
 @export
 class TransitionManager(Generic[P, T]):
+    """Evaluate prioritized state transitions with configurable hysteresis.
+
+    Each named determinant is called with only the arguments its signature can
+    accept. A determinant must remain true for its hysteresis threshold before
+    it can win, and the highest-priority eligible determinant supplies the next
+    state.
+
+    :ivar debug_entries: Latest threshold status for each determinant.
+    """
+
     def __init__(self, *, hysteresis_values: Sequence[int], priorities: Sequence[int], **transition_determinants: Callable[P, bool]) -> None:
         """Initialise the transition manager.
 

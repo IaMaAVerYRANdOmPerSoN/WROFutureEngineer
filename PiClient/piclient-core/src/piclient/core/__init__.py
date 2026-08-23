@@ -15,6 +15,15 @@ from . import lib  # Because pyright is stupid and doesn't understand * imports
 
 
 def format_fn(record: "Record") -> str:
+    """Format one Loguru record with elapsed time and source location.
+
+    The formatter includes the log level, message, optional contextual extras,
+    and optional exception details using Loguru markup.
+
+    :param record: Loguru record mapping containing message and metadata.
+    :returns: Markup-formatted line suitable for the configured logger sink.
+    :rtype: str
+    """
     location = record["file"].name + ":" + str(record["line"])
     return (
         "<blue>{elapsed.seconds}.{elapsed.microseconds:06d}</blue> | "

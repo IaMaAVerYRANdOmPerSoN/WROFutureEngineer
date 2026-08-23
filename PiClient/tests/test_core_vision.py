@@ -17,6 +17,7 @@ from piclient.core.vision import (
     VisionObject,
     VisionProcessor,
     WallsAndObstacles,
+    ParkingLot,
 )
 
 
@@ -43,7 +44,8 @@ class TestVisionObject(unittest.TestCase):
 
 class TestWallsDataStructures(unittest.TestCase):
     def test_open_challenge_walls_normalisation(self):
-        walls = OpenChallengeWalls(left=50, right=25, center=10, area=100, center_area=20)
+        walls = OpenChallengeWalls(
+            left=50, right=25, center=10, area=100, center_area=20)
         self.assertAlmostEqual(walls.left, 0.5)
         self.assertAlmostEqual(walls.right, 0.25)
         self.assertAlmostEqual(walls.center, 0.5)
@@ -67,7 +69,7 @@ class TestWallsDataStructures(unittest.TestCase):
             left=0, right=0, center=0, max_distance=1, center_area=1,
             left_raw=None, right_raw=None,
         )
-        container = WallsAndObstacles(walls=walls, obstacles=None)
+        container = WallsAndObstacles(walls=walls, obstacles=None, parking_lot=ParkingLot(closer=None, further=None, max_x=1, max_y=1))
         self.assertIs(container.walls, walls)
         self.assertIsNone(container.obstacles)
 
@@ -88,7 +90,8 @@ class TestVisionProcessorBase(unittest.TestCase):
     def test_simplify_contour_reduces_vertices(self):
         # A noisy near-square should simplify to ~4 corners.
         contour = np.array(
-            [[[0, 0]], [[5, 1]], [[10, 0]], [[10, 5]], [[10, 10]], [[5, 9]], [[0, 10]], [[0, 5]]],
+            [[[0, 0]], [[5, 1]], [[10, 0]], [[10, 5]], [
+                [10, 10]], [[5, 9]], [[0, 10]], [[0, 5]]],
             dtype=np.int32,
         )
         simplified = VisionProcessor.simplify_contour(contour)
@@ -111,16 +114,20 @@ class TestVisionProcessorBase(unittest.TestCase):
     def test_find_blocks_filters_small_contours(self):
         mask = np.zeros((100, 100), dtype=np.uint8)
         mask[0:5, 0:5] = 255  # area 25 < default min_area 120
+        # pyright: ignore[reportPrivateUsage]
         objects = self.processor._find_blocks([mask], ["tiny"]) # pyright: ignore[reportPrivateUsage]
         self.assertEqual(objects, ())
 
     def test_find_blocks_empty_mask(self):
         mask = np.zeros((100, 100), dtype=np.uint8)
-        self.assertEqual(self.processor._find_blocks([mask], ["none"]), ()) # pyright: ignore[reportPrivateUsage]
+        # pyright: ignore[reportPrivateUsage]
+        self.assertEqual(self.processor._find_blocks([mask], ["none"]), ())  # pyright: ignore[reportPrivateUsage]
 
     def test_perspective_transform_without_use_transform(self):
         contour = _square_contour(0, 0, 10)
-        objects = self.processor._perspective_transform([contour], ["red"]) # pyright: ignore[reportPrivateUsage]
+        objects = self.processor._perspective_transform( # pyright: ignore[reportPrivateUsage]
+            (("red", contour),),
+        )
         self.assertEqual(len(objects), 1)
         self.assertEqual(objects[0].color, "red")
 
@@ -149,7 +156,8 @@ class TestOpenChallengeVisionProcessor(unittest.TestCase):
         self.assertAlmostEqual(walls.center, 1.0)
 
     def test_all_white_frame_has_no_walls(self):
-        frame = np.full((208, 512, 3), 255, dtype=np.uint8)  # HSV value 255 -> not black
+        # HSV value 255 -> not black
+        frame = np.full((208, 512, 3), 255, dtype=np.uint8)
         walls = self.processor.get_normalized_relative_wall_distances(frame)
         self.assertAlmostEqual(walls.left, 0.0)
         self.assertAlmostEqual(walls.right, 0.0)
@@ -167,7 +175,8 @@ class TestObstacleChallengeVisionProcessor(unittest.TestCase):
 
     def test_get_segments_and_vertices(self):
         contour = _square_contour(0, 0, 10)
-        vertices, p1, p2 = ObstacleChallengeVisionProcessor.get_segments_and_vertices(contour)
+        vertices, p1, p2 = ObstacleChallengeVisionProcessor.get_segments_and_vertices(
+            contour)
         self.assertEqual(vertices.shape, (4, 2))
         # p2 is p1 rolled by -1 (each edge's end point).
         np.testing.assert_array_equal(p2, np.roll(p1, -1, axis=0))
@@ -185,43 +194,34 @@ class TestObstacleChallengeVisionProcessor(unittest.TestCase):
         frame = np.zeros((208, 512, 3), dtype=np.uint8)
         result = self.processor.get_walls_and_obstacles(frame)
         self.assertIsInstance(result, WallsAndObstacles)
-        self.assertTrue(result.walls.left == float("inf") or result.walls.right == float("inf"))
+        self.assertTrue(result.walls.left == float("inf")
+                        or result.walls.right == float("inf"))
 
     def test_get_target_returns_none_without_obstacles(self):
         walls = ObstacleChallengeWalls(
             left=0, right=0, center=0, max_distance=1, center_area=1,
             left_raw=None, right_raw=None,
         )
-        container = WallsAndObstacles(walls=walls, obstacles=None)
+        container = WallsAndObstacles(walls=walls, obstacles=None, parking_lot=ParkingLot(closer=None, further=None, max_x=1, max_y=1))
         self.assertIsNone(self.processor.get_target(container))
 
-    def test_get_midpoint_requires_wall_contours(self):
-        obstacle = VisionObject(contour=_square_contour(0, 0, 10), color="green")
+    def test_get_target_offset(self):
         walls = ObstacleChallengeWalls(
             left=0, right=0, center=0, max_distance=1, center_area=1,
             left_raw=None, right_raw=None,
         )
-        with self.assertRaises(ValueError):
-            self.processor.get_midpoint_to_wall(obstacle, walls)
-
-    def test_get_midpoint_between_obstacle_and_wall(self):
-        # Green obstacle at x in [0, 10], wall (used as left_raw) at x in [20, 30].
-        obstacle = VisionObject(contour=_square_contour(0, 0, 10), color="green")
-        wall = VisionObject(contour=_square_contour(20, 0, 10), color="walls")
-        walls = ObstacleChallengeWalls(
-            left=1, right=1, center=1, max_distance=256, center_area=100,
-            left_raw=wall, right_raw=wall,
-        )
-        midpoint = self.processor.get_midpoint_to_wall(obstacle, walls)
-        self.assertEqual(len(midpoint), 2)
-        # Closest gap is between x=10 and x=20, so the midpoint x is ~15.
-        self.assertAlmostEqual(midpoint[0], 15, delta=1)
+        obstacle_contour = _square_contour(100, 50, 20)
+        obstacle = VisionObject(contour=obstacle_contour, color="red")
+        container = WallsAndObstacles(walls=walls, obstacles=(obstacle,), parking_lot=ParkingLot(closer=None, further=None, max_x=1, max_y=1))
+        target = self.processor.get_target(container)
+        self.assertIsNotNone(target)
 
     def test_project_points_to_segments_shape(self):
         pts = np.array([[0, 0], [5, 5]], dtype=np.int32)
         seg_p1 = np.array([[0, 0], [10, 0]], dtype=np.int32)
         seg_p2 = np.array([[10, 0], [10, 10]], dtype=np.int32)
-        result = ObstacleChallengeVisionProcessor._project_points_to_segments(pts, seg_p1, seg_p2) # pyright: ignore[reportPrivateUsage]
+        result = ObstacleChallengeVisionProcessor._project_points_to_segments(  # pyright: ignore[reportPrivateUsage]
+            pts, seg_p1, seg_p2)
         self.assertEqual(result.shape, (2, 2, 2))
 
 

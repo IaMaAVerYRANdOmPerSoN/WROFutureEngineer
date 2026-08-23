@@ -1,5 +1,5 @@
 {
-    "python.analysis.autoImportCompletions": true,
+    "python.analysis.autoImportCompletions": false,
     "python.analysis.typeCheckingMode": "strict",
     "python.analysis.generateWithTypeAnnotation": true,
     "python.analysis.includeVenvInWorkspaceSymbols": false,
@@ -36,5 +36,14 @@
         "piclient-open_challenge/src",
         "piclient-obstacle_challenge/src"
     ],
-    "python-envs.defaultEnvManager": "ms-python.python:venv"
+    "python-envs.defaultEnvManager": "ms-python.python:venv",
+    "python.testing.unittestArgs": [
+        "-v",
+        "-s",
+        "./PiClient/tests",
+        "-p",
+        "test_*.py"
+    ],
+    "python.testing.pytestEnabled": false,
+    "python.testing.unittestEnabled": true
 }

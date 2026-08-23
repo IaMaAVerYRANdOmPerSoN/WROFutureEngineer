@@ -268,11 +268,11 @@ class Client:
         :returns: ``True`` if the command was acknowledged, ``False`` otherwise.
         :rtype: bool
         """
-        if GLOBAL_CONFIG().ClientConfig.SERVO_MAX_ANGLE <= angle:
+        if GLOBAL_CONFIG().ClientConfig.SERVO_MAX_ANGLE < angle:
             logger.warning(
                 f"Invalid request clamped: 'SET_SERVO {angle}'. {angle} is not in [{GLOBAL_CONFIG().ClientConfig.SERVO_MIN_ANGLE}, {GLOBAL_CONFIG().ClientConfig.SERVO_MAX_ANGLE}]")
             angle = GLOBAL_CONFIG().ClientConfig.SERVO_MAX_ANGLE
-        elif GLOBAL_CONFIG().ClientConfig.SERVO_MIN_ANGLE >= angle:
+        elif GLOBAL_CONFIG().ClientConfig.SERVO_MIN_ANGLE > angle:
             logger.warning(
                 f"Invalid request clamped: 'SET_SERVO {angle}'. {angle} is not in [{GLOBAL_CONFIG().ClientConfig.SERVO_MIN_ANGLE}, {GLOBAL_CONFIG().ClientConfig.SERVO_MAX_ANGLE}]")
             angle = GLOBAL_CONFIG().ClientConfig.SERVO_MIN_ANGLE
@@ -381,8 +381,14 @@ class DriveCommandExecutor:
     """
 
     def __init__(self, client: Client) -> None:
-        """
-        :param client: The `Client` whose `drive_motors` the worker will call.
+        """Create an executor that sends commands through *client*.
+
+        The executor owns a single background worker and stores at most one
+        pending command, so newer submissions replace stale pending work.
+
+        :param client: :class:`Client` used to transmit motor commands.
+        :returns: ``None``.
+        :rtype: None
         """
         self._client: Client = client
         self._pending: tuple[float, float, float] | None = None
@@ -390,11 +396,23 @@ class DriveCommandExecutor:
         self._worker_task: Task[NoReturn] | None = None
 
     async def __aenter__(self) -> Self:
+        """Start the single background command worker.
+
+        :returns: This initialized executor.
+        :rtype: Self
+        """
         self._worker_task = asyncio.create_task(self._worker())
         logger.info("Drive command executor started")
         return self
 
     async def __aexit__(self, *args: Any) -> None:
+        """Cancel and await the background command worker.
+
+        :param args: Async context-manager exception information, accepted for
+            protocol compatibility.
+        :returns: ``None``.
+        :rtype: None
+        """
         if self._worker_task:
             self._worker_task.cancel()
             try:
