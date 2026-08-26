@@ -115,7 +115,6 @@ To get our current design, we took inspiration from our previous robot we used l
 
 *add new robot photo*
 
-
 ---
 
 # 2. Power and Sensor Architecture
