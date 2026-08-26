@@ -7,3 +7,5 @@ Uno
 Apostla
 ToF
 subconstraint
+libcamera
+venv
