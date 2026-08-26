@@ -86,13 +86,29 @@ This section explains the physical design of the robot, including chassis layout
 - **Drive System**: We use rear wheel drive, means the motor's power is transmitted to the back wheels rather than the front.
     - [Why RWD?](docs/01_mechanical/mechanical_reasoning.md#drive-system)
 
-### Summary
-Write a short summary here:
-- chassis type:
-- steering type:
-- drivetrain type:
-- major mechanical priorities:
-- key lessons learned:
+### Structural Design
+To get our current design, we took inspiration from our previous robot we used last year in Future Engineers.
+
+#### Improvements
+- Make the robot thinner for more clearence and better weight distribution
+- More supports on the sides of the robot (we only had 2)
+
+![Photo 1](https://media1.tenor.com/m/na4hpUz4LC8AAAAC/blue-emoji.gif)
+
+*add old robot photo*
+
+---
+
+#### Changes
+- Rotating the Raspiberry Pi 90 degrees would allow for a slimmer design
+- Implimenting more supports on the sides of the robot
+- Created our own differential gear
+- We use the Arduino Uno instead of Hiwonder
+- Changed the camera angle and added a place for the stepdown voltage
+
+![Photo 1](https://media1.tenor.com/m/na4hpUz4LC8AAAAC/blue-emoji.gif)
+
+*add new robot photo*
 
 ---
 
