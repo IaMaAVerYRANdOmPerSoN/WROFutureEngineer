@@ -1,10 +1,10 @@
-# Differential Gear Assembly Instructions
+# Assembly Instructions
 
-All parts are 3D printed. Print everything before starting.
+Most of the parts are 3D printed. The only non-printed parts are the electrical components, screws, and bearings. The assembly is designed to be modular, so that each part can be replaced or upgraded without needing to rebuild the entire system. The assembly is also designed to be robust, so that it can withstand the stresses of competition without breaking or coming apart.
 
----
+## Differential Assembly
 
-## Parts List
+### Parts List
 
 | Part | Quantity |
 | ---- | -------- |
@@ -20,9 +20,7 @@ All parts are 3D printed. Print everything before starting.
 | Furitek Micro Komodo Motor | 1 |
 | Screws (M2) | ~8 |
 
----
-
-## `Step 1` Crown Wheel
+### `Step 1` Crown Wheel
 
 Place the Crown Wheel flat with the bevel gear face pointing up. This is the base of the differential.
 
@@ -31,9 +29,7 @@ Place the Crown Wheel flat with the bevel gear face pointing up. This is the bas
 </p>
 <p align="center"><i>Crown Wheel placed face up on work surface.</i></p>
 
----
-
-## `Step 2` Insert Large Gears
+### `Step 2` Insert Large Gears
 
 Insert both Large Gears into the Crown Wheel. The longer shaft goes on the left, the shorter one on the right. Slide both through until seated.
 
@@ -42,9 +38,7 @@ Insert both Large Gears into the Crown Wheel. The longer shaft goes on the left,
 </p>
 <p align="center"><i>Both Large Gears inserted — longer shaft on the left, shorter on the right.</i></p>
 
----
-
-## `Step 3` Insert Small Gears
+### `Step 3` Insert Small Gears
 
 Push the Large Gears back slightly to make room, then insert the two Small Gears between them. Once in place, push the Large Gears forward to lock everything in.
 
@@ -53,9 +47,8 @@ Push the Large Gears back slightly to make room, then insert the two Small Gears
 </p>
 <p align="center"><i>Small Gears inserted between the Large Gears. Push Large Gears forward to lock.</i></p>
 
----
 
-## `Step 4` Insert Big Spacer
+### `Step 4` Insert Big Spacer
 
 Slide the Big Spacer onto the shaft from the front and push forward until it sits flush against the Crown Wheel. This holds the Small Gears in place.
 
@@ -64,9 +57,8 @@ Slide the Big Spacer onto the shaft from the front and push forward until it sit
 </p>
 <p align="center"><i>Big Spacer pushed forward to secure the Small Gears.</i></p>
 
----
 
-## `Step 5` Attach Rotating Cage
+### `Step 5` Attach Rotating Cage
 
 Slide both halves of the Rotating Cage onto the assembly from each side. Line up the holes and push in until fully seated.
 
@@ -76,9 +68,7 @@ Slide both halves of the Rotating Cage onto the assembly from each side. Line up
 </p>
 <p align="center"><i>Rotating Cage pressed onto both sides of the Crown Wheel assembly.</i></p>
 
----
-
-## `Step 6` Mount the Motor
+### `Step 6` Mount the Motor
 
 Place the motor into the mount bracket and screw in with M2 screws on both sides. The motor shaft should point down toward the Pinion position.
 
@@ -87,9 +77,7 @@ Place the motor into the mount bracket and screw in with M2 screws on both sides
 </p>
 <p align="center"><i>Motor screwed into the mount bracket. Shaft pointing down.</i></p>
 
----
-
-## `Step 7` Attach Pinion
+### `Step 7` Attach Pinion
 
 Push the Pinion up onto the motor shaft from below until it meshes with the Crown Wheel teeth. Screw in through the side to secure it.
 
@@ -99,9 +87,7 @@ Push the Pinion up onto the motor shaft from below until it meshes with the Crow
 </p>
 <p align="center"><i>Pinion pushed up onto the motor shaft and screwed in from the side.</i></p>
 
----
-
-## `Step 8` Mount Motor Assembly to Rotating Cage
+### `Step 8` Mount Motor Assembly to Rotating Cage
 
 Push the motor and differential assembly down into the Rotating Cage. Line up the slots and press in until seated. Screw in through both sides.
 
@@ -111,9 +97,7 @@ Push the motor and differential assembly down into the Rotating Cage. Line up th
 </p>
 <p align="center"><i>Motor assembly pressed into the Rotating Cage and screwed down on both sides.</i></p>
 
----
-
-## `Step 9` Prepare Rear Body Mount
+### `Step 9` Prepare Rear Body Mount
 
 Press four 6mm ball bearings into the bearing seats on the Rear Body Mount (two on each side). Insert the axle through each side.
 
@@ -122,9 +106,7 @@ Press four 6mm ball bearings into the bearing seats on the Rear Body Mount (two 
 </p>
 <p align="center"><i>Four ball bearings pressed into the Rear Body Mount with axles inserted.</i></p>
 
----
-
-## `Step 10` Attach Wheels
+### `Step 10` Attach Wheels
 
 Screw the wheels onto each axle. Make sure they are tight and do not wobble.
 
@@ -133,9 +115,7 @@ Screw the wheels onto each axle. Make sure they are tight and do not wobble.
 </p>
 <p align="center"><i>Wheels screwed onto each axle.</i></p>
 
----
-
-## `Step 11` Final Assembly
+### `Step 11` Final Assembly
 
 Push the full differential assembly down into the Rear Body Mount while inserting the T-joint axle through the Crown Wheel center. Screw into the Rear Body Mount through all mounting points.
 
@@ -145,9 +125,7 @@ Push the full differential assembly down into the Rear Body Mount while insertin
 </p>
 <p align="center"><i>T-joint axle inserted and full assembly screwed into the Rear Body Mount.</i></p>
 
----
-
-## Check Before Installing
+### Check Before Installing
 
 - Both wheels spin freely by hand.
 - Holding one wheel still makes the other spin at double speed.
