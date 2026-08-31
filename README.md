@@ -279,71 +279,53 @@ This section explains how another team could rebuild, set up, and test the robot
 ### Files
 - [`docs/05_reproducibility/build_guide.md`](docs/05_reproducibility/build_guide.md)
 - [`docs/05_reproducibility/bill_of_materials.md`](docs/05_reproducibility/bill_of_materials.md)
-- [`docs/05_reproducibility/assembly_steps.md`](docs/05_reproducibility/assembly_steps.md)
 - [`docs/05_reproducibility/setup_guide.md`](docs/05_reproducibility/setup_guide.md)
+- [`docs/05_reproducibility/building_from_source.md`](docs/05_reproducibility/building_from_source.md)
 - [`docs/05_reproducibility/testing_workflow.md`](docs/05_reproducibility/testing_workflow.md)
-- [`docs/05_reproducibility/release_notes.md`](docs/05_reproducibility/release_notes.md)
+
+---
+
+### Software Setup
+
+- **Normal install**: Install the prebuilt wheel using pip on Raspberry Pi OS (64-bit, Bookworm or later)
+    - [Setup guide](docs/05_reproducibility/setup_guide.md)
+- **Build from source**: Clone the repo and build four namespace packages using Python 3.13+. Required if the wheel is not yet published to PyPI.
+    - [Building from source](docs/05_reproducibility/building_from_source.md)
+- **picamera2**: Not included in the wheel — use the system-wide installation bundled with Raspberry Pi OS. Do not install from source.
+
+```bash
+python -m venv --system-site-packages .venv
+source .venv/bin/activate
+pip install piclient[all]
+```
+
+---
+
+### Hardware Setup
+
+- **Bill of materials**: Full component list including electronics, mechanical parts, 3D printed parts, and tools
+    - [Bill of materials](docs/05_reproducibility/bill_of_materials.md)
+- **Build guide**: Step-by-step assembly instructions with photos
+    - [Build guide](docs/05_reproducibility/build_guide.md)
+
+---
+
+### Testing
+
+- **Track is the source of truth**: No change is considered valid until tested on the real track. Unit tests and integration tests are automated via CI/CD but cannot replace real-world validation.
+- **Hardware testing**: Components are tested directly on the robot. 3D printed parts are rapidly prototyped and tested. Electronics are validated in SPICE simulation before being installed.
+- **Software testing**: All pull requests are automatically tested by the CI/CD pipeline. Logs and video footage are used to diagnose failures.
+- **Fallback plan**: Spare parts are kept for all critical components. All packages are versioned and uploaded to PyPI for quick rollback. A fully assembled electronics backup is kept ready for competition.
+    - [Testing workflow](docs/05_reproducibility/testing_workflow.md)
+
+---
 
 ### Summary
-Write a short summary here:
-- how to build the robot:
-- how to install software:
-- how to calibrate:
-- how to test:
-- what files are needed to reproduce the system:
-
----
-
-## Hardware Summary
-Fill in this quick-reference hardware list.
-
-| Component | Model / Part | Purpose |
-|----------|---------------|---------|
-| Main controller |  |  |
-| Secondary controller |  |  |
-| Drive motor |  |  |
-| Steering servo |  |  |
-| Motor driver / ESC |  |  |
-| Camera |  |  |
-| LiDAR / distance sensor |  |  |
-| IMU |  |  |
-| Battery |  |  |
-| Voltage regulator / BEC |  |  |
-
----
-
-## Software Summary
-Fill in this quick-reference software list.
-
-| Item | Description |
-|------|-------------|
-| Main language |  |
-| Main controller software |  |
-| Secondary controller software |  |
-| Main control loop |  |
-| Perception method |  |
-| Planning method |  |
-| Steering control method |  |
-| Speed control method |  |
-
----
-
-## Build and Setup Quick Start
-Give a short version here, and keep the detailed steps in `docs/05_reproducibility/`.
-
-1. Build the chassis
-2. Mount electronics
-3. Connect wiring
-4. Install software dependencies
-5. Upload or run code
-6. Calibrate sensors
-7. Run tests
-
-Detailed instructions:
-- [`docs/05_reproducibility/build_guide.md`](docs/05_reproducibility/build_guide.md)
-- [`docs/05_reproducibility/setup_guide.md`](docs/05_reproducibility/setup_guide.md)
-
----
+- how to build the robot: See bill of materials and build guide
+- how to install software: `pip install piclient[all]` on Raspberry Pi OS Bookworm
+- how to calibrate: Run `python -m utils --tool contours control` under competition lighting and update `piclient.toml`
+- how to test: Run on track — unit tests via CI/CD, real-world validation required for all changes
+- what files are needed to reproduce the system: All STL files in `models/stl/`, config in `piclient.toml`, Arduino firmware in `ArudinoServer/`
 
 ## Testing and Validation
 Summarize how the robot was tested.
