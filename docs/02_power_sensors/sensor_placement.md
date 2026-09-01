@@ -1,67 +1,15 @@
 # Sensor Placement
 
-## Objective
+[Back to README](../../README.md)
 
-Explain where each sensor is mounted and why that placement was selected.
+---
 
-## Placement Overview
+## Camera
 
-Describe the overall placement strategy of the sensing system.
+The camera is mounted 19 cm from the floor and angled downward.
 
-## Sensor Placement Table
+**Why angled downward:**
+Pointing the camera downward removes anything outside the game mat from the frame that would otherwise interfere with the HSV color detection. Without the downward tilt, the top portion of the frame picks up irrelevant colors that can trigger false detections.
 
-| Sensor | Position on Robot | Height | Angle | Facing Direction | Reason |
-|--------|-------------------|--------|-------|------------------|--------|
-|        |                   |        |       |                  |        |
-
-## Sensor 1 Placement
-
-- Mounted location:
-- Height from ground:
-- Angle:
-- Why this position was chosen:
-- What problems this placement avoids:
-
-## Sensor 2 Placement
-
-- Mounted location:
-- Height from ground:
-- Angle:
-- Why this position was chosen:
-- What problems this placement avoids:
-
-## Sensor 3 Placement
-
-- Mounted location:
-- Height from ground:
-- Angle:
-- Why this position was chosen:
-- What problems this placement avoids:
-
-## Geometry and Field-of-View Considerations
-
-- forward visibility:
-- side visibility:
-- blind spots:
-- distance measurement quality:
-- effect on obstacle detection:
-- effect on lane following:
-
-## Mechanical Integration Considerations
-
-- vibration:
-- mounting rigidity:
-- protection from collision:
-- cable routing:
-- interference with other parts:
-
-## Placement Iterations
-
-- initial placement:
-- issue observed:
-- revised placement:
-- improvement achieved:
-
-## Final Notes
-
-Summarize why the final sensor placement worked well.
+**Why 19 cm:**
+The height is a tradeoff between two things, the further up the camera is, the larger the field of view and the more of the track it can see ahead, which helps with early corner and pillar detection. However, a taller sensor tower takes longer to print and is more likely to tip or vibrate during sharp turns. 19 cm was chosen as a balance between a useful field of view and a practical, stable mount height.

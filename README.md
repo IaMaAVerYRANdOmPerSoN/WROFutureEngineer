@@ -146,8 +146,7 @@ This section explains how the robot is powered, what sensors are used, where the
 
 - **Camera (OV5647)**: Detects walls, corner lines, and colored pillars via CSI-2 at 640x480 up to 62.50 fps
     - [Camera selection](docs/02_power_sensors/sensor_selection.md#camera--ov5647)
-- **LiDAR (LD19)**: 360-degree distance measurements for wall and obstacle detection over USB serial. Not yet integrated into the challenge runners.
-    - [LiDAR selection](docs/02_power_sensors/sensor_selection.md#lidar--ld19)
+    - [Camera placement](docs/02_power_sensors/sensor_placement.md)
 
 ---
 
@@ -238,13 +237,13 @@ All settings are stored in `piclient.toml`. Nothing is hardcoded — speed, PD g
 | Final Turn | Last turn of last lap | Same as Turn |
 | Final Straight | After final turn | Drive to stop |
 
-- [Open challenge runner details](docs/software/runners.md#open-challenge)
+- [Open challenge runner details](docs/software/challenge_running.md#open-challenge)
 
 ### Obstacle Challenge
 
 Same as the open challenge with one extra state. When a pillar is detected, the robot steers toward the gap between the pillar and the wall. Green pillars are passed on the left, red on the right.
 
-- [Obstacle challenge runner details](docs/software/runners.md#obstacle-challenge)
+- [Obstacle challenge runner details](docs/software/challenge_running.md#obstacle-challenge)
 
 ---
 
