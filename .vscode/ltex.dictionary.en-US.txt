@@ -10,3 +10,4 @@ subconstraint
 libcamera
 venv
 isort
+clanky
