@@ -9,13 +9,11 @@
 
 ## Hardware Setup
 
-*For more detailed instructions, see our [Build Guide](./build_guide.md).*
-
-[ populate with hardware setup instructions ]
+First, you should assemble the robot according to the instructions in [Hardware Assembly](./hardware_assembly.md). Please make sure to follow the assembly instructions carefully, as improper assembly can lead to hardware damage or malfunction. Please ensure all electrical connections are secure and insulated, and that the robot is powered off when making adjustments.
 
 ## Software Setup
 
-After building the robot and imaging the Raspberry Pi, you can set up the software on the Pi. The easiest way is to use the prebuilt wheel. pip (or equivalent) will automatically install the wheel and its dependencies.
+After building the robot and imaging the Raspberry Pi, you can set up the software on the Pi. The easiest way is to use the prebuilt wheel. `pip` (or equivalent) will automatically install the wheel and its dependencies.
 
 If you want to build from source, see [Building from Source](./building_from_source.md).
 
