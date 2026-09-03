@@ -88,6 +88,11 @@ The frame was shifting and flexing under load:
 | V2 | Thicker base; support around cutout | Frame shifting and flexing under load |
 | V3 | Servo moved rearward; front extended for bumper | Reduce robot length; integrate bumper cleanly |
 
+<p align="center">
+  <img src="../../docs/img/arduino_layout.png" width="600">
+</p>
+<p align="center"><i>Final version of the Arduino Uno layout with servo repositioned and bumper support added.</i></p>
+
 ---
 
 ## Connectors
@@ -114,3 +119,8 @@ Connectors shortened to make the robot as compact as possible. This caused the b
 | V1 | Medium length | Space for layout flexibility during early design |
 | V2 | Increased length | Planned front LiDAR — later abandoned |
 | V3 | Shortened; C-shape profile | Compact final design; C-shape fixes battery clearance |
+
+<p align="center">
+  <img src="../../docs/img/connectors.png" width="600">
+</p>
+<p align="center"><i>Final version of the connectors layout</i></p>
