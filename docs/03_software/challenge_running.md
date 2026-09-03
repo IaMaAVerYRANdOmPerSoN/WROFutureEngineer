@@ -50,6 +50,46 @@ Gains `Kp` and `Kd` are set separately for wall following and corner turning in 
 
 ---
 
+---
+ 
+## How Vision and the State Machine Work Together
+ 
+The vision process and the state machine run as separate processes but are tightly coupled through a pipe. Every camera frame produces a set of measurements — wall distances, pillar positions, corner fill — and these measurements are what the state machine acts on.
+ 
+The key relationship is:
+ 
+- **Vision tells the state machine what it sees.** It does not make decisions — it only reports numbers.
+- **The state machine decides what to do with those numbers.** It evaluates the measurements against thresholds, applies hysteresis, and chooses a state.
+- **The state determines which drive command gets sent.** Different states use different PD gains and speeds.
+This separation means the vision code can be tested independently using a recorded video, and the state machine logic can be reasoned about without worrying about how the measurements were produced.
+ 
+---
+ 
+## How HSV Detection Works
+ 
+The camera captures frames in BGR format. Before any detection is done, each frame is converted to HSV (Hue, Saturation, Value) color space. HSV separates color information from brightness, which makes detection more stable under different lighting conditions — a red pillar in shadow still has roughly the same hue and saturation, only its value changes.
+ 
+**Walls** are detected by masking for black pixels — low value, low saturation. The amount of black in the left, right, and center regions of the frame is counted and used as a proxy for wall distance.
+ 
+**Pillars** are detected by masking for red and green:
+ 
+- **Green** sits around hue 40–80 in OpenCV's 0–180 scale. A single mask covers the full green range.
+- **Red** wraps around the hue wheel at both 0° and 180°, so two masks are needed and combined with a bitwise OR.
+```python
+# Red requires two ranges due to hue wrap-around
+mask_red = cv2.bitwise_or(
+    cv2.inRange(hsv, lower_red_1, upper_red_1),
+    cv2.inRange(hsv, lower_red_2, upper_red_2)
+)
+mask_green = cv2.inRange(hsv, lower_green, upper_green)
+```
+ 
+Once masked, contours are found and the largest one is taken as the detected pillar. The position of that contour relative to the nearby wall determines the steering target.
+ 
+All HSV threshold values are set in `piclient.toml` under `[VisionConfig]` and should be tuned under competition lighting before each run.
+
+---
+
 ## Obstacle Challenge
 
 ### [`StateMachine`](https://apostla-api-reference.web.app/lib.html#piclient.core.lib.StateMachine)
