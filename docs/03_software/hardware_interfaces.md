@@ -43,14 +43,6 @@ Internally, the executor stores only the latest command. A single background wor
 
 This is what allows the control loop to run at full frame rate without stalling on serial latency.
 
----
-
-## LiDAR
-
-The [`LiDAR`](https://apostla-api-reference.web.app/interface.html#piclient.core.interface.LiDAR) interface parses binary 47-byte packets from the LD19 LiDAR sensor, converts polar coordinates to Cartesian, and exposes them as [`LiDARPacket`](https://apostla-api-reference.web.app/interface.html#piclient.core.interface.LiDARPacket) structured data.
-
-**Current status:** The LiDAR is wired up, and the parsing code works, but it is not yet connected to either the open challenge or obstacle challenge runner. It is available as future work.
-
----
+--- 
 
 [Interface - Apostla 0.0.1 documentation](https://apostla-api-reference.web.app/interface.html)

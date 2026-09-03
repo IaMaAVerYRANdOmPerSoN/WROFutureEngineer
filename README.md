@@ -116,14 +116,45 @@ To get our current design, we took inspiration from our previous robot we used l
 
 ### 3D Printed Parts
 
-- **Turning System**: Servo-actuated rack and pinion steering with a curved front bumper for wall sliding in the obstacle challenge
-    - [Turning system iterations](docs/01_mechanical/turning_system.md)
-- **Raspberry Pi 5 Layout and Camera Mount**: Slim rotated design with a separated camera tower angled at 35 degrees downward
-    - [RP5 layout and camera mount iterations](docs/01_mechanical/rp5_camera_mount.md)
+- **Turning System**: Servo-actuated rack and pinion steering with a curved front bumper for wall sliding in the obstacle challenge. The servo connects to the steering rack via a servo horn and tie rods — rotating the servo horn pushes or pulls the tie rods, which turn the front wheels left or right.
+    - [Turning system iterations](docs/01_mechanical/mechanical_iterations.md#turning-system)
+
+![Turning System](docs/img/turning_system_final.png)
+
+- **Raspberry Pi 5 Layout, Camera Mount, and ESC**: Slim rotated design with a separated camera tower angled at 35 degrees downward. The ESC is mounted inside the same assembly to keep electronics consolidated.
+    - [RP5 layout and camera mount iterations](docs/01_mechanical/mechanical_iterations.md#raspberry-pi-5-layout-and-camera-mount)
+
+![RP5 and Camera Mount](docs/img/rp5_camera_mount.png)
+
 - **Arduino Uno Layout**: Main chassis plate holding the Arduino, servo, and front assembly; redesigned for compactness across three versions
-    - [Arduino layout iterations](docs/01_mechanical/arduino_layout.md)
+    - [Arduino layout iterations](docs/01_mechanical/mechanical_iterations.md#arduino-uno-layout)
+
+![Arduino Layout](docs/img/arduino_layout.png)
+
 - **Connectors**: 3D printed C-shaped connectors replacing brass standoffs to speed up assembly and disassembly
-    - [Connector iterations](docs/01_mechanical/connectors.md)
+    - [Connector iterations](docs/01_mechanical/mechanical_iterations.md#connectors)
+
+![Connectors](docs/img/connectors.png)
+
+- **Furitek Micro Komodo 1212**: Brushless motor rated at 3450 KV and 120W; drives the rear wheels through the differential gearbox
+    - [Motor reasoning](docs/01_mechanical/mechanical_reasoning.md#motor-selection)
+
+- **Differential Gear System**: Custom-designed differential allowing the rear wheels to spin at different speeds during turns; went through multiple iterations before settling on an off-the-shelf gearbox
+
+![Drivetrain](docs/img/differential.png)
+
+- **Wheels**: 35mm rubber wheels chosen to raise the chassis to give the differential adequate ground clearance
+    - [Wheel and torque reasoning](docs/01_mechanical/torque_speed_reasoning.md)
+
+- **Ball Bearings**: Four 6mm ball bearings pressed into the rear body mount to support the axles and reduce friction
+
+---
+
+### Full Robot
+
+| | |
+|:---:|:---:|
+| ![Full Robot](docs/img/full_robot.png) |
 
 ---
 
@@ -231,8 +262,6 @@ All settings are stored in `piclient.toml`. Nothing is hardcoded — speed, PD g
     - [Arduino client details](docs/03_software/hardware_interfaces.md#arduino-client)
 - **DriveCommandExecutor**: Sits between the control loop and the Arduino — only the latest command is sent, stale commands are thrown away
     - [DriveCommandExecutor details](docs/03_software/hardware_interfaces.md#drivecommandexecutor)
-- **LiDAR**: Wired up and parses data but not yet connected to either challenge runner
-    - [LiDAR details](docs/03_software/hardware_interfaces.md#lidar)
 
 ---
 
