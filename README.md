@@ -94,13 +94,17 @@ This section explains the physical design of the robot, including chassis layout
 ### Structural Design
 To get our current design, we took inspiration from our previous robot we used last year in Future Engineers.
 
+
+#### Old Design
+![Photo 1](https://media1.tenor.com/m/na4hpUz4LC8AAAAC/blue-emoji.gif)
+
+*add old robot photo*
+
 #### Improvements
 - Make the robot thinner for more clearence and better weight distribution
 - More supports on the sides of the robot (we only had 2)
 
-![Photo 1](https://media1.tenor.com/m/na4hpUz4LC8AAAAC/blue-emoji.gif)
 
-*add old robot photo*
 
 ---
 
@@ -114,6 +118,17 @@ To get our current design, we took inspiration from our previous robot we used l
 ![Photo 1](https://media1.tenor.com/m/na4hpUz4LC8AAAAC/blue-emoji.gif)
 
 *add new robot photo*
+
+### 3D Printed Parts
+
+- **Turning System**: Servo-actuated rack and pinion steering with a curved front bumper for wall sliding in the obstacle challenge
+    - [Turning system iterations](docs/01_mechanical/turning_system.md)
+- **Raspberry Pi 5 Layout and Camera Mount**: Slim rotated design with a separated camera tower angled at 35 degrees downward
+    - [RP5 layout and camera mount iterations](docs/01_mechanical/rp5_camera_mount.md)
+- **Arduino Uno Layout**: Main chassis plate holding the Arduino, servo, and front assembly; redesigned for compactness across three versions
+    - [Arduino layout iterations](docs/01_mechanical/arduino_layout.md)
+- **Connectors**: 3D printed C-shaped connectors replacing brass standoffs to speed up assembly and disassembly
+    - [Connector iterations](docs/01_mechanical/connectors.md)
 
 ---
 
@@ -170,7 +185,7 @@ This section explains how the robot is powered, what sensors are used, where the
 
 # 3. Software Architecture and Strategy
 
-# Software
+## Software
 
 This section explains the software that runs on the Raspberry Pi, including how the processes are structured, how the robot detects walls and obstacles, and how drive commands are sent to the Arduino.
 
@@ -227,6 +242,8 @@ All settings are stored in `piclient.toml`. Nothing is hardcoded — speed, PD g
 ---
 
 ## Challenge Running
+The robot uses a finite state machine (FSM) to decide what to do at any given moment. Each state has a specific trigger that causes the robot to enter it and a specific action it takes while in that state. The FSM runs once per camera frame, so the robot is constantly re-evaluating which state it should be in based on the latest vision data.
+
 
 ### Open Challenge
 
@@ -237,13 +254,13 @@ All settings are stored in `piclient.toml`. Nothing is hardcoded — speed, PD g
 | Final Turn | Last turn of last lap | Same as Turn |
 | Final Straight | After final turn | Drive to stop |
 
-- [Open challenge runner details](docs/software/challenge_running.md#open-challenge)
+- [Open challenge runner details](docs/03_software/challenge_running.md#open-challenge)
 
 ### Obstacle Challenge
 
 Same as the open challenge with one extra state. When a pillar is detected, the robot steers toward the gap between the pillar and the wall. Green pillars are passed on the left, red on the right.
 
-- [Obstacle challenge runner details](docs/software/challenge_running.md#obstacle-challenge)
+- [Obstacle challenge runner details](docs/03_software/challenge_running.md#obstacle-challenge)
 
 ---
 
