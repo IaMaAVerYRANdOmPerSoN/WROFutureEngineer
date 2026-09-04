@@ -6,6 +6,8 @@ When designing a complex system, we often face trade-offs between different desi
 
  For detailed mechanical iterations, see [Mechanical Iterations](../01_mechanical/mechanical_iterations.md).
 
+ For power iterations, see [Power Iterations](../02_power_sensors/power_architecture.md#iterations)
+
     
 ### Python Packaging
 

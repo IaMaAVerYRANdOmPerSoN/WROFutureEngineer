@@ -1,65 +1,5 @@
 # WRO Future Engineers 2026
 
-## Major Problems
-
-### 1. Differential Gear
-
-- Online differential design failed under load ([Week 11](#week-11-mar-11-18))
-- First custom design broke during testing ([Week 11](#week-11-mar-11-18))
-- Middle axle broke during assembly ([Week 16](#week-16-apr-20-27))
-- Melted from running the robot too fast ([Week 17](#week-17-apr-28-may-5))
-- Continued dragging on the ground after reprinting ([Week 16](#week-16-apr-20-27))
-- Still not working after multiple iterations ([Week 18](#week-18-may-6-13))
-- Fixed then broke again ([Week 20](#week-20-may-22-29), [Week 23](#week-23-june-14-21))
-- Gear connecting to motor wears out after 1-2 days ([Week 25](#week-25-june-28-july-5))
-- Purchased off-the-shelf differential was too large and hit the ground; sourced a smaller gearbox from coach's old RC kit ([Week 28](#week-28-jun-29-jul-5), [Week 29](#week-29-jul-6-12), [Week 30](#week-30-jul-13-19))
-- Axle connectors too loose for the differential output ([Week 30](#week-30-aug-13-19))
-- Axle slipping in the differential gearbox ([Week 32](#week-32-aug-27-sep-2))
-
-The differential was the single most persistent hardware problem throughout the build. The team began with an adapted online design which immediately failed under load as the teeth did not mesh properly. Three custom printed versions followed, each addressing a different failure mode - poor tooth geometry, axle slipping, and excessive friction from FDM surface finish limitations. After the third printed version melted from heat generated under high speed, the decision was made to purchase an off-the-shelf differential. The first purchased unit was too large and dragged on the ground. Rather than modifying the chassis, the coach sourced a smaller gearbox from a salvaged RC car kit which fit the existing axle geometry. The smaller salvaged gearbox fit the existing axle geometry. However, the motor continued to lack sufficient torque to move the robot reliably after sharp turns. After investigating potential causes including gearbox friction and gear slipping, the team identified that the gear ratio was too low for the motor to produce adequate torque at the wheel. Switching to a higher gear ratio in Week 35 resolved the issue and the robot moved reliably. Each failure drove a different solution, and the team learned that components cannot be evaluated in isolation from the rest of the system.
-
-### 2. Camera
-
-- Error persisted for three weeks ([Week 12](#week-12-mar-19-26), [Week 13](#week-13-mar-27-apr-3))
-- Confirmed hardware fault - I2C error on OV5647 sensor; resolved by borrowing a replacement ([Week 15](#week-15-apr-10-17))
-
-The camera stopped working during testing and the cause was not immediately clear. Initial suspicion fell on software or configuration issues. After exhaustive debugging including re-seating the CSI ribbon cable multiple times, checking config.txt overlays, and re-imaging the OS with no change, diagnostics finally pointed to a hardware fault. The dmesg output showed an I2C read error on the OV5647 sensor (error -121) and the I2C bus at address 0x36 was completely empty, confirming the sensor itself had failed. A replacement camera was borrowed from a teammate to continue development.
-
-### 3. Raspberry Pi
-
-- First Pi broke for unknown reasons ([Week 18](#week-18-may-6-13))
-- Second Pi broke - LED error code 4 long 3 short (RP1 not found), unknown cause ([Week 32](#week-32-aug-27-sep-2))
-
-The team went through two Raspberry Pi 5 units during the build. The first failed after a connection issue that could not be resolved even after reflashing the SD card. The second showed LED error code 4 long 3 short, indicating a hardware-level failure of the main I/O chip. A burning smell had been noticed days before the second failure, suggesting it may have been caused by a power event or short circuit. Both times the coach had a backup unit available which allowed development to continue. The fan was configured to always run on the replacement unit to reduce the risk of thermal damage.
-
-### 4. Power System
-
-- Deans-T connector melted ([Week 14](#week-14-apr-3-10))
-- Voltage regulator short circuited; port broke ([Week 19](#week-19-may-13-20))
-- Wiring broke and required re-soldering ([Week 31](#week-31-aug-20-27))
-- Servo failed completely; no backup available ([Week 33](#week-33-aug-27-sep-2))
-
-The power system experienced several failures throughout the build. The Deans-T connector melted early on due to undersized wiring carrying more current than it was rated for. All wiring was replaced with correctly rated wire after this incident. The step-down voltage regulator later short circuited when wires were caught in the motor system, breaking the regulator port entirely. Wiring to the motor also disconnected during testing and had to be re-soldered. Late in the build the servo motor failed completely for the first time despite correct wiring, with no clear cause. A replacement was ordered via express shipping and arrived within a few days.
-
-### 5. Open Challenge Code
-
-- Unnecessary Hybrid state and oscillation bug between Turn and Follow Wall states ([Week 17](#week-17-apr-28-may-5))
-- PD values poorly tuned; robot crashed into inner walls ([Week 24](#week-24-june-25-july-2))
-- Lap counting issues ([Week 24](#week-24-june-25-july-2))
-
-The first version of the open challenge code included a Hybrid state in addition to Follow Wall and Turn, which was intended to handle the transition zone at corners. The coach identified this as unnecessary and pointed out it created 6 possible state transitions instead of 2, making the logic much harder to debug. It was removed and replaced with a simpler two-state machine using hysteresis to prevent oscillation between states. PD tuning proved difficult without consistent hardware - the robot frequently crashed into inner walls when switching states because the gains were set too aggressively. Lap counting was also unreliable because single-frame detections of the corner line were being counted multiple times. These issues were resolved through careful tuning on the track over several weeks.
-
-### 6. Obstacle Challenge
-
-- Robot driving sideways despite correct steering indicator ([Week 27](#week-27-jul-23-30))
-- Wall distances appearing swapped in vision output ([Week 27](#week-27-jul-23-30))
-- Color encoding bug causing wrong pillar colors in replay ([Week 28](#week-28-jul-30-aug-5))
-- Steering gimbal broke multiple times ([Week 28](#week-28-jul-30-aug-5), [Week 31](#week-31-aug-20-27))
-
-The obstacle challenge development uncovered several bugs that were difficult to identify without the replay system. The robot was observed driving sideways despite the steering indicator pointing straight ahead, which the coach identified as a sign that the left and right wall distances were swapped in the vision output - the robot was steering in the wrong direction relative to what it thought it was doing. A separate color encoding bug caused red pillars to appear the wrong color in the replay video due to a BGR/RGB mix-up in the pipeline. The steering gimbal broke repeatedly under the stress of sharp corrections during obstacle avoidance, requiring multiple reprints. These issues were worked through iteratively using the video replay system which allowed the team to diagnose problems without needing the physical robot running.
-
----
-
 # Journal
 
 ## Week 1 (Dec 22–28)
@@ -363,43 +303,37 @@ The first versions of all 3D printed parts were adapted from last year's robot. 
 
 ## Week 33 (Aug 4–10)
 
-- Switched to a higher gear ratio; robot now moves reliably with sufficient torque.
+
 - CI pipeline fixed; API reference deployments now automated and testing CI working correctly.
 - API docs live at https://apostla-api-reference.web.app/index.html. TestPyPI deployment planned as next step.
 
 ---
 
 ## Week 34 (Aug 11–17)
-
+ 
 - Parking lot wall following issue identified - parking lot blocks view of wall for a few seconds causing erratic behaviour. Coach suggested maintaining orientation for a fixed duration when wall is temporarily obscured.
 - Steering gimbal broke again; ran out of backup parts. Requested more extras to be printed.
 - Servo stopped working entirely despite correct wiring. First time this servo has failed. No backup available - looking for a fast replacement online.
-
 ---
-
+ 
 ## Week 35 (Aug 18–24)
-
+ 
 **Mechanical Iterations — Final Versions**
 - Turning system V3: curved front bumper added to allow robot to slide off walls in obstacle challenge instead of getting stuck.
 - Arduino layout V3: servo moved rearward to shorten robot length; front section extended to support bumper attachment.
 - Connectors V3: shortened to C-shape to keep robot compact while routing around the battery.
-
 > For the full version history of all printed parts see [Mechanical Iterations](../01_mechanical/mechanical_iterations.md).
-
+ 
 **Differential Gear Iterations (Versions 4-5)**
-
+ 
 | Version | Design Goals | Limitations | Takeaways |
 | --- | --- | --- | --- |
 | 4 | Use a robust metal differential designed for RC cars. | The differential was too large for the universal axles, rubbed against the floor, and bent the rear assembly because of its weight. | Components cannot be viewed in isolation; they are constrained by and must be viewed in the context of the entire system. |
-| 5 | Use a compact differential gearbox salvaged from a smaller RC car (1/24-1/28). | The gearbox was salvaged rather than purpose-built. No backups available, and the design is not easily reproducible. | The smaller, lighter, self-contained gearbox eliminated 3D-printed gears, reduced complexity, fit the design constraints, and provided a good overall trade-off. |
-
+| 5 | Use a compact differential gearbox salvaged from a smaller RC car (1/24-1/28). | The gearbox was salvaged rather than purpose-built. No backups available, and the design is not easily reproducible. | The smaller, lighter, self-contained gearbox eliminated 3D-printed gears, reduced complexity, fit the design constraints, and allowed the robot to run smoothly. |
+ 
 > For more details see [Iteration Cycles](../04_systems_engineering/iteration_cycles.md).
-
-- Switched to a higher gear ratio; robot now moves reliably with sufficient torque.
-- CI pipeline fixed; API reference deployments now automated and testing CI working correctly.
-- Parking lot wall following issue identified - parking lot blocks view of wall for a few seconds causing erratic behaviour. Coach suggested maintaining orientation for a fixed duration when wall is temporarily obscured.
-- Steering gimbal broke again; ran out of backup parts. Requested more extras to be printed.
-- Servo stopped working entirely despite correct wiring. First time this servo has failed. No backup available - looking for a fast replacement online.
+ 
+- Switched differential with one from an RC car (1/4 gear ratio)
 
 ---
 
@@ -418,3 +352,116 @@ The first versions of all 3D printed parts were adapted from last year's robot. 
 - Turning system, RP5 layout, Arduino Uno layout, and connector iterations documented and added to the repo.
 - Current differential confirmed as a pre-built off-the-shelf unit.
 - Voltage regulator identified - Yahboom buck converter (6V–24V to 5V/5A) designed specifically for Raspberry Pi 5.
+
+---
+
+## Major Problems
+ 
+### 1. Differential Gear
+ 
+- Online differential design failed under load ([Week 11](#week-11-mar-39))
+- First custom design broke during testing ([Week 11](#week-11-mar-39))
+- Middle axle broke during assembly ([Week 16](#week-16-apr-713))
+- Melted from running the robot too fast ([Week 18](#week-18-apr-2127))
+- Continued dragging on the ground after reprinting ([Week 16](#week-16-apr-713))
+- Still not working after multiple iterations ([Week 19](#week-19-apr-28may-4))
+- Fixed then broke again ([Week 20](#week-20-may-511), [Week 23](#week-23-may-26jun-1))
+- Gear connecting to motor wears out after 1-2 days ([Week 25](#week-25-jun-915))
+- Purchased off-the-shelf differential was too large and hit the ground; sourced a smaller gearbox from coach's old RC kit ([Week 28](#week-28-jun-30jul-6), [Week 29](#week-29-jul-713), [Week 30](#week-30-jul-1420))
+- Axle connectors too loose for the differential output ([Week 30](#week-30-jul-1420))
+- Axle slipping in the differential gearbox ([Week 32](#week-32-jul-28aug-3))
+- Switching differential ([Week 35](#week-35-aug-1824))
+The differential was the single biggest hardware headache all build. Honestly the part that got us down the most. The team started with an adapted online design which failed right away under load because the teeth didn't mesh properly. Three custom printed versions came after that, each one fixing a different problem, bad tooth shape, axle slipping, and too much friction from the 3D printing itself. After the third printed one melted from heat at high speed, we decided to just buy an off-the-shelf differential instead. The first one we bought was too big and dragged on the ground. Instead of changing the chassis, the coach found a smaller gearbox from an old RC car kit that fit our axles and had a better gear ratio, which finally fixed it and the robot ran smoothly. Every failure pushed us to a different fix, and we learned that you can't look at one part on its own, everything on the robot affects everything else. Looking back it's kind of funny that months of work came down to one small gearbox from the coach's old RC kit.
+ 
+### 2. Camera
+ 
+- Error persisted for three weeks ([Week 12](#week-12-mar-1016), [Week 13](#week-13-mar-1723))
+- Confirmed hardware fault - I2C error on OV5647 sensor; resolved by borrowing a replacement ([Week 15](#week-15-mar-31apr-6))
+The camera stopped working during testing and the cause was clear at first. We assumed it had to do something with the software or configuration. After a lot of debugging including re-seating the CSI ribbon cable multiple times, checking config.txt overlays, and re-imaging the OS with no change, we finally figured out it was a hardware fault. The dmesg output showed an I2C read error on the OV5647 sensor (error -121) and the I2C bus at address 0x36 was completely empty, confirming the sensor itself had failed. Later that week, a replacement camera was borrowed from a teammate.
+ 
+### 3. Raspberry Pi
+ 
+- First Pi broke for unknown reasons ([Week 18](#week-18-apr-2127))
+- Second Pi broke - LED error code 4 long 3 short (RP1 not found), unknown cause ([Week 32](#week-32-jul-28aug-3))
+We ent through two Raspberry Pi 5 units during the build. The first failed after a connection issue that could not be resolved even after reflashing the SD card. The second showed LED error code 4 long 3 short, meaning a hardware-level failure of the main I/O chip. We noticed a burning smell days before the second failure, so it was probably caused by a power event or short circuit. Both times the coach had a backup unit available which allowed us to continue. Now the fan is configured to always run on the replacement unit to reduce the risk of thermal damage.
+ 
+### 4. Power System
+ 
+- Deans-T connector melted ([Week 14](#week-14-mar-2430))
+- Voltage regulator short circuited; port broke ([Week 19](#week-19-apr-28may-4))
+- Wiring broke and required re-soldering ([Week 31](#week-31-jul-2127))
+- Servo failed completely; no backup available ([Week 34](#week-34-aug-1117))
+The power system broke down a bunch of times througout the build. The Deans-T connector melted early on because of undersized wiring carrying more current than it was rated for. We later replaced all wiring with correctly rated wire after. The step-down voltage regulator later short circuited when wires were caught in the motor system, breaking the regulator port entirely. The wiring to the motor also disconnected during testing and had to be re-soldered. Also, late in the build the servo motor failed completely for the first time, with no clear cause. We ordered a replacement via express shipping and it arrived within a few days.
+ 
+### 5. Open Challenge Code
+ 
+- Unnecessary Hybrid state and oscillation bug between Turn and Follow Wall states ([Week 17](#week-17-apr-1420))
+- PD values poorly tuned; robot crashed into inner walls ([Week 24](#week-24-jun-28))
+- Lap counting issues ([Week 24](#week-24-jun-28))
+The first version of the open challenge code had a Hybrid state on top of Follow Wall and Turn, which was intended to handle the transition zone at corners. Our coach said it was unnecessary and pointed out it created 6 possible state transitions instead of 2, making the logic much harder to debug. We then removed and replaced it with a simpler two-state machine using hysteresis to prevent oscillation between states. The PD tuning proved difficult without consistent hardware and the robot frequently crashed into inner walls when switching states because the gains were set too aggressively. Lap counting was also unreliable because single-frame detections of the corner line were being counted multiple times. These issues were resolved through careful tuning on the track over several weeks.
+ 
+### 6. Obstacle Challenge
+ 
+- Robot driving sideways despite correct steering indicator ([Week 27](#week-27-jun-2329))
+- Wall distances appearing swapped in vision output ([Week 27](#week-27-jun-2329))
+- Color encoding bug causing wrong pillar colors in replay ([Week 28](#week-28-jun-30jul-6))
+- Steering gimbal broke multiple times ([Week 27](#week-27-jun-2329), [Week 34](#week-34-aug-1117))
+Working on the obstacle challenge turned up a bunch of bugs that would've been almost impossible to find without the replay system. The robot was driving sideways even though the steering indicator showed it going straight, which the coach figured out meant the left and right wall distances were swapped in the vision output, so the robot was steering the wrong way without knowing it. There was also a color bug where red pillars showed up as the wrong color in the replay because of a BGR/RGB mix-up in the code. The steering gimbal kept breaking from the sharp corrections during obstacle avoidance, so we had to reprint it more than once. We worked through all of it using the video replay system, which let us figure out problems without needing the actual robot running. This was probably the most confusing stretch of debugging all year, none of the robot's behavior made sense until the replay let us actually see what the vision was doing.
+ 
+---
+ 
+# Reflection
+ 
+## What Could Have Been Done Better
+ 
+### Hardware
+ 
+We should have started with an off-the-shelf differential from the very beginning, because five rounds of printing our own cost us months of build time we didn't need to lose. The PLA material limits were a risk we should have seen coming a lot earlier than we did. We also should have kept more spare parts on hand from the start, since running out of steering gimbals and having no backup servo during important testing weeks cost us a lot of time we couldn't get back. Better cable management and strain relief from day one would have stopped the melted connector, the short-circuited regulator, and the motor wire coming loose. We also should have tested each component on its own before putting it all together, since the camera issue dragged on for three weeks partly because we didn't isolate it fast enough.
+ 
+### Software
+ 
+The codebase got over-engineered early on with async processing, multiprocessing, and shared memory before we even had basic wall-following working reliably, and getting something simple working first would have saved us a lot of debugging time later. HSV threshold tuning should have been standardized much earlier with a proper tool and documented values instead of being redone informally almost every session. The obstacle challenge also got started too late compared to the competition timeline, which left us without enough time to actually test and tune it properly.
+ 
+### Process
+ 
+We needed more track time earlier on, since a lot of our biggest issues, like PD tuning, lap counting, and state machine bugs, only ever showed up during real runs and took weeks to fix because we didn't have enough access to a track. Relying so heavily on one person to understand the code was a risk that caught up with us the moment Michael left for China. Ryan and Elvis ended up spending an entire four hour class period just trying to figure out how to even connect to the robot and make a basic code change, since Michael had always been the one handling that part and nobody else really knew the process. If we had shared that knowledge across the whole team earlier, that day alone would have taken twenty minutes instead of four hours.
+ 
+---
+ 
+## Future Improvements
+ 
+### Hardware
+ 
+We want to replace the OV5647 camera with the Raspberry Pi Camera Module 3 Wide, since its higher resolution and 120fps would give the vision pipeline a lot more headroom, especially for the obstacle challenge at higher speeds. We'd also like to design a proper PCB for power distribution instead of relying on point-to-point wiring, which would cut down on failure points and make the electronics a lot more compact and reliable. The LD19 LiDAR is already wired up and parsing data but was never actually connected to the control loop, so integrating it into the challenge runners would make wall following a lot more reliable than counting pixels under lighting that keeps changing. We also want to design a proper Ackermann steering geometry to get rid of the tire scrub we get during turns, which should improve how accurately the robot follows its path at higher speeds.
+ 
+### Software
+ 
+We want to build adaptive HSV thresholds that adjust to the lighting automatically instead of needing to be recalibrated by hand before every run. Adding odometry or dead-reckoning using encoder feedback or IMU data would also help lap counting be more reliable and take some of the pressure off relying on vision alone. We still need to finish the parallel parking implementation for the obstacle challenge. We'd also like to properly publish the piclient package to PyPI so setup is just a single pip install instead of needing to build from source every time. Expanding the test suite with more integration tests using recorded video would also let us validate software changes without needing physical track time for every little check.
+ 
+### Process
+ 
+We want to start hardware iteration earlier and run it alongside software development instead of doing them one after the other. We also want to keep a shared calibration log so HSV values and PD gains from each session are actually written down and easy to compare over time instead of living in someone's head. Most importantly, we want to cross-train everyone on both hardware and software so we never end up in a situation like the one after Michael left, where Ryan and Elvis lost a whole class period just trying to figure out how to connect to the robot and push a code change.
+ 
+---
+ 
+## what did we learn?
+ 
+Getting a simple solution working first matters more than building something elegant. We spent a lot of time on a complex pipeline before the basic wall-following was even reliable, and that cost us weeks we could have spent testing.
+ 
+Knowledge needs to be shared across the whole team. When Michael left for China, Ryan and Elvis sat down to make what should have been a quick code change and ended up spending an entire four hour class just trying to figure out how to even connect to the robot in the first place. Michael had always been the one who handled that side of things, so nobody else really knew the steps. A team where only one person understands the code is a team with a single point of failure, and that class was proof of it.
+ 
+Looking back at the whole build, it definitely wasn't a straight line. Some weeks we felt like we were almost done, other weeks it felt like everything that could break just did. What got us through was that every failure, the differential, the camera, the Pi, taught us something we wouldn't have figured out any other way. We're proud of where the robot ended up, not because we avoided the setbacks, but because of how we worked through them.
+
+---
+
+**Heres a photo of Michael hard at work**
+<p align="center">
+  <img src="../../docs/img/michael_working.jpg" width="500">
+</p>
+<p align="center">
+
+**Heres a photo of Ryan, Elvis, and our previous teammate last year**
+<p align="center">
+  <img src="../../docs/img/lastyear.jpg" width="500">
+</p>
+<p align="center">

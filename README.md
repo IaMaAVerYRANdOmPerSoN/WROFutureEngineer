@@ -12,31 +12,118 @@ This repo is organized to show:
 
 ---
 
-## Team Information
-Team Apostla consists of 3 Ontario high school students.
-### Michael
-![Photo 1](https://media1.tenor.com/m/na4hpUz4LC8AAAAC/blue-emoji.gif)
-### Elvis
-![Photo 1](https://media1.tenor.com/m/na4hpUz4LC8AAAAC/blue-emoji.gif)
-### Ryan
-![Photo 1](https://media1.tenor.com/m/na4hpUz4LC8AAAAC/blue-emoji.gif)
+## Team Members
 
-### *add more info about team and stuff*
+<p align="center">
+  <img src="docs/img/Team.png" width="600">
+</p>
+<p align="center"><i>Explorer Robotics — WRO Future Engineers 2026</i></p>
+
+---
+
+We are a three-person team from Explorer Robotics in Whitby, Ontario, Canada. We have been competing in WRO for several years. This year we set out to build a fully autonomous self-driving robot from scratch, designing our own chassis, differential gear system, and vision pipeline.
+
+<p align="center">
+  <img src="docs/img/Elvis.png" width="200">
+  <img src="docs/img/michael.png" width="200">
+  <img src="docs/img/Ryan.png" width="200">
+</p>
+<p align="center">Elvis &nbsp;&nbsp;&nbsp; Michael &nbsp;&nbsp;&nbsp; Ryan</p>
+
+## Our Coach
+<table>
+<tr>
+  <td align="center" width="40%">
+    <img src="docs/img/coach.png" width="100%"/><br>
+    <em>Our Coach</em>
+  </td>
+
+  <td valign="top" width="60%">
+  
+
+
+  ### Information
+  - Head coach of Robotics Competitions, including FLL (First LEGO League),  WRO (World Robotics Olympiad) Robo Sports, Future Engineers, and Robo Mission. Led teams in winning multiple national, international robotics, and programming awards.
+  - Over 20 years of IT industry experience as a software engineer working internationally.
+  - MSc in Electrical & Computer Engineering from the University of Alberta.
+  - BSc in Mathematics from Peking University.
+  - Founder of Explorer Robotics, a local robotics club in Ajax and Whitby, teaching coding, AI, robotics, etc.
+  </td>
+</tr>
+</table>
+
+[![Website](https://img.shields.io/badge/Website-explorer--robotics.com-blue?style=for-the-badge&logo=google-chrome)](https://explorer-robotics.com/)
 
 ---
 
 ## Robot Summary
-Briefly describe your robot in 3–6 sentences.
 
-Example:
-> Our robot is a self-driving vehicle designed for the WRO 2026 Future Engineers challenge. It uses [camera / LiDAR / ultrasonic / IMU / other sensors] to detect the environment, follow the track, and react to obstacles. The robot is built with [main controller], [drive system], and [steering mechanism]. Our design focuses on [stability / reliability / fast turning / accurate detection / modularity].
+> Our robot is a self-driving car built for the WRO 2026 Future Engineers challenge. It uses one downward-angled camera to spot track walls, corner lines, and colored obstacle pillars, and follows the track using a state-machine control loop. The robot runs on a Raspberry Pi 5 for vision, an Arduino Uno for motor and servo control, a Furitek Micro Komodo 1212 brushless motor that drives the rear wheels through a differential gearbox, and rack-and-pinion steering run by an HS-5055MG servo. Our design is simple and reliable, using one sensor for all detection and a sturdy build that's easy to fix during competition.
 
-### Main Features
-- [Feature 1]
-- [Feature 2]
-- [Feature 3]
-- [Feature 4]
+---
 
+## Table of Contents
+
+- [Project Overview](#project-overview)
+- [Team Members](#team-members)
+- [Robot Summary](#robot-summary)
+- [Repository Structure](#repository-structure)
+  - [Main Files](#main-files)
+  - [Documentation](#documentation)
+  - [Other Project Assets](#other-project-assets)
+- [1. Mechanical Design](#1-mechanical-design)
+  - [Images of Robot](#images-of-robot)
+  - [Structural Design](#structural-design)
+    - [Old Design](#old-design)
+    - [Improvements](#improvements)
+    - [Changes](#changes)
+  - [3D Printed Parts](#3d-printed-parts)
+  - [Full Robot](#full-robot)
+- [2. Power and Sensor Architecture](#2-power-and-sensor-architecture)
+  - [Files](#files)
+  - [Power](#power)
+  - [Voltage and Current Requirements](#voltage-and-current-requirements)
+    - [5V Rail (Raspberry Pi, Arduino, Servo)](#5v-rail-raspberry-pi-arduino-servo)
+    - [7.4V Rail (Motor)](#74v-rail-motor)
+    - [Total Battery Power and Current](#total-battery-power-and-current)
+    - [Runtime Estimate](#runtime-estimate)
+  - [Sensors](#sensors)
+  - [Compute](#compute)
+  - [Summary](#summary)
+- [3. Software Architecture and Strategy](#3-software-architecture-and-strategy)
+  - [Software](#software)
+  - [Architecture](#architecture)
+  - [Config](#config)
+  - [Vision](#vision)
+    - [Wall Following](#wall-following)
+    - [Obstacle Detection](#obstacle-detection)
+  - [Hardware Interfaces](#hardware-interfaces)
+  - [Challenge Running](#challenge-running)
+    - [Open Challenge](#open-challenge)
+    - [Obstacle Challenge](#obstacle-challenge)
+  - [Running the Robot](#running-the-robot)
+- [4. Systems Engineering and Design Decisions](#4-systems-engineering-and-design-decisions)
+  - [Files](#files-1)
+  - [Constraints](#constraints)
+  - [Trade-offs](#trade-offs)
+  - [Design Iteration](#design-iteration)
+  - [Risk Analysis](#risk-analysis)
+  - [Subsystem Interactions](#subsystem-interactions)
+  - [Summary](#summary-1)
+- [5. Reproducibility](#5-reproducibility)
+  - [Files](#files-2)
+  - [Software Setup](#software-setup)
+  - [Hardware Setup](#hardware-setup)
+  - [Testing](#testing)
+  - [Summary](#summary-2)
+- [Testing and Validation](#testing-and-validation)
+- [Media and Visual Documentation](#media-and-visual-documentation)
+  - [Diagrams](#diagrams)
+  - [Videos](#videos)
+- [CAD and Wiring Files](#cad-and-wiring-files)
+- [Version History](#version-history)
+- [Contribution and Documentation Rules](#contribution-and-documentation-rules)
+- [Final Notes](#final-notes)
 
 ---
 
@@ -47,7 +134,7 @@ Example:
 - `LICENSE` – repository license
 - `.gitignore` – ignored local/generated files
 - `requirements.txt` – Python dependencies
-- `CHANGELOG.md` – version history
+
 
 ### Documentation
 - `docs/01_mechanical/` – mobility and mechanical design
@@ -55,20 +142,39 @@ Example:
 - `docs/03_software/` – software design and obstacle strategy
 - `docs/04_systems_engineering/` – engineering decisions, trade-offs, and risks
 - `docs/05_reproducibility/` – build, setup, assembly, and testing workflow
+- `docs/journal/` – dated engineering journal (Markdown + PDF export)
+- `docs/img/` – images referenced throughout the docs (robot photos, diagrams, team photos)
+- `docs/plan.md`, `docs/shoppingList.md`, `docs/coach_comments.md` – supporting planning docs
 
-### Other Project Assets
-- `cad/` – CAD models and mechanical design files
-- `wiring/` – wiring diagrams and connector information
-- `src/` – source code
-- `tests/` – testing scripts, procedures, and logs
-- `data/` – calibration data and experiment results
-- `media/` – photos, screenshots, and videos
-- `submissions/` – final competition submission materials
+**Other top-level folders:**
+- `ArudinoServer/` – PlatformIO firmware for the Arduino (low-level motor/servo control)
+- `PiClient/` – Python code on the Raspberry Pi
+    - `src/` – main vision processing, control, and Arduino communication logic
+    - `src_min/` – a minimal/leaner variant of the same modules
+    - `utils/tools/` – standalone calibration and debug tools (contours, lidar, manual control)
+    - `tests/` – test and experiment scripts
+- `EDA/` – KiCad PCB project (schematic, layout, project files)
+    - `FAB/` – fabrication outputs (Gerbers, BOM, pick-and-place positions)
+    - `lib/` – imported component symbol/footprint libraries
+
+
+
+
 
 ---
 
 # 1. Mechanical Design
 This section explains the physical design of the robot, including chassis layout, steering, drivetrain, torque/speed reasoning, and mechanical improvements over time.
+
+---
+
+### Files
+- [`docs/mechanical/mechanical_reasoning.md`](docs/01_mechanical/mechanical_reasoning.md)
+- [`docs/mechanical/mechanical_iterations.md`](docs/01_mechanical/mechanical_iterations.md)
+- [`docs/mechanical/torque_speed_reasoning.md`](docs/01_mechanical/torque_speed_reasoning.md)
+
+
+---
 
 - **Dimentions**: 24cm length 10cm wide 28cm high
     - [Dimentions reasoning](docs/01_mechanical/mechanical_reasoning.md#size-reasoning)
@@ -80,26 +186,24 @@ This section explains the physical design of the robot, including chassis layout
 ### Images of Robot
 | | |
 |:---:|:---:|
-| ![Photo 1](https://media1.tenor.com/m/na4hpUz4LC8AAAAC/blue-emoji.gif) | ![Photo 2](https://media1.tenor.com/m/na4hpUz4LC8AAAAC/blue-emoji.gif) |
-| ![Photo 3](https://media1.tenor.com/m/na4hpUz4LC8AAAAC/blue-emoji.gif) | ![Photo 4](https://media1.tenor.com/m/na4hpUz4LC8AAAAC/blue-emoji.gif) |
-| ![Photo 5](https://media1.tenor.com/m/na4hpUz4LC8AAAAC/blue-emoji.gif) | ![Photo 6](https://media1.tenor.com/m/na4hpUz4LC8AAAAC/blue-emoji.gif) |
+| ![Photo 1](docs/img/robot%20front.png) | ![Photo 2](docs/img/robot%20back.png) |
+| ![Photo 3](docs/img/robot%20right.png) | ![Photo 4](docs/img/robot%20left.png) |
+| ![Photo 5](docs/img/robot%20over.png) | ![Photo 6](docs/img/robot%20under.png) |
 
-*Placeholder images*
 
 ---
 
 - **Drive System**: We use rear wheel drive, means the motor's power is transmitted to the back wheels rather than the front.
     - [Why RWD?](docs/01_mechanical/mechanical_reasoning.md#drive-system)
-- **Steering type:** Parallel (Zero-Ackermann), Both front wheels turn at the same angle instead of the inner wheel turning more sharply than the outer. This causes slight tire scrub during turns but is acceptable on a small lightweight robot on a smooth mat.
+- **Steering type:** Parallel (Zero-Ackermann), Both front wheels turn at the same angle instead of the inner wheel turning more sharply than the outer. It does cause slight tire scrub during turns but it is acceptable on a small lightweight robot on a smooth mat.
     - [Why Parallel Zero-Ackermann?](docs/01_mechanical/mechanical_reasoning.md#steering-system)
 ### Structural Design
 To get our current design, we took inspiration from our previous robot we used last year in Future Engineers.
 
 
 #### Old Design
-![Photo 1](https://media1.tenor.com/m/na4hpUz4LC8AAAAC/blue-emoji.gif)
+![Photo 1](docs/img/old_robot_left.webp)
 
-*add old robot photo*
 
 #### Improvements
 - Make the robot thinner for more clearence and better weight distribution
@@ -112,17 +216,15 @@ To get our current design, we took inspiration from our previous robot we used l
 #### Changes
 - Rotating the Raspiberry Pi 90 degrees would allow for a slimmer design
 - Implimenting more supports on the sides of the robot
-- Created our own differential gear
 - We use the Arduino Uno instead of Hiwonder
 - Changed the camera angle and added a place for the stepdown voltage
 
-![Photo 1](https://media1.tenor.com/m/na4hpUz4LC8AAAAC/blue-emoji.gif)
+![Photo 1](docs/img/robot%20left.png)
 
-*add new robot photo*
 
 ### 3D Printed Parts
 
-- **Turning System**: Servo-actuated rack and pinion steering with a curved front bumper for wall sliding in the obstacle challenge. The servo connects to the steering rack via a servo horn and tie rods — rotating the servo horn pushes or pulls the tie rods, which turn the front wheels left or right.
+- **Turning System**: Servo-actuated rack and pinion steering with a curved front bumper for wall sliding in the obstacle challenge. The servo connects to the steering rack via a servo horn and tie rods, rotating the servo horn pushes or pulls the tie rods, which turn the front wheels left or right.
     - [Turning system iterations](docs/01_mechanical/mechanical_iterations.md#turning-system)
 
 ![Turning System](docs/img/turning_system_final.png)
@@ -172,15 +274,31 @@ This section explains how the robot is powered, what sensors are used, where the
 - [`docs/02_power_sensors/sensor_selection.md`](docs/02_power_sensors/sensor_selection.md)
 - [`docs/02_power_sensors/sensor_placement.md`](docs/02_power_sensors/sensor_placement.md)
 - [`docs/02_power_sensors/calibration.md`](docs/02_power_sensors/calibration.md)
-- [`docs/02_power_sensors/wiring.md`](docs/02_power_sensors/wiring.md)
+
 
 ---
 
+
 ### Power
+
+Everything starts with a single Gens Ace 1300mAh 2S LiPo battery. From there, power splits into two separate paths so the compute side and the actuator side never interfere with each other.
+
+The first path goes through our Yahboom voltage regulator board, which steps the battery's 7.4V down to a clean 5V. That 5V feeds into the Raspberry Pi 5 through USB-C. The Arduino Uno doesn't connect to the battery at all, it gets powered straight from the Pi over a USB-B cable. The camera is also powered off the Pi, through its flat CSI ribbon cable, which carries both data and power in one connector.
+
+The second path runs through the ESC. The ESC takes power directly from the battery and has its own built-in BEC (battery eliminator circuit) to regulate it. On the output side, the ESC's voltage pin powers the servo, and the ESC also drives the brushless motor directly since the motor doesn't need to be stepped down first.
+
+<p align="center">
+  <img src="docs/diagrams/schematic.webp" width="500">
+</p>
+<p align="center"><i>Full electronics schematic showing power distribution and signal connections.</i></p>
+
+The Raspberry Pi is the brain, it runs the vision pipeline, figures out where objects are, and decides what the robot should do next. The Arduino doesn't make any decisions, it just takes the drive commands the Pi sends it and turns them into precise PWM signals, since the Pi can't reliably time PWM output on its own while it's busy processing frames. The camera is the robot's only sense of the outside world, it feeds every frame the vision pipeline uses to find walls, corners, and pillars.
+
+On the actuator side, the ESC handles throttle control for the drive motor based on the PWM signal it gets from the Arduino, and its BEC also acts as the power source for the servo, so the servo never has to touch the battery directly. The servo itself just turns the front wheels left and right based on the steering commands coming from the Arduino, and the motor is what actually moves the robot forward, spinning the rear wheels through the differential.
 
 - **Battery**: Gens Ace 1300mAh 2S LiPo, 7.4V nominal, 45C discharge
     - [Battery details](docs/02_power_sensors/power_architecture.md#battery)
-- **Voltage Regulation**: Step-down buck regulator converts 7.4V to 5V for the Raspberry Pi; ESC built-in BEC powers the servo independently
+- **Voltage Regulation**: Yahboom regulator converts 7.4V to 5V for the Raspberry Pi; ESC built-in BEC powers the servo independently
     - [Regulator details](docs/02_power_sensors/power_architecture.md#design-rationale)
 - **Main Power Switch**: Smaller switch installed on the main battery rail after the original 20A switch was replaced for easier integration
     - [Power design](docs/02_power_sensors/power_architecture.md#iterations)
@@ -265,6 +383,27 @@ Because of the decently short battery life, we have had between 4-5 batteries.
 
 ---
 
+### Actuators
+
+- **ESC**: Furitek Lizard Pro 30A/50A ESC
+    - [ESC reasoning](docs/02_power_sensors/power_architecture.md#electronic-speed-controller)
+- **Drive Motor**: Furitek Micro Komodo 1212 Stepper Motor
+    - [Motor reasoning](docs/01_mechanical/mechanical_reasoning.md#motor-selectionmotor-selection)
+- **Steering Motor**: HS-5055MG 11.9g Metal Gear Digital Micro Servo
+    - [Steering reasoning](docs/01_mechanical/mechanical_reasoning.md#servo-motor)
+---
+
+## Risks and Mitigation
+
+- **Voltage drop:** The 45C discharge rating minimizes voltage sag under peak current draw. Battery voltage is monitored during practice runs to identify cell degradation early.
+- **Brownout:** The Pi is powered through a Yahboom voltage regulator board rather than directly from the battery, isolating it from motor-induced voltage dips. A regulator with sufficient headroom above the Pi's peak draw was selected. We may have broken one of our raspberry pi's because we forgot the regulator...
+- **Electrical noise:** Motor and ESC wiring are routed away from signal wires. The serial communication lines between the Pi and Arduino are kept short.
+- **Loose connectors:** All connectors are secured with heat shrink. Once, one of our wires got caught in the gear system causing damage, leading to a short circuit. All wiring has since been replaced.
+- **Overheating:** The ESC and motor are mounted with airflow clearance. Competition runs are under 3 minutes, well within thermal limits. The Raspberry Pi fan is configured to always run after the temperature sensor proved unreliable on our unit.
+- **Power spikes from motors / servos:** The ESC BEC powers the servo independently from the motor rail. The dedicated regulator for the Pi prevents motor spikes from reaching the compute system.
+
+---
+
 ### Summary
 - battery: Gens Ace 1300mAh 2S LiPo (7.4V, 45C)
 - voltage regulation: Buck regulator for Pi (5V); ESC BEC for servo
@@ -282,6 +421,16 @@ This section explains the software that runs on the Raspberry Pi, including how 
 
 ---
 
+### Files
+- [`docs/03_software/architecture.md`](docs/03_software/architecture.md)
+- [`docs/03_software/challenge)running.md`](docs/03_software/challenge_running.md)
+- [`docs/03_software/config.md`](docs/03_software/config.md)
+- [`docs/03_software/hardware_interfaces.md`](docs/03_software/hardware_interfaces.md)
+- [`docs/03_software/state_machine.md`](docs/03_software/state_machine.md)
+- [`docs/03_software/vision.md`](docs/03_software/vision.md)
+
+---
+
 ## Architecture
 
 Three processes run at the same time, camera, vision, and main control. The camera writes frames into shared memory, the vision process reads them and finds walls and obstacles, and the main process runs the state machine and sends commands to the Arduino. The system always uses the freshest data; stale frames and commands are dropped automatically.
@@ -294,7 +443,7 @@ Three processes run at the same time, camera, vision, and main control. The came
     - [Runner details](docs/03_software/challenge_running.md)
 
 <p align="center">
-  <img src="docs/img/architecture.webp" width="750">
+  <img src="docs/diagrams/architecture.webp" width="750">
 </p>
 <p align="center"><i>Full software architecture diagram.</i></p>
 
@@ -312,10 +461,20 @@ All settings are stored in `piclient.toml`. Nothing is hardcoded — speed, PD g
 
 ## Vision
 
+### Wall Following
+
+`open_challenge.py:95-104` (and the "Straight" branch of `obstacle_challenge.py`): the vision pipeline finds black wall contours per frame (`vision_processing.py:126-130`) and measures each wall's pixel distance from frame-center (`get_wall_distance`). The difference between right and left distance is fed into a PD controller (`wall_follow.tick(right - left)`), and the output is sent as a steering command via `client.drive_motors(...)`. If the right wall is further than the left, the correction steers left, and vice versa. It only cares about relative position, not absolute distance, which is why the perspective transform can be skipped. Camera distortion does not change which wall is closer.
+
+### Obstacle Detection
+
+`vision_processing.py:100-106`: red and green pillars are found the same way as walls, but by color-thresholding the UV plane instead of the Y plane. Once a pillar is found, `get_obstacle_path_x` calculates a target x position by finding the midpoint of the gap between the obstacle and the nearest wall, then interpolates linearly toward a lookahead point ahead. A separate PD controller (`obstacle_avoid`) steers toward that target x position rather than centering between walls. This only runs in `obstacle_challenge.py`'s "Straight" state, and only when `obstacles` is non-empty. Otherwise it falls back to plain wall following.
+
 - **Open Challenge**: Counts black pixels in left, right, and center regions. More black pixels means the wall is closer. Corner detection triggers when the center region fills up.
     - [Open challenge vision details](docs/03_software/vision.md#open-challenge)
 - **Obstacle Challenge**: Finds red and green pillars using HSV color detection and calculates the gap between each pillar and the nearby wall. The midpoint of that gap becomes the steering target.
     - [Obstacle challenge vision details](docs/03_software/vision.md#obstacle-challenge)
+
+
 
 ---
 
@@ -325,7 +484,7 @@ All settings are stored in `piclient.toml`. Nothing is hardcoded — speed, PD g
     - [Camera details](docs/03_software/hardware_interfaces.md#camera)
 - **Arduino Client**: Sends serial commands with transaction IDs so multiple commands can be in flight at once
     - [Arduino client details](docs/03_software/hardware_interfaces.md#arduino-client)
-- **DriveCommandExecutor**: Sits between the control loop and the Arduino — only the latest command is sent, stale commands are thrown away
+- **DriveCommandExecutor**: Sits between the control loop and the Arduino, only the latest command is sent, stale commands are thrown away
     - [DriveCommandExecutor details](docs/03_software/hardware_interfaces.md#drivecommandexecutor)
 
 ---
@@ -373,7 +532,6 @@ The journal is best viewed on GitHub where all links are clickable. A PDF versio
 
 ### Files
 - [`docs/04_systems_engineering/subsystem_interactions.md`](docs/04_systems_engineering/subsystem_interactions.md)
-- [`docs/04_systems_engineering/engineering_decisions.md`](docs/04_systems_engineering/engineering_decisions.md)
 - [`docs/04_systems_engineering/constraints_tradeoffs.md`](docs/04_systems_engineering/constraints_tradeoffs.md)
 - [`docs/04_systems_engineering/risk_analysis.md`](docs/04_systems_engineering/risk_analysis.md)
 - [`docs/04_systems_engineering/iteration_cycles.md`](docs/04_systems_engineering/iteration_cycles.md)
@@ -451,6 +609,7 @@ This section explains how another team could rebuild, set up, and test the robot
 - [`docs/05_reproducibility/setup_guide.md`](docs/05_reproducibility/setup_guide.md)
 - [`docs/05_reproducibility/building_from_source.md`](docs/05_reproducibility/building_from_source.md)
 - [`docs/05_reproducibility/testing_workflow.md`](docs/05_reproducibility/testing_workflow.md)
+- [`docs/05_reproducibility/release_notes.md`](docs/05_reproducibility/release_notes.md)
 
 ---
 
@@ -505,39 +664,32 @@ Example points:
 - full track tests
 
 Detailed records:
-- [`docs/03_software/tuning_validation.md`](docs/03_software/tuning_validation.md)
-- [`docs/01_mechanical_iterations/iteration_cycles.md`](docs/04_systems_engineering/iteration_cycles.md)
+- [`docs/04_systems_engineering/iteration_cycles.md`](docs/04_systems_engineering/iteration_cycles.md)
  - [View Journal](docs/Journal/CHANGELOG.md)
 
 ---
 
-## Media and Visual Documentation
-Use this section to point judges to photos, diagrams, and videos.
-
-### Photos
-- overall robot:
-- front view:
-- top view:
-- sensor placement:
-- wiring overview:
-
 ### Diagrams
-- chassis diagram:
-- power diagram:
-- wiring diagram:
-- software flowchart:
-- state machine diagram:
+<p align="center">
+  <img src="docs/diagrams/architecture.webp" width="750">
+</p>
+<p align="center"><i>Full software architecture diagram.</i></p>
+
+<p align="center">
+  <img src="docs/diagrams/schematic.webp" width="500">
+</p>
+<p align="center"><i>Full electronics schematic showing power distribution and signal connections.</i></p>
 
 ### Videos
-- robot demo:
-- obstacle handling demo:
-- testing clips:
+### Open Challenge Run
+[![Open Challenge Run](https://img.youtube.com/vi/WqN3tuj8LFo/maxresdefault.jpg)](https://www.youtube.com/watch?v=WqN3tuj8LFo)
+
+### Obstacle Challenge Run
+[![Obstacle Challenge Run](https://img.youtube.com/vi/08cq6RNCGQM/maxresdefault.jpg)](https://www.youtube.com/watch?v=08cq6RNCGQM)
 
 Suggested folders:
-- `media/`
 - `docs/images/`
 - `docs/diagrams/`
-- `docs/videos/`
 
 ---
 
