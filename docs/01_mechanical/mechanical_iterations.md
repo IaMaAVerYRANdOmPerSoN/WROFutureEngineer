@@ -124,3 +124,26 @@ Connectors shortened to make the robot as compact as possible. This caused the b
   <img src="../../docs/img/connectors.png" width="600">
 </p>
 <p align="center"><i>Final version of the connectors layout</i></p>
+
+---
+
+## Differential Gear Design
+
+Our differential gear design went through several iterations, each with its own set of trade-offs and limitations. The table below summarizes the different versions of our differential gear design, along with their design goals, limitations, and takeaways.
+
+| Version | Design Goals | Limitations | Takeaways |
+| --- | --- | --- | --- |
+| 1 | Adapt a preliminary GrabCAD differential with minor modifications. | The design ignored our size constraints. The teeth did not mesh, wore quickly, and broke at increased speed. | Existing designs must be evaluated against our constraints before testing. |
+| 2 | Design the differential from scratch around our size constraints. | Gear wear still caused skipping, rapid direction changes caused locking, and poor meshing generated temperatures exceeding PLA glass transition temperatures. | Material constraints and operating conditions must be considered alongside geometry. |
+| 3 | Improve meshing and alignment by adding axles inside the rotating cage and securing all moving components. | The added complexity made tolerance tuning difficult. Friction increased wear, and the design couldn't overcome the surface finish limitations of FDM 3D printing. | A more robust design can introduce new friction, tolerance, and manufacturing problems. |
+| 4 | Use a robust metal differential designed for RC cars. | The differential was too large for the universal axles, rubbed against the floor, and bent the rear assembly because of its weight. | Components cannot be viewed in isolation; they are constrained by and must be viewed in the context of the entire system. |
+| 5 | Use a compact differential gearbox salvaged from a smaller RC car (1/24–1/28). | The gearbox was salvaged rather than purpose-built. No backups available, and the design is not easily reproducible. | The smaller, lighter, self-contained gearbox eliminated 3D-printed gears, reduced complexity, fit the design constraints, and provided a good overall trade-off. |
+
+Despite pivoting our design in fundamentally different directions two times, we were able to converge on a final design that met our requirements and constraints. Iteration 1-3 focused on mitigating a fundamental material constraint in FDM PLA, while iteration 4-5 were architectural shifts to completely different models that better meet our requirements. We learned that testing more approaches and iterating quickly near the start of the design process is more effective than premature optimization of a single approach.
+
+<p align="center">
+  <img src="../../docs/img/differential.png" width="600">
+</p>
+<p align="center"><i>Final version of the differential layout</i></p>
+
+---

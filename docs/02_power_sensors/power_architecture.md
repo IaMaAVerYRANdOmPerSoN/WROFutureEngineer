@@ -39,11 +39,11 @@ Explain how the robot is powered and why this power system was selected.
 ## Power Distribution
 
 - **Direct battery power**: ESC and drive motor draw directly from the battery through the main power rail.
-- **Regulated power**: The Raspberry Pi receives 5V from a dedicated step-down buck regulator. This isolates the Pi from voltage fluctuations caused by the motor during acceleration.
+- **Regulated power**: The Raspberry Pi receives 5V from a Yahboom voltage regulator board. This isolates the Pi from voltage fluctuations caused by the motor during acceleration.
 - **Servo power**: The ESC's built-in BEC supplies 5V or 6.5V to the servo motor independently from the main motor rail.
 - **Camera power**: The OV5647 camera draws 3.3V from the Raspberry Pi's CSI rail.
 - **Arduino power**: The Arduino draws 5V from the Raspberry Pi over USB.
-- **Voltage step-down**: A Pololu step-down buck regulator converts 7.4V battery output to stable 5V for the Raspberry Pi.
+- **Voltage step-down**: Yahboom voltage regulator board converts 7.4V battery output to stable 5V for the Raspberry Pi.
 
 ---
 
@@ -72,7 +72,7 @@ Explain how the robot is powered and why this power system was selected.
 
 - **Why this battery was selected:** The Gens Ace 1300mAh 2S LiPo balances capacity, weight, and discharge rate. The 45C rating ensures peak current can be delivered without voltage sag, and 1300mAh is sufficient for multiple competition runs without unnecessary weight.
 - **Why this voltage level was selected:** 2S (7.4V nominal) sits within the operating range of the ESC and motor. 3S would require more aggressive software speed limiting and increases overcurrent risk without meaningful benefit for a wall-following robot.
-- **Why this regulator setup was selected:** A dedicated step-down buck regulator isolates the Raspberry Pi from motor-induced voltage fluctuations. The ESC's built-in BEC handles servo power separately, further reducing load on the regulator and preventing servo actuation from affecting the Pi's supply.
+- **Why this regulator setup was selected:** A Yahboom voltage regulator board isolates the Raspberry Pi from motor-induced voltage fluctuations. The ESC's built-in BEC handles servo power separately, further reducing load on the regulator and preventing servo actuation from affecting the Pi's supply.
 - **Why this design is safe and reliable:** Each subsystem is powered independently — the motor draws directly from the battery through the ESC, the Pi draws through a dedicated regulator, and the servo draws from the ESC BEC. A motor current spike cannot directly affect the Pi or servo.
 
 ---
@@ -93,7 +93,7 @@ Explain how the robot is powered and why this power system was selected.
 ## Risks and Mitigation
 
 - **Voltage drop:** The 45C discharge rating minimizes voltage sag under peak current draw. Battery voltage is monitored during practice runs to identify cell degradation early.
-- **Brownout:** The Pi is powered through a dedicated buck regulator rather than directly from the battery, isolating it from motor-induced voltage dips. A regulator with sufficient headroom above the Pi's peak draw was selected.
+- **Brownout:** The Pi is powered through a Yahboom voltage regulator board rather than directly from the battery, isolating it from motor-induced voltage dips. A regulator with sufficient headroom above the Pi's peak draw was selected.
 - **Electrical noise:** Motor and ESC wiring are routed away from signal wires. The serial communication lines between the Pi and Arduino are kept short.
 - **Loose connectors:** All connectors are secured with heat shrink. The Deans-T connector is checked before every run. A melted connector was encountered in Week 14 due to undersized wiring — all wiring has since been replaced with correctly rated wire.
 - **Overheating:** The ESC and motor are mounted with airflow clearance. Competition runs are under 3 minutes, well within thermal limits. The Raspberry Pi fan is configured to always run after the temperature sensor proved unreliable on our unit.
@@ -109,7 +109,3 @@ Explain how the robot is powered and why this power system was selected.
 - **Final improvement:** High-current motor wiring is now fully separated from low-current signal and compute wiring. Each subsystem is powered independently. The regulator is physically isolated from the drivetrain to prevent future damage.
 
 ---
-
-## Final Notes
-
-The power architecture was designed around separating high-current and low-current subsystems. By routing motor power directly through the ESC and battery, compute power through a dedicated buck regulator, and servo power through the ESC BEC, the design ensures the most demanding load — the drive motor — cannot destabilize the control and vision systems. The lessons learned from the melted connector and regulator failures in earlier builds directly shaped the current design, resulting in a cleaner and more reliable power system.

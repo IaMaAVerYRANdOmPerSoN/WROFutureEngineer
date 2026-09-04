@@ -301,6 +301,11 @@ Full auto-generated API docs: https://apostla-api-reference.web.app/
 # 4. Systems Engineering and Design Decisions
 This section explains how the robot was developed as an integrated system and how trade-offs were evaluated.
 
+- **Engineering Journal**:
+The journal is best viewed on GitHub where all links are clickable. A PDF version is also available for submission.
+    - [View Journal](docs/Journal/CHANGELOG.md)
+    - [View Journal PDF](docs/Journal/JOURNAL.pdf)
+
 ### Files
 - [`docs/04_systems_engineering/subsystem_interactions.md`](docs/04_systems_engineering/subsystem_interactions.md)
 - [`docs/04_systems_engineering/engineering_decisions.md`](docs/04_systems_engineering/engineering_decisions.md)
@@ -404,9 +409,6 @@ pip install piclient[all]
 
 - **Bill of materials**: Full component list including electronics, mechanical parts, 3D printed parts, and tools
     - [Bill of materials](docs/05_reproducibility/bill_of_materials.md)
-- **Build guide**: Step-by-step assembly instructions with photos
-    - [Build guide](docs/05_reproducibility/build_guide.md)
-
 ---
 
 ### Testing
@@ -438,10 +440,9 @@ Example points:
 - full track tests
 
 Detailed records:
-- `tests/`
-- `data/`
 - [`docs/03_software/tuning_validation.md`](docs/03_software/tuning_validation.md)
-- [`docs/04_systems_engineering/iteration_cycles.md`](docs/04_systems_engineering/iteration_cycles.md)
+- [`docs/01_mechanical_iterations/iteration_cycles.md`](docs/04_systems_engineering/iteration_cycles.md)
+ - [View Journal](docs/Journal/CHANGELOG.md)
 
 ---
 
@@ -490,8 +491,8 @@ Brief notes:
 Briefly summarize major milestones here.
 
 See full details in:
-- [`CHANGELOG.md`](CHANGELOG.md)
-- [`docs/05_reproducibility/release_notes.md`](docs/05_reproducibility/release_notes.md)
+
+- [`Journal`](docs/journal/CHANGELOG.md)
 
 Example:
 - **v0.1** – initial repo structure
