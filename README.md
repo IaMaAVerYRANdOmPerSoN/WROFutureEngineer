@@ -307,10 +307,20 @@ All settings are stored in `piclient.toml`. Nothing is hardcoded — speed, PD g
 
 ## Vision
 
+### Wall Following
+
+`open_challenge.py:95-104` (and the "Straight" branch of `obstacle_challenge.py`): the vision pipeline finds black wall contours per frame (`vision_processing.py:126-130`) and measures each wall's pixel distance from frame-center (`get_wall_distance`). The difference between right and left distance is fed into a PD controller (`wall_follow.tick(right - left)`), and the output is sent as a steering command via `client.drive_motors(...)`. If the right wall is further than the left, the correction steers left, and vice versa. It only cares about relative position, not absolute distance, which is why the perspective transform can be skipped. Camera distortion does not change which wall is closer.
+
+### Obstacle Detection
+
+`vision_processing.py:100-106`: red and green pillars are found the same way as walls, but by color-thresholding the UV plane instead of the Y plane. Once a pillar is found, `get_obstacle_path_x` calculates a target x position by finding the midpoint of the gap between the obstacle and the nearest wall, then interpolates linearly toward a lookahead point ahead. A separate PD controller (`obstacle_avoid`) steers toward that target x position rather than centering between walls. This only runs in `obstacle_challenge.py`'s "Straight" state, and only when `obstacles` is non-empty. Otherwise it falls back to plain wall following.
+
 - **Open Challenge**: Counts black pixels in left, right, and center regions. More black pixels means the wall is closer. Corner detection triggers when the center region fills up.
     - [Open challenge vision details](docs/03_software/vision.md#open-challenge)
 - **Obstacle Challenge**: Finds red and green pillars using HSV color detection and calculates the gap between each pillar and the nearby wall. The midpoint of that gap becomes the steering target.
     - [Obstacle challenge vision details](docs/03_software/vision.md#obstacle-challenge)
+
+
 
 ---
 
@@ -320,7 +330,7 @@ All settings are stored in `piclient.toml`. Nothing is hardcoded — speed, PD g
     - [Camera details](docs/03_software/hardware_interfaces.md#camera)
 - **Arduino Client**: Sends serial commands with transaction IDs so multiple commands can be in flight at once
     - [Arduino client details](docs/03_software/hardware_interfaces.md#arduino-client)
-- **DriveCommandExecutor**: Sits between the control loop and the Arduino — only the latest command is sent, stale commands are thrown away
+- **DriveCommandExecutor**: Sits between the control loop and the Arduino, only the latest command is sent, stale commands are thrown away
     - [DriveCommandExecutor details](docs/03_software/hardware_interfaces.md#drivecommandexecutor)
 
 ---

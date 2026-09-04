@@ -77,12 +77,39 @@ Adding LiDAR or ToF sensors would only be justified if there was a real constrai
 
 | Trade-Off | Decision |
 | ----------- | ---------- |
-| Cost vs performance | OV5647 chosen over Pi Camera Module 3 — adequate performance at lower cost |
-| Throughput vs Accuracy | Camera capped at 62.50 fps at 640x480 — higher resolution reduces frame rate below what the control loop needs |
-| Redundancy vs complexity | Single camera chosen — simplifies design and reduces weight, cost, and complexity |
+| Cost vs performance | OV5647 chosen over Pi Camera Module 3, adequate performance at lower cost |
+| Throughput vs Accuracy | Camera capped at 62.50 fps at 640x480, higher resolution reduces frame rate below what the control loop needs |
+| Redundancy vs complexity | Single camera chosen, simplifies design and reduces weight, cost, and complexity |
 
 ---
 
 ## Final Decision
 
 The OV5647 camera covers all sensing requirements for the competition. The camera is a lightweight, compact, and cost-effective solution that provides sufficient performance for both the open and obstacle challenges. While there are trade-offs in terms of accuracy and redundancy, the single-sensor approach simplifies the design and reduces potential points of failure.
+
+---
+
+## Arduino Uno R3
+
+**Purpose:** Low-level hardware controller that handles PWM output to the ESC and servo, and receives drive commands from the Raspberry Pi over USB serial.
+
+**Why it was selected:**
+The Raspberry Pi 5 runs Linux, which is not a real-time operating system. It cannot guarantee microsecond-level PWM timing under load. When the vision pipeline and control loop are running at 62.5 fps, the CPU is busy enough that GPIO-based PWM timing becomes unreliable. The Arduino handles PWM output in a tight bare-metal loop with no operating system overhead, guaranteeing consistent pulse widths to the ESC and servo regardless of what the Pi is doing.
+
+**Advantages:**
+- Guarantees precise PWM timing independent of Pi CPU load
+- Simple USB serial connection to the Pi
+- Well-documented with broad library support for servo and ESC control
+- Easy to flash and modify via PlatformIO
+- Low cost and widely available
+
+**Limitations:**
+- Adds a serial communication step between the control loop and the hardware, introducing a small amount of latency
+- Requires a separate USB cable and port on the Pi
+
+**Alternatives considered:**
+- **Direct Pi GPIO PWM** — unreliable under Linux without a dedicated real-time co-processor
+- **ESP32** — more capable but significantly more complex to set up; overkill for this application
+- **Hiwonder controller (used last year)**, replaced with the Arduino Uno for simpler software control and better documentation
+
+---
