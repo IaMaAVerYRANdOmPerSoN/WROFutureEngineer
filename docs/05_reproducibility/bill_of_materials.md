@@ -17,7 +17,7 @@ This document lists all components used to build the robot, including electronic
 | Servo Motor | [Hitec HS-5055MG](https://hitecrcd.com/hs-5055mg-economy-metal-gear-feather-servo/) | Steering control | 1 | $25 |
 | Camera | [OV5647 5MP 1080P](https://www.amazon.ca/dp/B0D324RKRZ) | Wall, pillar, and corner line detection | 1 | $35 |
 | Battery | [Gens Ace 1300mAh 2S LiPo 45C](https://genstattu.com/gens-ace-1300mah-2s-7-4v-45c-g-tech-lipo-battery-pack-with-deans-plug/) | Main power source | 1 | $21 |
-| Voltage Regulator | Pololu Step-Down (5V) | Powers Raspberry Pi from battery | 1 | $15 |
+| Voltage Regulator | Yahboom Step-Down (5V) | Powers Raspberry Pi from battery | 1 | $30 |
 | Power Switch | — | Main battery on/off | 1 | — |
 | Deans-T Connector | — | Battery main connector | 2 | — |
 
@@ -56,9 +56,9 @@ This document lists all components used to build the robot, including electronic
 
 | Category | Estimated Cost (CAD) |
 | ---------- | ---------------------- |
-| Electronics | ~$394 |
+| Electronics | ~$419 |
 | Mechanical | ~$27 |
 | Filament | ~$10 |
-| **Total** | **~$431** |
+| **Total** | **~$45f6** |
 
 *Prices are approximate and based on retail cost at time of purchase. Some components were sourced from existing supplies.*

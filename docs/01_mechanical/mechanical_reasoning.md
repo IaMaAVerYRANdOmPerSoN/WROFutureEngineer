@@ -12,8 +12,10 @@
 A DC motor is simple, cheap, and easy to control with a basic circuit. It works well for basic speed control but spins unevenly at low speeds, which makes precise movement difficult.
 
 </td>
-<td width="8%"></td>
-<td width="50%" valign="top" style="border: 1px solid #888; border-radius: 6px; padding: 12px;">
+</tr>
+<tr>
+<td colspan="2" valign="top" style="border: 1px solid #888; border-radius: 6px; padding: 12px;">
+
 
 ### Furitek Micro Komodo 1212
 
@@ -33,6 +35,7 @@ Our robot measures 24 x 10 x 28 cm. The camera is mounted on a tall vertical mas
 
 ## Drive System
 
+**Gear ratio:** 1:4 (motor to wheel)
 The WRO Future Engineer rules do not allow differential drive or omnidirectional wheels, Thus narrowing the solution space to effectively 3 options: Rear-Wheel Drive (RWD), Front-Wheel Drive (FWD), and 4-Wheel Drive (4WD). Each of these options has its own advantages and disadvantages, which are summarized in the table below.
 
 | | **RWD** | **FWD** | **4WD** |
@@ -42,8 +45,22 @@ The WRO Future Engineer rules do not allow differential drive or omnidirectional
 
 We chose RWD because it is the simplest design, which makes it easier to build and maintain. It is also lighter than FWD or 4WD, which improves acceleration and reduces power consumption. The robot will not be moving at high speeds, so stability is not a major concern. With FWD and 4WD, the steering mechanism is extremely complex, especially considering that the vast majority of components are designed in-house and 3D printed. The complexity of FWD and 4WD would make it difficult to design, test, and maintain the robot in a competition environment. We couldn't make a reliable and robust 3D printed differential gear, let alone a complete FWD or 4WD system. RWD is the best option for our robot because it is the simplest option that satisfies our design constraints (We do not operate at speeds where RWD becomes problematic.) It is also the most reliable option, which is important in a competition environment.
 
+## Steering System
+
+- **Steering type:** Parallel (Zero-Ackermann)
+- **Actuator used:** Hitec HS-5055MG servo motor
+- **Steering linkage:** Servo-actuated rack and pinion, moving both front wheels through a shared tie rod so they turn to the same angle rather than the different angles a true Ackermann linkage would use
+- **Steering range:** 30-150 degrees (90 is straight), limited by rack travel and chassis clearance, not by the servo's own 0-180 degree range
+- **Why selected:**
+    - A servo gives direct, repeatable position control, the steering angle the PD controller calculates each frame can be commanded and held without extra feedback hardware, unlike a plain DC motor.
+    - Rack and pinion is simple to 3D print and assemble reliably compared to a multi-link Ackermann setup, and converts the servo's rotational output into linear rack travel directly.
+    - True Ackermann geometry only pays off at speeds where the inner/outer wheel angle difference meaningfully reduces tire scrub. At the robot's operating speed of 1.5-2.0 m/s (see [torque_speed_reasoning.md](./torque_speed_reasoning.md)), that difference doesn't matter enough to justify the added linkage complexity.
+
+---
+
 ## Servo Motor
 
 We selected a standard servo motor for steering because it provides precise and repeatable control of the front wheels. Unlike a motor that would need additional position feedback and a more complicated control system, a servo can move directly to a commanded angle and hold that position. This makes it easier for the robot to follow the steering angles calculated by our control code and helps it make consistent turns.
 
-A servo motor also fits well with our focus on simplicity and reliability. Its compact size and straightforward interface make it easy to mount and connect to the robot's control system, while its position control reduces the risk of over- or under-steering. Reliable steering is especially important in a competition environment, where small errors in each turn can accumulate and cause the robot to leave the intended path.
+A servo motor also fits well with our focus on simplicity and reliability. Its compact size and straightforward interface make it easy to mount and connect to the robot's control system, while its position control reduces the risk of over or under-steering. Reliable steering is especially important in a competition environment, where small errors in each turn can accumulate and cause the robot to leave the intended path.
+
