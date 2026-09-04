@@ -313,13 +313,67 @@ This section explains how the robot was developed as an integrated system and ho
 - [`docs/04_systems_engineering/risk_analysis.md`](docs/04_systems_engineering/risk_analysis.md)
 - [`docs/04_systems_engineering/iteration_cycles.md`](docs/04_systems_engineering/iteration_cycles.md)
 
+### Constraints
+
+The robot must satisfy four levels of constraints in order of priority:
+
+- **WRO rules compliance**: Size, mass, power, and mechanical limits must be respected at all times. The robot must start, stop, and reset reliably.
+- **Score maximization**: The robot must complete challenge objectives as reliably as possible, minimize recovery time, and avoid oscillations and false detections.
+- **Simplicity and reliability**: Each subsystem has a clear single purpose. The system degrades gracefully under sensor noise and is easy to debug during competition setup.
+- **Speed**: The camera pipeline, control loop, and serial interface must keep up with the required frame rate without creating stale-data backlogs.
+    - [Full constraint tree](docs/04_systems_engineering/constraints_tradeoffs.md#constraint-tree)
+
+---
+
+### Trade-offs
+
+Trade-offs are evaluated against the constraint hierarchy, a trade-off that violates a higher-level constraint is rejected regardless of its other benefits. Hardware trade-offs are treated with more caution than software trade-offs because they are harder to reverse. A quick preliminary solution is always tested on the track before committing to a final design.
+
+- **Single camera over multiple sensors**: Reduces weight, cost, and synchronization complexity. HSV calibration and track testing address the lighting sensitivity limitation.
+- **Rear-wheel drive over four-wheel drive**: Simpler drivetrain leaves more room for reliable software and testing.
+- **Latest-wins command scheduling**: A fresh steering correction is more valuable than guaranteed delivery of an outdated command.
+- **Namespace package architecture**: More complex to set up but provides clear interfaces, independent distribution, and sustainable long-term maintainability.
+    - [Full trade-off analysis](docs/04_systems_engineering/constraints_tradeoffs.md#trade-offs)
+
+---
+
+### Design Iteration
+
+Major design decisions are modelled as a Directed Acyclic Graph, early hardware choices form root nodes that constrain downstream software and tuning decisions. Two case studies show how this plays out in practice:
+
+- **Differential gear**: Five iterations from an adapted GrabCAD design through three custom printed versions to a salvaged RC gearbox. Each iteration exposed a new constraint, material limits, tolerance stacking, component sizing, that drove the next architectural shift.
+- **Python packaging**: Four iterations from a flat src directory to a namespace package architecture with independently distributable components, driven by the need for clear interfaces between the camera, vision, control, and recording subsystems.
+    - [Full iteration history](docs/04_systems_engineering/iteration_cycles.md)
+
+---
+
+### Risk Analysis
+
+Risks are identified through track telemetry, SPICE circuit simulation, and rulebook audits. Each risk is placed on a likelihood vs. impact matrix to prioritize fixes. Mitigation follows the same iterative process as design, a quick patch is tested on the track first, then refined into the final solution.
+
+- **Risk lifecycle**: Identify → Evaluate → Mitigate → Validate on track → Iterate
+    - [Full risk analysis](docs/04_systems_engineering/risk_analysis.md)
+
+---
+
+### Subsystem Interactions
+
+The robot's performance is determined by how its subsystems work together. Key interactions:
+
+- **Mechanical and control**: Steering range, drive speed, camera height, and PD gains must be tuned together, a software improvement is only useful if the drivetrain can produce the requested response.
+- **Power and electrical**: Motor and servo current spikes can cause Raspberry Pi brownouts. The regulator and wiring separate high-current actuator loads from compute power.
+- **Perception and behavior**: The camera is the only active sensor. Vision runs in a separate process and signals the main loop when fresh data is ready. Corner detection requires several consecutive frames to filter noise.
+- **Software and communication**: The DriveCommandExecutor uses latest-wins scheduling so serial latency never creates a backlog of stale commands.
+    - [Full subsystem interaction map](docs/04_systems_engineering/subsystem_interactions.md)
+
+---
+
 ### Summary
-Write a short summary here:
-- biggest engineering constraints:
-- main trade-offs:
-- most important decisions:
-- major risks:
-- how the robot improved through iteration:
+- biggest engineering constraints: WRO size and mass limits; camera-only perception under variable lighting; PLA material limits for 3D printed gears
+- main trade-offs: Single camera vs. multi-sensor; RWD vs. AWD; namespace packages vs. flat src; printed differential vs. off-the-shelf gearbox
+- most important decisions: Latest-wins command scheduling; parallel process architecture; namespace package distribution
+- major risks: Differential gear failure; Raspberry Pi brownout; camera detection failure under competition lighting
+- how the robot improved through iteration: Each failure exposed a new constraint that drove the next design, five differential versions, four packaging versions, and continuous PD and HSV tuning on the track
 
 ---
 
