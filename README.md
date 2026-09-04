@@ -85,7 +85,8 @@ This section explains the physical design of the robot, including chassis layout
 
 - **Drive System**: We use rear wheel drive, means the motor's power is transmitted to the back wheels rather than the front.
     - [Why RWD?](docs/01_mechanical/mechanical_reasoning.md#drive-system)
-
+- **Steering type:** Parallel (Zero-Ackermann), Both front wheels turn at the same angle instead of the inner wheel turning more sharply than the outer. This causes slight tire scrub during turns but is acceptable on a small lightweight robot on a smooth mat.
+    - [Why Parallel Zero-Ackermann?](docs/01_mechanical/mechanical_reasoning.md#steering-system)
 ### Structural Design
 To get our current design, we took inspiration from our previous robot we used last year in Future Engineers.
 
@@ -179,7 +180,66 @@ This section explains how the robot is powered, what sensors are used, where the
 - **Main Power Switch**: Smaller switch installed on the main battery rail after the original 20A switch was replaced for easier integration
     - [Power design](docs/02_power_sensors/power_architecture.md#iterations)
 - **Estimated Runtime**: ~17 minutes at average load; enough for ~5 full competition runs per charge
-    - [Runtime details](docs/02_power_sensors/power_architecture.md#runtime-considerations)
+
+## Voltage and Current Requirements
+
+### 5V Rail (Raspberry Pi, Arduino, Servo)
+
+| Component | Current Draw |
+|-----------|-------------|
+| Raspberry Pi 5 | 2.40A |
+| Arduino Uno R3 | 0.05A |
+| Servo Motor (stall) | 0.70A |
+| Camera (OV5647) | 0.25A |
+| **Total 5V current** | **3.40A** |
+
+Power at 5V: 3.40A × 5V = **17W**
+
+Accounting for regulator efficiency (80%):
+17W ÷ 0.8 = **21.25W** needed from battery for the 5V rail.
+
+---
+
+### 7.4V Rail (Motor)
+
+| Component | Current Draw |
+|-----------|-------------|
+| Drive Motor (average during run) | 3.50A |
+| **Total motor current** | **3.50A** |
+
+Power at 7.4V: 3.50A × 7.4V = **25.9W**
+
+---
+
+### Total Battery Power and Current
+
+| Rail | Power |
+|------|-------|
+| 5V rail (via regulator) | 21.25W |
+| Motor rail (direct) | 25.9W |
+| **Total** | **47.15W** |
+
+Total current from battery:
+47.15W ÷ 7.4V = **6.37A**
+
+---
+
+### Runtime Estimate
+
+6.37A average draw from a 1300mAh (1.3Ah) battery at 80% usable capacity:
+
+(1.3Ah × 0.8) ÷ 6.37A = **~0.16 hours (~10 minutes)**
+
+In practice the robot lasts significantly longer because:
+- The motor draws far less than stall current at competition speeds (30-40% throttle)
+- The Raspberry Pi rarely hits full load simultaneously with peak motor draw
+- The servo is at stall current only momentarily during sharp turns
+- The regulator efficiency is typically closer to 85-90% under real load
+
+At realistic average loads (~4A total), the expected runtime is approximately **17 minutes**, sufficient for ~5 full competition runs per charge.
+
+Because of the decently short battery life, we have had between 4-5 batteries.
+
 
 ---
 
@@ -303,8 +363,8 @@ This section explains how the robot was developed as an integrated system and ho
 
 - **Engineering Journal**:
 The journal is best viewed on GitHub where all links are clickable. A PDF version is also available for submission.
-    - [View Journal](docs/Journal/CHANGELOG.md)
-    - [View Journal PDF](docs/Journal/JOURNAL.pdf)
+    - [View Journal](docs/journal/CHANGELOG.md)
+    - [View Journal PDF](docs/journal/CHANGELOG.pdf)
 
 ### Files
 - [`docs/04_systems_engineering/subsystem_interactions.md`](docs/04_systems_engineering/subsystem_interactions.md)
