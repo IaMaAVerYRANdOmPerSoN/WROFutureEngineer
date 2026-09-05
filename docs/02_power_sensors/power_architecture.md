@@ -90,17 +90,6 @@ Explain how the robot is powered and why this power system was selected.
 
 ---
 
-## Risks and Mitigation
-
-- **Voltage drop:** The 45C discharge rating minimizes voltage sag under peak current draw. Battery voltage is monitored during practice runs to identify cell degradation early.
-- **Brownout:** The Pi is powered through a Yahboom voltage regulator board rather than directly from the battery, isolating it from motor-induced voltage dips. A regulator with sufficient headroom above the Pi's peak draw was selected.
-- **Electrical noise:** Motor and ESC wiring are routed away from signal wires. The serial communication lines between the Pi and Arduino are kept short.
-- **Loose connectors:** All connectors are secured with heat shrink. The Deans-T connector is checked before every run. A melted connector was encountered in Week 14 due to undersized wiring — all wiring has since been replaced with correctly rated wire.
-- **Overheating:** The ESC and motor are mounted with airflow clearance. Competition runs are under 3 minutes, well within thermal limits. The Raspberry Pi fan is configured to always run after the temperature sensor proved unreliable on our unit.
-- **Power spikes from motors / servos:** The ESC BEC powers the servo independently from the motor rail. The dedicated regulator for the Pi prevents motor spikes from reaching the compute system.
-
----
-
 ## Iterations
 
 - **Initial power design:** Large 20A toggle switch sourced from school supply; undersized wiring throughout the power harness; no dedicated regulator mount.
@@ -109,3 +98,23 @@ Explain how the robot is powered and why this power system was selected.
 - **Final improvement:** High-current motor wiring is now fully separated from low-current signal and compute wiring. Each subsystem is powered independently. The regulator is physically isolated from the drivetrain to prevent future damage.
 
 ---
+
+## Electronic Speed Controller (ESC)  
+The ESC is a key component that regulates how the motor receives power. It:  
+- Controls the motor's speed  
+- Manages direction  
+- Ensures safe delivery of voltage and current to the motor
+
+## Furitek Lizard Pro 30A/50A ESC
+
+- **Battery Support:** 2S–3S LiPo
+- **BEC:** 5V or 6.5V, 2.5A
+- **Constant Current:** 30A
+- **Burst Current:** 50A
+- **Built-in Power Switch**
+- **Dimensions:** 28 × 15.5 mm
+- **Weight:** 3.7 g
+
+**Where to Buy:** [Click Here](https://furitek.com/products/combo-of-furitek-lizard-pro-30a-50a-brushed-brushless-esc-for-axial-scx24-with-bluetooth)
+
+This ESC was chosen for its high current capacity, lightweight design, and reliable built-in BEC, making it well-suited for our motor and servo needs.

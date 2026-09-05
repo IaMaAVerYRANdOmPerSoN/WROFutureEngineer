@@ -20,6 +20,7 @@ This document lists all components used to build the robot, including electronic
 | Voltage Regulator | Yahboom Step-Down (5V) | Powers Raspberry Pi from battery | 1 | $30 |
 | Power Switch | — | Main battery on/off | 1 | — |
 | Deans-T Connector | — | Battery main connector | 2 | — |
+| Differential (1/4 gear ratio)| 1 | — |
 
 ---
 

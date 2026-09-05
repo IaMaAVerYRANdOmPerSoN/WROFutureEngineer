@@ -25,9 +25,38 @@ A small but powerful brushless motor rated at 3450 KV and 120W. It needs a brush
 </tr>
 </table>
 
+
 ## Motor Choice
 
 The Micro Komodo spins smoothly at all speeds, which is important for our wall-following code to keep the robot at a steady distance from the walls. A regular DC motor would cause the robot to move unevenly at low speeds, leading to unpredictable movement.
+
+<table>
+<tr>
+<td width="65%" valign="top">
+
+### Potential Improvements
+- Experiment with 10 : 58 – 14 : 58 combinations to tune the balance between torque and top speed.
+- Upgrade or lubricate bearings to reduce friction and improve consistency over multiple heats.
+
+</td>
+<td width="35%" valign="top">
+
+### Performance Specifications
+- KV: **3450 rpm/V**  
+- No-load @10V: **0.7 A**  
+- Power: **120 W**  
+- Battery: **2–3S LiPo**  
+- Resistance: **0.16 Ω**  
+- Max Current: **10 A**  
+- Slot/Pole: **12**  
+- Shaft: **1.5 × 6 mm**  
+
+</td>
+</tr>
+</table>
+
+
+---
 
 ## Size Reasoning
 
@@ -63,4 +92,23 @@ We chose RWD because it is the simplest design, which makes it easier to build a
 We selected a standard servo motor for steering because it provides precise and repeatable control of the front wheels. Unlike a motor that would need additional position feedback and a more complicated control system, a servo can move directly to a commanded angle and hold that position. This makes it easier for the robot to follow the steering angles calculated by our control code and helps it make consistent turns.
 
 A servo motor also fits well with our focus on simplicity and reliability. Its compact size and straightforward interface make it easy to mount and connect to the robot's control system, while its position control reduces the risk of over or under-steering. Reliable steering is especially important in a competition environment, where small errors in each turn can accumulate and cause the robot to leave the intended path.
+
+
+### HS-5055MG 11.9g Metal Gear Digital Micro Servo
+
+- **Operating Voltage:** 4.8V – 6.0V DC
+- **Max Torque:** 22 oz/in (1.6 kg/cm)
+- **Speed:** 0.17s/60° @ 6.0V
+- **Stall Current:** 700 mA
+- **Gear Material:** Metal
+- **Weight:** 9.5 g
+- **Circuit Type:** G1 Programmable Digital
+
+**Where to Buy:** [Click Here](https://hitecrcd.com/hs-5055mg-economy-metal-gear-feather-servo/?srsltid=AfmBOooq_9U4Nehv90Y-tGWqZeo6_1c0_7imuMD9W_dBJmYS1m0sd2Y_)
+
+### Potential Improvements
+- Improve response time. This servo motor is not as quick as higher-end micro servos, which reduces steering precision during sharp turns.
+- Upgrade to a higher-torque digital micro servo for more reliable steering.
+
+This servo motor was chosen for its compact size, strong torque, and durable metal gears, making it great for precise steering control.
 

@@ -12,11 +12,47 @@ This repo is organized to show:
 
 ---
 
-## Team Information
-- **Team Members:** Elvis Wang, Michael Xie, Ryan Rao
-- **Coach / Mentor:** Huifei Rao
+## Team Members
 
-### *add more info about team and stuff*
+<p align="center">
+  <img src="docs/img/Team.png" width="600">
+</p>
+<p align="center"><i>Explorer Robotics — WRO Future Engineers 2026</i></p>
+
+---
+
+We are a three-person team from Explorer Robotics in Whitby, Ontario, Canada. We have been competing in WRO for several years. This year we set out to build a fully autonomous self-driving robot from scratch, designing our own chassis, differential gear system, and vision pipeline.
+
+<p align="center">
+  <img src="docs/img/Elvis.png" width="200">
+  <img src="docs/img/Micheal.png" width="200">
+  <img src="docs/img/Ryan.png" width="200">
+</p>
+<p align="center">Elvis &nbsp;&nbsp;&nbsp; Michael &nbsp;&nbsp;&nbsp; Ryan</p>
+
+## Our Coach
+<table>
+<tr>
+  <td align="center" width="40%">
+    <img src="docs/img/coach.png" width="100%"/><br>
+    <em>Our Coach</em>
+  </td>
+
+  <td valign="top" width="60%">
+  
+
+
+  ### Information
+  - Head coach of Robotics Competitions, including FLL (First LEGO League),  WRO (World Robotics Olympiad) Robo Sports, Future Engineers, and Robo Mission. Led teams in winning multiple national, international robotics, and programming awards.
+  - Over 20 years of IT industry experience as a software engineer working internationally.
+  - MSc in Electrical & Computer Engineering from the University of Alberta.
+  - BSc in Mathematics from Peking University.
+  - Founder of Explorer Robotics, a local robotics club in Ajax and Whitby, teaching coding, AI, robotics, etc.
+  </td>
+</tr>
+</table>
+
+[![Website](https://img.shields.io/badge/Website-explorer--robotics.com-blue?style=for-the-badge&logo=google-chrome)](https://explorer-robotics.com/)
 
 ---
 
@@ -24,14 +60,73 @@ This repo is organized to show:
 Briefly describe your robot in 3–6 sentences.
 
 Example:
-> Our robot is a self-driving vehicle designed for the WRO 2026 Future Engineers challenge. It uses [camera / LiDAR / ultrasonic / IMU / other sensors] to detect the environment, follow the track, and react to obstacles. The robot is built with [main controller], [drive system], and [steering mechanism]. Our design focuses on [stability / reliability / fast turning / accurate detection / modularity].
+> Our robot is a self-driving car built for the WRO 2026 Future Engineers challenge. It uses one downward-angled camera to spot track walls, corner lines, and colored obstacle pillars, and follows the track using a state-machine control loop. The robot runs on a Raspberry Pi 5 for vision, an Arduino Uno for motor and servo control, a Furitek Micro Komodo 1212 brushless motor that drives the rear wheels through a differential gearbox, and rack-and-pinion steering run by an HS-5055MG servo. Our design is simple and reliable, using one sensor for all detection and a sturdy build that's easy to fix during competition.
 
-### Main Features
-- [Feature 1]
-- [Feature 2]
-- [Feature 3]
-- [Feature 4]
+---
 
+## Table of Contents
+
+- [Project Overview](#project-overview)
+- [Team Members](#team-members)
+- [Robot Summary](#robot-summary)
+- [Repository Structure](#repository-structure)
+  - [Main Files](#main-files)
+  - [Documentation](#documentation)
+  - [Other Project Assets](#other-project-assets)
+- [1. Mechanical Design](#1-mechanical-design)
+  - [Images of Robot](#images-of-robot)
+  - [Structural Design](#structural-design)
+    - [Old Design](#old-design)
+    - [Improvements](#improvements)
+    - [Changes](#changes)
+  - [3D Printed Parts](#3d-printed-parts)
+  - [Full Robot](#full-robot)
+- [2. Power and Sensor Architecture](#2-power-and-sensor-architecture)
+  - [Files](#files)
+  - [Power](#power)
+  - [Voltage and Current Requirements](#voltage-and-current-requirements)
+    - [5V Rail (Raspberry Pi, Arduino, Servo)](#5v-rail-raspberry-pi-arduino-servo)
+    - [7.4V Rail (Motor)](#74v-rail-motor)
+    - [Total Battery Power and Current](#total-battery-power-and-current)
+    - [Runtime Estimate](#runtime-estimate)
+  - [Sensors](#sensors)
+  - [Compute](#compute)
+  - [Summary](#summary)
+- [3. Software Architecture and Strategy](#3-software-architecture-and-strategy)
+  - [Software](#software)
+  - [Architecture](#architecture)
+  - [Config](#config)
+  - [Vision](#vision)
+    - [Wall Following](#wall-following)
+    - [Obstacle Detection](#obstacle-detection)
+  - [Hardware Interfaces](#hardware-interfaces)
+  - [Challenge Running](#challenge-running)
+    - [Open Challenge](#open-challenge)
+    - [Obstacle Challenge](#obstacle-challenge)
+  - [Running the Robot](#running-the-robot)
+- [4. Systems Engineering and Design Decisions](#4-systems-engineering-and-design-decisions)
+  - [Files](#files-1)
+  - [Constraints](#constraints)
+  - [Trade-offs](#trade-offs)
+  - [Design Iteration](#design-iteration)
+  - [Risk Analysis](#risk-analysis)
+  - [Subsystem Interactions](#subsystem-interactions)
+  - [Summary](#summary-1)
+- [5. Reproducibility](#5-reproducibility)
+  - [Files](#files-2)
+  - [Software Setup](#software-setup)
+  - [Hardware Setup](#hardware-setup)
+  - [Testing](#testing)
+  - [Summary](#summary-2)
+- [Testing and Validation](#testing-and-validation)
+- [Media and Visual Documentation](#media-and-visual-documentation)
+  - [Photos](#photos)
+  - [Diagrams](#diagrams)
+  - [Videos](#videos)
+- [CAD and Wiring Files](#cad-and-wiring-files)
+- [Version History](#version-history)
+- [Contribution and Documentation Rules](#contribution-and-documentation-rules)
+- [Final Notes](#final-notes)
 
 ---
 
@@ -42,7 +137,7 @@ Example:
 - `LICENSE` – repository license
 - `.gitignore` – ignored local/generated files
 - `requirements.txt` – Python dependencies
-- `CHANGELOG.md` – version history
+
 
 ### Documentation
 - `docs/01_mechanical/` – mobility and mechanical design
@@ -50,15 +145,24 @@ Example:
 - `docs/03_software/` – software design and obstacle strategy
 - `docs/04_systems_engineering/` – engineering decisions, trade-offs, and risks
 - `docs/05_reproducibility/` – build, setup, assembly, and testing workflow
+- `docs/journal/` – dated engineering journal (Markdown + PDF export)
+- `docs/img/` – images referenced throughout the docs (robot photos, diagrams, team photos)
+- `docs/plan.md`, `docs/shoppingList.md`, `docs/coach_comments.md` – supporting planning docs
 
-### Other Project Assets
-- `cad/` – CAD models and mechanical design files
-- `wiring/` – wiring diagrams and connector information
-- `src/` – source code
-- `tests/` – testing scripts, procedures, and logs
-- `data/` – calibration data and experiment results
-- `media/` – photos, screenshots, and videos
-- `submissions/` – final competition submission materials
+**Other top-level folders:**
+- `ArudinoServer/` – PlatformIO firmware for the Arduino (low-level motor/servo control)
+- `PiClient/` – Python code on the Raspberry Pi
+    - `src/` – main vision processing, control, and Arduino communication logic
+    - `src_min/` – a minimal/leaner variant of the same modules
+    - `utils/tools/` – standalone calibration and debug tools (contours, lidar, manual control)
+    - `tests/` – test and experiment scripts
+- `EDA/` – KiCad PCB project (schematic, layout, project files)
+    - `FAB/` – fabrication outputs (Gerbers, BOM, pick-and-place positions)
+    - `lib/` – imported component symbol/footprint libraries
+
+
+
+
 
 ---
 
@@ -71,28 +175,28 @@ This section explains the physical design of the robot, including chassis layout
     - [Motor reasoning](docs/01_mechanical/mechanical_reasoning.md#motor-selectionmotor-selection)
 - **Steering Motor**: HS-5055MG 11.9g Metal Gear Digital Micro Servo
     - [Steering reasoning](docs/01_mechanical/mechanical_reasoning.md#servo-motor)
-
+- **ESC**: Furitek Lizard Pro 30A/50A ESC
+    - [ESC reasoning](docs/02_power_sensors/power_architecture.md#electronic-speed-controller)
 ### Images of Robot
 | | |
 |:---:|:---:|
-| ![Photo 1](https://media1.tenor.com/m/na4hpUz4LC8AAAAC/blue-emoji.gif) | ![Photo 2](https://media1.tenor.com/m/na4hpUz4LC8AAAAC/blue-emoji.gif) |
-| ![Photo 3](https://media1.tenor.com/m/na4hpUz4LC8AAAAC/blue-emoji.gif) | ![Photo 4](https://media1.tenor.com/m/na4hpUz4LC8AAAAC/blue-emoji.gif) |
-| ![Photo 5](https://media1.tenor.com/m/na4hpUz4LC8AAAAC/blue-emoji.gif) | ![Photo 6](https://media1.tenor.com/m/na4hpUz4LC8AAAAC/blue-emoji.gif) |
+| ![Photo 1](docs/img/robot%20front.png) | ![Photo 2](docs/img/robot%20back.png) |
+| ![Photo 3](docs/img/robot%20right.png) | ![Photo 4](docs/img/robot%20left.png) |
+| ![Photo 5](docs/img/robot%20over.png) | ![Photo 6](docs/img/robot%20under.png) |
 
-*Placeholder images*
 
 ---
 
 - **Drive System**: We use rear wheel drive, means the motor's power is transmitted to the back wheels rather than the front.
     - [Why RWD?](docs/01_mechanical/mechanical_reasoning.md#drive-system)
-- **Steering type:** Parallel (Zero-Ackermann), Both front wheels turn at the same angle instead of the inner wheel turning more sharply than the outer. This causes slight tire scrub during turns but is acceptable on a small lightweight robot on a smooth mat.
+- **Steering type:** Parallel (Zero-Ackermann), Both front wheels turn at the same angle instead of the inner wheel turning more sharply than the outer. It does cause slight tire scrub during turns but it is acceptable on a small lightweight robot on a smooth mat.
     - [Why Parallel Zero-Ackermann?](docs/01_mechanical/mechanical_reasoning.md#steering-system)
 ### Structural Design
 To get our current design, we took inspiration from our previous robot we used last year in Future Engineers.
 
 
 #### Old Design
-![Photo 1](https://media1.tenor.com/m/na4hpUz4LC8AAAAC/blue-emoji.gif)
+![Photo 1](docs/img/old_robot_left.webp)
 
 *add old robot photo*
 
@@ -107,17 +211,15 @@ To get our current design, we took inspiration from our previous robot we used l
 #### Changes
 - Rotating the Raspiberry Pi 90 degrees would allow for a slimmer design
 - Implimenting more supports on the sides of the robot
-- Created our own differential gear
 - We use the Arduino Uno instead of Hiwonder
 - Changed the camera angle and added a place for the stepdown voltage
 
-![Photo 1](https://media1.tenor.com/m/na4hpUz4LC8AAAAC/blue-emoji.gif)
+![Photo 1](docs/img/robot%20left.png)
 
-*add new robot photo*
 
 ### 3D Printed Parts
 
-- **Turning System**: Servo-actuated rack and pinion steering with a curved front bumper for wall sliding in the obstacle challenge. The servo connects to the steering rack via a servo horn and tie rods — rotating the servo horn pushes or pulls the tie rods, which turn the front wheels left or right.
+- **Turning System**: Servo-actuated rack and pinion steering with a curved front bumper for wall sliding in the obstacle challenge. The servo connects to the steering rack via a servo horn and tie rods, rotating the servo horn pushes or pulls the tie rods, which turn the front wheels left or right.
     - [Turning system iterations](docs/01_mechanical/mechanical_iterations.md#turning-system)
 
 ![Turning System](docs/img/turning_system_final.png)
@@ -175,7 +277,7 @@ This section explains how the robot is powered, what sensors are used, where the
 
 - **Battery**: Gens Ace 1300mAh 2S LiPo, 7.4V nominal, 45C discharge
     - [Battery details](docs/02_power_sensors/power_architecture.md#battery)
-- **Voltage Regulation**: Step-down buck regulator converts 7.4V to 5V for the Raspberry Pi; ESC built-in BEC powers the servo independently
+- **Voltage Regulation**: Yahboom regulator converts 7.4V to 5V for the Raspberry Pi; ESC built-in BEC powers the servo independently
     - [Regulator details](docs/02_power_sensors/power_architecture.md#design-rationale)
 - **Main Power Switch**: Smaller switch installed on the main battery rail after the original 20A switch was replaced for easier integration
     - [Power design](docs/02_power_sensors/power_architecture.md#iterations)
@@ -257,6 +359,17 @@ Because of the decently short battery life, we have had between 4-5 batteries.
     - [Raspberry Pi details](docs/02_power_sensors/sensor_selection.md#raspberry-pi-5-8gb)
 - **Arduino Uno R3**: Handles PWM output to ESC and servo; receives drive commands from the Pi over USB serial
     - [Arduino details](docs/02_power_sensors/sensor_selection.md#arduino-uno-r3)
+
+---
+
+## Risks and Mitigation
+
+- **Voltage drop:** The 45C discharge rating minimizes voltage sag under peak current draw. Battery voltage is monitored during practice runs to identify cell degradation early.
+- **Brownout:** The Pi is powered through a Yahboom voltage regulator board rather than directly from the battery, isolating it from motor-induced voltage dips. A regulator with sufficient headroom above the Pi's peak draw was selected. We may have broken one of our raspberry pi's because we forgot the regulator...
+- **Electrical noise:** Motor and ESC wiring are routed away from signal wires. The serial communication lines between the Pi and Arduino are kept short.
+- **Loose connectors:** All connectors are secured with heat shrink. Once, one of our wires got caught in the gear system causing damage, leading to a short circuit. All wiring has since been replaced.
+- **Overheating:** The ESC and motor are mounted with airflow clearance. Competition runs are under 3 minutes, well within thermal limits. The Raspberry Pi fan is configured to always run after the temperature sensor proved unreliable on our unit.
+- **Power spikes from motors / servos:** The ESC BEC powers the servo independently from the motor rail. The dedicated regulator for the Pi prevents motor spikes from reaching the compute system.
 
 ---
 
