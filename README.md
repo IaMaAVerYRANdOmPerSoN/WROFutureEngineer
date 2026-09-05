@@ -120,7 +120,6 @@ Example:
   - [Summary](#summary-2)
 - [Testing and Validation](#testing-and-validation)
 - [Media and Visual Documentation](#media-and-visual-documentation)
-  - [Photos](#photos)
   - [Diagrams](#diagrams)
   - [Videos](#videos)
 - [CAD and Wiring Files](#cad-and-wiring-files)
@@ -402,7 +401,7 @@ Three processes run at the same time, camera, vision, and main control. The came
     - [Runner details](docs/03_software/challenge_running.md)
 
 <p align="center">
-  <img src="docs/img/architecture.webp" width="750">
+  <img src="docs/diagrams/architecture.webp" width="750">
 </p>
 <p align="center"><i>Full software architecture diagram.</i></p>
 
@@ -629,33 +628,22 @@ Detailed records:
 
 ---
 
-## Media and Visual Documentation
-Use this section to point judges to photos, diagrams, and videos.
-
-### Photos
-- overall robot:
-- front view:
-- top view:
-- sensor placement:
-- wiring overview:
-
 ### Diagrams
-- chassis diagram:
-- power diagram:
-- wiring diagram:
-- software flowchart:
-- state machine diagram:
+<p align="center">
+  <img src="docs/diagrams/architecture.webp" width="750">
+</p>
+<p align="center"><i>Full software architecture diagram.</i></p>
 
 ### Videos
-- robot demo:
-- obstacle handling demo:
-- testing clips:
+### Open Challenge Run
+[![Open Challenge Run](https://img.youtube.com/vi/WqN3tuj8LFo/maxresdefault.jpg)](https://www.youtube.com/watch?v=WqN3tuj8LFo)
+
+### Obstacle Challenge Run
+[![Obstacle Challenge Run](https://img.youtube.com/vi/08cq6RNCGQM/maxresdefault.jpg)](https://www.youtube.com/watch?v=08cq6RNCGQM)
 
 Suggested folders:
-- `media/`
 - `docs/images/`
 - `docs/diagrams/`
-- `docs/videos/`
 
 ---
 

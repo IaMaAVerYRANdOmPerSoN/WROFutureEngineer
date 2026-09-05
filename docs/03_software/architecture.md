@@ -36,7 +36,7 @@ The robot runs four separate OS processes in parallel so that the camera, vision
 ## Data Flow
 
 <p align="center">
-  <img src="/docs/img/architecture.webp" width="750" alt="Architecture diagram showing the four processes and their data flow" />
+  <img src="/docs/diagrams/architecture.webp" width="750" alt="Architecture diagram showing the four processes and their data flow" />
 </p>
 <p align="center"><i>Data flow diagram for the four processes.</i></p>
 
