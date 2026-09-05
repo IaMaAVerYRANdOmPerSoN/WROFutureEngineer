@@ -57,9 +57,7 @@ We are a three-person team from Explorer Robotics in Whitby, Ontario, Canada. We
 ---
 
 ## Robot Summary
-Briefly describe your robot in 3–6 sentences.
 
-Example:
 > Our robot is a self-driving car built for the WRO 2026 Future Engineers challenge. It uses one downward-angled camera to spot track walls, corner lines, and colored obstacle pillars, and follows the track using a state-machine control loop. The robot runs on a Raspberry Pi 5 for vision, an Arduino Uno for motor and servo control, a Furitek Micro Komodo 1212 brushless motor that drives the rear wheels through a differential gearbox, and rack-and-pinion steering run by an HS-5055MG servo. Our design is simple and reliable, using one sensor for all detection and a sturdy build that's easy to fix during competition.
 
 ---
@@ -174,8 +172,7 @@ This section explains the physical design of the robot, including chassis layout
     - [Motor reasoning](docs/01_mechanical/mechanical_reasoning.md#motor-selectionmotor-selection)
 - **Steering Motor**: HS-5055MG 11.9g Metal Gear Digital Micro Servo
     - [Steering reasoning](docs/01_mechanical/mechanical_reasoning.md#servo-motor)
-- **ESC**: Furitek Lizard Pro 30A/50A ESC
-    - [ESC reasoning](docs/02_power_sensors/power_architecture.md#electronic-speed-controller)
+
 ### Images of Robot
 | | |
 |:---:|:---:|
@@ -272,7 +269,20 @@ This section explains how the robot is powered, what sensors are used, where the
 
 ---
 
+
 ### Power
+
+Everything starts with a single Gens Ace 1300mAh 2S LiPo battery. From there, power splits into two separate paths so the compute side and the actuator side never interfere with each other.
+
+The first path goes through our Yahboom voltage regulator board, which steps the battery's 7.4V down to a clean 5V. That 5V feeds into the Raspberry Pi 5 through USB-C. The Arduino Uno doesn't connect to the battery at all, it gets powered straight from the Pi over a USB-B cable. The camera is also powered off the Pi, through its flat CSI ribbon cable, which carries both data and power in one connector.
+
+The second path runs through the ESC. The ESC takes power directly from the battery and has its own built-in BEC (battery eliminator circuit) to regulate it. On the output side, the ESC's voltage pin powers the servo, and the ESC also drives the brushless motor directly since the motor doesn't need to be stepped down first.
+
+**Insert Schematic**
+
+The Raspberry Pi is the brain, it runs the vision pipeline, figures out where objects are, and decides what the robot should do next. The Arduino doesn't make any decisions, it just takes the drive commands the Pi sends it and turns them into precise PWM signals, since the Pi can't reliably time PWM output on its own while it's busy processing frames. The camera is the robot's only sense of the outside world, it feeds every frame the vision pipeline uses to find walls, corners, and pillars.
+
+On the actuator side, the ESC handles throttle control for the drive motor based on the PWM signal it gets from the Arduino, and its BEC also acts as the power source for the servo, so the servo never has to touch the battery directly. The servo itself just turns the front wheels left and right based on the steering commands coming from the Arduino, and the motor is what actually moves the robot forward, spinning the rear wheels through the differential.
 
 - **Battery**: Gens Ace 1300mAh 2S LiPo, 7.4V nominal, 45C discharge
     - [Battery details](docs/02_power_sensors/power_architecture.md#battery)
@@ -359,6 +369,16 @@ Because of the decently short battery life, we have had between 4-5 batteries.
 - **Arduino Uno R3**: Handles PWM output to ESC and servo; receives drive commands from the Pi over USB serial
     - [Arduino details](docs/02_power_sensors/sensor_selection.md#arduino-uno-r3)
 
+---
+
+### Actuators
+
+- **ESC**: Furitek Lizard Pro 30A/50A ESC
+    - [ESC reasoning](docs/02_power_sensors/power_architecture.md#electronic-speed-controller)
+- **Drive Motor**: Furitek Micro Komodo 1212 Stepper Motor
+    - [Motor reasoning](docs/01_mechanical/mechanical_reasoning.md#motor-selectionmotor-selection)
+- **Steering Motor**: HS-5055MG 11.9g Metal Gear Digital Micro Servo
+    - [Steering reasoning](docs/01_mechanical/mechanical_reasoning.md#servo-motor)
 ---
 
 ## Risks and Mitigation
@@ -622,8 +642,7 @@ Example points:
 - full track tests
 
 Detailed records:
-- [`docs/03_software/tuning_validation.md`](docs/03_software/tuning_validation.md)
-- [`docs/01_mechanical_iterations/iteration_cycles.md`](docs/04_systems_engineering/iteration_cycles.md)
+- [`docs/04_systems_engineering/iteration_cycles.md`](docs/04_systems_engineering/iteration_cycles.md)
  - [View Journal](docs/Journal/CHANGELOG.md)
 
 ---
