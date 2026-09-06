@@ -325,6 +325,12 @@ To get our current design, we took inspiration from our previous robot we used l
 
 ---
 
+### Assembly Video
+
+[![Assembly Video](https://img.youtube.com/vi/6nG1ul_CTjg/0.jpg)](https://youtu.be/6nG1ul_CTjg)
+
+---
+
 # 2. Power and Sensor Architecture
 This section explains how the robot is powered, what sensors are used, where they are placed, and how they are calibrated.
 
