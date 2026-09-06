@@ -28,7 +28,11 @@ CHANNEL_LIMITS = {
 
 @dataclass
 class ThresholdState:
-    """Mutable HSV threshold values mirrored by the OpenCV trackbars."""
+    """Mutable HSV threshold endpoints mirrored by the six trackbars.
+
+    ``h_*`` values use OpenCV's 0-179 hue range; saturation and value fields
+    use the 0-255 ranges.
+    """
 
     h_low: int = 0
     h_high: int = CHANNEL_LIMITS["H"]
@@ -68,12 +72,18 @@ def _create_trackbars(state: ThresholdState) -> None:
 
     cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
 
-    cv2.createTrackbar("H Low", WINDOW_NAME, state.h_low, CHANNEL_LIMITS["H"], _make_callback("H"))
-    cv2.createTrackbar("H High", WINDOW_NAME, state.h_high, CHANNEL_LIMITS["H"], _make_callback("H"))
-    cv2.createTrackbar("S Low", WINDOW_NAME, state.s_low, CHANNEL_LIMITS["S"], _make_callback("S"))
-    cv2.createTrackbar("S High", WINDOW_NAME, state.s_high, CHANNEL_LIMITS["S"], _make_callback("S"))
-    cv2.createTrackbar("V Low", WINDOW_NAME, state.v_low, CHANNEL_LIMITS["V"], _make_callback("V"))
-    cv2.createTrackbar("V High", WINDOW_NAME, state.v_high, CHANNEL_LIMITS["V"], _make_callback("V"))
+    cv2.createTrackbar("H Low", WINDOW_NAME, state.h_low,
+                       CHANNEL_LIMITS["H"], _make_callback("H"))
+    cv2.createTrackbar("H High", WINDOW_NAME, state.h_high,
+                       CHANNEL_LIMITS["H"], _make_callback("H"))
+    cv2.createTrackbar("S Low", WINDOW_NAME, state.s_low,
+                       CHANNEL_LIMITS["S"], _make_callback("S"))
+    cv2.createTrackbar("S High", WINDOW_NAME, state.s_high,
+                       CHANNEL_LIMITS["S"], _make_callback("S"))
+    cv2.createTrackbar("V Low", WINDOW_NAME, state.v_low,
+                       CHANNEL_LIMITS["V"], _make_callback("V"))
+    cv2.createTrackbar("V High", WINDOW_NAME, state.v_high,
+                       CHANNEL_LIMITS["V"], _make_callback("V"))
 
 
 def _read_thresholds() -> tuple[tuple[int, int, int], tuple[int, int, int]]:
@@ -122,10 +132,16 @@ def _compose_display(frame: np.ndarray, mask: np.ndarray) -> np.ndarray:
 
 
 async def run_color_threshold_tuner() -> None:
-    """Run the live HSV threshold tuner until the user exits."""
+    """Run the live-camera HSV tuner until ``q`` or Escape is pressed.
+
+    Frames are converted from BGR to HSV, thresholded with the trackbar values,
+    and displayed beside the source frame. Pressing ``s`` prints the current
+    lower and upper bounds. Requires camera hardware and an OpenCV GUI session.
+    """
     camera_config = GLOBAL_CONFIG().CameraConfig
     cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
-    cv2.resizeWindow(WINDOW_NAME, camera_config.OUTPUT_WIDTH * 2, camera_config.OUTPUT_HEIGHT)
+    cv2.resizeWindow(WINDOW_NAME, camera_config.OUTPUT_WIDTH *
+                     2, camera_config.OUTPUT_HEIGHT)
 
     state = ThresholdState()
     _create_trackbars(state)
@@ -156,7 +172,7 @@ async def run_color_threshold_tuner() -> None:
 
 
 def main() -> None:
-    """Entry point for the HSV threshold tuner."""
+    """Start the asyncio event loop for the HSV tuner and GUI windows."""
     asyncio.run(run_color_threshold_tuner())
 
 

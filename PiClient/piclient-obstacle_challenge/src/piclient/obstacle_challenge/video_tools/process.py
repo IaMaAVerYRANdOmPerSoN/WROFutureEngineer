@@ -23,7 +23,7 @@ from piclient.core.vision import (
 
 from ..obstacle_challenge import ObstacleChallengeStateMachine
 from ..transition_determinants import (
-    TypedTranisitionManager,
+    TypedTransitionManager,
     should_avoid_obstacle,
     should_straight,
     should_turn,
@@ -97,8 +97,6 @@ class VideoFileCameraSource:
         finally:
             capture.release()
             shm.close()
-            return
-
 
 class RecordingDriveCommandExecutor:
     """In-memory stand-in used by offline source-video processing."""
@@ -184,7 +182,8 @@ def frame_timestamp(frame_index: float, fps: float) -> float:
     return frame_index / fps if fps > 0 else frame_index / GLOBAL_CONFIG().CameraConfig.FPS
 
 
-def build_transition_manager() -> TypedTranisitionManager:
+
+def build_transition_manager() -> TypedTransitionManager:
     """Construct the transition manager used for offline replay.
 
     The manager uses the same production transition predicates and priorities
@@ -192,7 +191,7 @@ def build_transition_manager() -> TypedTranisitionManager:
     challenge configuration.
 
     :returns: Configured transition manager for obstacle-challenge states.
-    :rtype: TypedTranisitionManager
+    :rtype: TypedTransitionManager
     """
     return TransitionManager(
         hysteresis_values=[GLOBAL_CONFIG().SharedChallengeConfig.HYSTERESIS] * 3,

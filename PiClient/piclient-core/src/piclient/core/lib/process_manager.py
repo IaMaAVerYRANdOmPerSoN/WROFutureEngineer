@@ -38,7 +38,8 @@ class ProcessContextManager:
         self,
         camera_callback: Callable[[_S, "Connection[Any, Any]"], NoReturn | None],
         vision_callback: Callable[[_S, "Connection[Any, Any]", "Connection[Any, Any]"], NoReturn | None],
-        recorder_callback: Callable[[_S, "Connection[Any, Any]"], NoReturn | None] | None = None,
+        recorder_callback: Callable[[
+            _S, "Connection[Any, Any]"], NoReturn | None] | None = None,
         shm_size: int | None = None,
         shm_name: _S = ...
     ) -> None:
@@ -50,7 +51,8 @@ class ProcessContextManager:
         self,
         camera_callback: Callable[[str, "Connection[Any, Any]"], NoReturn | None],
         vision_callback: Callable[[str, "Connection[Any, Any]", "Connection[Any, Any]"], NoReturn | None],
-        recorder_callback: Callable[[str, "Connection[Any, Any]"], NoReturn] | None = None,
+        recorder_callback: Callable[[
+            str, "Connection[Any, Any]"], NoReturn] | None = None,
         shm_size: int | None = None,
         shm_name: None = None
     ) -> None:
@@ -61,17 +63,25 @@ class ProcessContextManager:
         self,
         camera_callback: Callable[[Any, "Connection[Any, Any]"], NoReturn | None],
         vision_callback: Callable[[Any, "Connection[Any, Any]", "Connection[Any, Any]"], NoReturn | None],
-        recorder_callback: Callable[[Any, "Connection[Any, Any]"], NoReturn | None] | None = None,
+        recorder_callback: Callable[[
+            Any, "Connection[Any, Any]"], NoReturn | None] | None = None,
         shm_size: int | None = None,
         shm_name: Any = None
     ):
-        """Initialize the process context manager.
+        """Initialize the fixed camera/vision/recorder process topology.
 
-        :param shm_size: Size of the shared memory segment. If None, uses the default size.
-        :param shm_name: Name of the shared memory segment. If None, uses the default name.
-        :param camera_callback: The callback function to be called in the camera process.
-        :param vision_callback: The callback function to be called in the vision process.
-        :param recorder_callback: The callback function to be called in the recorder process.
+        The camera callback receives the shared-memory name and two send-only
+        pipe endpoints (vision and recorder). The vision callback receives the
+        name, a frame-notification receiver, and a results sender. The optional
+        recorder callback receives the name and recorder receiver.
+
+        :param shm_size: Shared-memory allocation in bytes; defaults to the
+            configured camera buffer size.
+        :param shm_name: Shared-memory name; defaults to the challenge name.
+        :param camera_callback: Camera subprocess target.
+        :param vision_callback: Vision subprocess target.
+        :param recorder_callback: Recorder subprocess target, or ``None`` to
+            use the stub callback.
         """
         self.shm_size = shm_size if shm_size is not None else self._DEFAULT_SHM_SIZE
         self.shm_name = shm_name if shm_name is not None else self._DEFAULT_SHM_NAME
@@ -108,7 +118,12 @@ class ProcessContextManager:
                     f"Process {process.name} (PID: {process.pid}) could not be killed. Manual cleanup may be required.")
 
     def __enter__(self):
-        """Enter the process context manager."""
+        """Create shared memory, pipes, and all three subprocesses.
+
+        A stale segment with the configured name is closed and unlinked before
+        recreation. The returned manager exposes the vision result receiver as
+        :attr:`output_stream`.
+        """
         try:
             self.shm = shared_memory.SharedMemory(
                 create=True, size=self.shm_size, name=self.shm_name)
@@ -163,7 +178,12 @@ class ProcessContextManager:
         return self
 
     def __exit__(self, exc_type: type[BaseException], exc_value: BaseException, traceback: object) -> None:
-        """Exit the process context manager."""
+        """Stop camera and vision, wait for recorder, and unlink shared memory.
+
+        Camera and vision receive bounded graceful termination followed by kill
+        escalation. The recorder is joined without a timeout, so cleanup can
+        block while it drains its pipe and closes its recording.
+        """
         logger.info("Stopping Robot..")
 
         logger.info("Terminating processes and cleaning up shared memory...")

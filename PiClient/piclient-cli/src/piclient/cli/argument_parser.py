@@ -15,7 +15,16 @@ def _walk_config(
     obj: object,
     prefix: str = "",
 ) -> Generator[tuple[str, object], None, None]:
-    """Yield ``(dotted_key, value)`` pairs for every leaf in a nested dataclass tree."""
+    """Yield dotted paths and values for instantiated configuration leaves.
+
+    Traversal uses ``vars`` and therefore visits the attributes present on the
+    supplied object, recursively descending only into dataclass instances.
+    Private attributes are skipped; non-dataclass values are yielded as leaves.
+
+    :param obj: Root object whose attributes should be traversed.
+    :param prefix: Dotted path accumulated from enclosing dataclasses.
+    :returns: Pairs of ``("section.field", value)`` for each public leaf.
+    """
     for key, value in vars(obj).items():
         if key.startswith("_"):
             continue
@@ -30,12 +39,15 @@ def _walk_config(
 class TypedArgumentParser(ArgumentParser):
     """Argument parser that derives options from nested configuration fields.
 
-    Every leaf discovered by :func:`_walk_config` becomes a dotted command-line
-    option. Parsed strings are converted using the root configuration's type
-    annotations and written back into that configuration.
+    Every leaf discovered by :func:`_walk_config` becomes an option such as
+    ``--CameraConfig.OUTPUT_WIDTH``. ``argparse`` stores the dotted option name
+    as its destination. Supplied strings are converted using the root
+    configuration's annotations and written back to that configuration; absent
+    options are removed from the returned namespace.
 
     :ivar root: Configuration object whose fields define the options.
     """
+
     def __init__(
         self,
         root: Config,
@@ -69,11 +81,13 @@ class TypedArgumentParser(ArgumentParser):
 
         :param args: Arguments to parse, or ``None`` for ``sys.argv``.
         :param namespace: Optional namespace to populate.
-        :param kwargs: Additional parser compatibility arguments.
+        :param kwargs: Accepted for compatibility with parser wrappers; ignored
+            because :class:`argparse.ArgumentParser` does not use them here.
         :returns: Namespace containing only explicitly supplied options.
         :rtype: argparse.Namespace
         """
-        parsed: Namespace = super().parse_args(args, namespace) # pyright: ignore[reportAssignmentType]
+        parsed: Namespace = super().parse_args(
+            args, namespace)  # pyright: ignore[reportAssignmentType]
 
         for attr, raw_value in list(vars(parsed).items()):
             if raw_value is None:

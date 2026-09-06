@@ -17,8 +17,11 @@ from piclient.core.interface import DriveCommandExecutor
 from piclient.core.lib import GLOBAL_CONFIG, PD, calculate_EMA, export
 from piclient.core.vision import WallsAndObstacles
 
-ParkingState = Literal["follow_wall", "approach_lot", "arc_one", "arc_two", "parked"]
+ParkingState = Literal["follow_wall",
+                       "approach_lot", "arc_one", "arc_two", "parked"]
+"""States used by :class:`ParallelParkingStateMachine`."""
 ParkingSide = Literal["left", "right"]
+"""Parking-lot side labels retained for API typing."""
 
 _parking_cfg = GLOBAL_CONFIG().ParallelParkingConfig
 _client_cfg = GLOBAL_CONFIG().ClientConfig
@@ -27,12 +30,13 @@ _client_cfg = GLOBAL_CONFIG().ClientConfig
 @export
 class ParallelParkingStateMachine:
     """State machine for wall-follow and two-arc parallel parking."""
-    
+
     def __init__(
         self,
         drive_command_executor: DriveCommandExecutor,
         round_driving_direction: Literal["CLOCKWISE", "COUNTERCLOCKWISE"],
-        drive_command_duration_s: float = GLOBAL_CONFIG().SharedChallengeConfig.DRIVE_COMMAND_DURATION,
+        drive_command_duration_s: float = GLOBAL_CONFIG(
+        ).SharedChallengeConfig.DRIVE_COMMAND_DURATION,
         wall_follow_speed: float = _parking_cfg.WALL_FOLLOW_SPEED,
         wall_follow_offset_factor: float = _parking_cfg.WALL_FOLLOW_OFFSET_FACTOR,
         wall_follow_kpkd: tuple[float, float] = _parking_cfg.WALL_FOLLOW_KPKD,
@@ -105,9 +109,15 @@ class ParallelParkingStateMachine:
         await self.drive_command_executor.__aexit__(exc_type, exc_value, traceback)
 
     def update(self, walls_and_obstacles: WallsAndObstacles) -> None:
-        """Update the state machine based on the latest vision data.
+        """Update parking state and wall error from normalized marker data.
 
-        :param walls_and_obstacles: The latest vision data containing wall and obstacle information.
+        A lone closer marker below ``y=0.6`` starts the approach phase. When
+        both markers disappear for 2.5 seconds, the first reverse arc begins.
+        Marker coordinates and bounding boxes are expected to be normalized by
+        :class:`ParkingLot`.
+
+        :param walls_and_obstacles: Latest wall, obstacle, and parking-marker
+            measurements.
         """
         self.walls_and_obstacles = walls_and_obstacles
 
@@ -139,10 +149,10 @@ class ParallelParkingStateMachine:
             # Parking lot clipping edge of frame, use the further contour if available
             if self.walls_and_obstacles.parking_lot.further is not None:
                 active_wall = self.walls_and_obstacles.parking_lot.further
-           
 
         normalized_x = (active_wall.x_centroid * 2.0) - 1.0
-        wall_follow_offset = self.wall_follow_offset_factor * active_wall.bbox[2]  # bbox[2] is the width of the bounding box
+        wall_follow_offset = self.wall_follow_offset_factor * \
+            active_wall.bbox[2]  # bbox[2] is the width of the bounding box
 
         if self.round_driving_direction == "CLOCKWISE":
             self.parking_lot_error = -normalized_x - wall_follow_offset
@@ -153,22 +163,32 @@ class ParallelParkingStateMachine:
         """Handle the wall-following state.
 
         This method computes the necessary correction based on the current wall distance and submits a drive command to the executor."""
-        correction = calculate_EMA(self.wall_follow_controller.tick(self.parking_lot_error), self.previous_correction, 0.35)
+        correction = calculate_EMA(self.wall_follow_controller.tick(
+            self.parking_lot_error), self.previous_correction, 0.35)
         self.previous_correction = correction
 
-        self.drive_command_executor.submit(self.wall_follow_speed, correction * 90 + 90, self.drive_command_duration_s)
-        logger.debug(f"Wall-following: speed={self.wall_follow_speed}, correction={correction:.2f}, servo_angle={correction * 90 + 90:.2f}")
+        self.drive_command_executor.submit(
+            self.wall_follow_speed, correction * 90 + 90, self.drive_command_duration_s)
+        logger.debug(
+            f"Wall-following: speed={self.wall_follow_speed}, correction={correction:.2f}, servo_angle={correction * 90 + 90:.2f}")
 
     def _handle_approach_lot(self) -> None:
         """Handle the approach-lot state.
 
         This method drives the vehicle straight forwards until the parking lot Y centroid exceeds a threshold,
         indicating that the vehicle is close enough to the parking lot to begin the parking maneuver."""
-        self.drive_command_executor.submit(self.wall_follow_speed, 95, self.drive_command_duration_s) # Slight steering trim
-        logger.debug(f"Approaching parking lot: speed={self.wall_follow_speed}, servo_angle=90")
+        self.drive_command_executor.submit(
+            self.wall_follow_speed, 95, self.drive_command_duration_s)  # Slight steering trim
+        logger.debug(
+            f"Approaching parking lot: speed={self.wall_follow_speed}, servo_angle=95")
 
     def _handle_arc(self, servo_angle: float, duration_s: float) -> None:
-        """Drive backwards at a fixed steering angle for the configured duration."""
+        """Drive a reverse arc and advance to the next parking phase.
+
+        Steering is mirrored for clockwise travel. On completion of the second
+        arc, the state becomes ``"parked"`` and a near-zero-speed command is
+        submitted.
+        """
         servo_angle = servo_angle if self.round_driving_direction == "COUNTERCLOCKWISE" else 180 - servo_angle
         if self.current_state == "arc_one" and self.arc_one_start_time_s is None:
             self.arc_one_start_time_s = self.time_provider()
@@ -187,10 +207,12 @@ class ParallelParkingStateMachine:
             else:
                 self.current_state = "parked"
                 self.arc_two_start_time_s = None
-                self.drive_command_executor.submit(0.01, 90, self.drive_command_duration_s)  # Stop the vehicle
+                self.drive_command_executor.submit(
+                    0.01, 90, self.drive_command_duration_s)  # Stop the vehicle
             return
 
-        self.drive_command_executor.submit(_parking_cfg.ARC_SPEED, servo_angle, self.drive_command_duration_s)
+        self.drive_command_executor.submit(
+            _parking_cfg.ARC_SPEED, servo_angle, self.drive_command_duration_s)
         logger.debug(
             f"Executing reverse arc: state={self.current_state}, "
             f"speed={_parking_cfg.ARC_SPEED}, servo_angle={servo_angle}, "
@@ -206,10 +228,12 @@ class ParallelParkingStateMachine:
         self._handle_arc(self.arc_two_servo_angle, self.arc_two_duration_s)
 
     def handle_state_actions(self) -> bool:
-        """Handle actions for the current state.
+        """Submit the command for the current parking state.
 
-        :param walls_and_obstacles: The latest vision data containing wall and obstacle information.
-        :return: True if the parking routine is finished, False otherwise.
+        State data must already have been supplied through :meth:`update`.
+        Returns ``True`` only after the state reaches ``"parked"``.
+
+        :returns: Whether the parking routine is complete.
         """
         if self.current_state == "follow_wall":
             self._handle_follow_wall()

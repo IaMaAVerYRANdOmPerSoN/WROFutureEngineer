@@ -15,7 +15,7 @@ from piclient.core.lib import PD, StateMachine, GLOBAL_CONFIG, calculate_EMA
 from piclient.core.vision import WallsAndObstacles
 
 from .transition_determinants import (
-    TypedTranisitionManager,
+    TypedTransitionManager,
     ChallengeState,
     Target,
     LapCount,
@@ -24,7 +24,14 @@ from .parallel_parking import ParallelParkingStateMachine
 
 
 def get_wall_error(walls_and_obstacles: WallsAndObstacles) -> float:
-    """Return the wall-following error as a finite scalar."""
+    """Return right-minus-left wall fill as a finite control error.
+
+    Non-finite wall ratios are replaced with ``1.0`` before subtraction.
+
+    :param walls_and_obstacles: Latest wall measurement.
+    :returns: ``right - left`` wall-following error.
+    :rtype: float
+    """
     left_distance = float(walls_and_obstacles.walls.left)
     right_distance = float(walls_and_obstacles.walls.right)
 
@@ -86,7 +93,7 @@ class ObstacleChallengeStateMachine(StateMachine[
     def __init__(
         self,
         initial_state: ChallengeState | None,
-        transition_manager: TypedTranisitionManager,
+        transition_manager: TypedTransitionManager,
         drive_command_executor: DriveCommandExecutor,
         parallel_parking_state_machine: type[ParallelParkingStateMachine],
         wall_follow_kpkd: tuple[float, float] | None = None,
@@ -153,7 +160,8 @@ class ObstacleChallengeStateMachine(StateMachine[
             if drive_command_duration is not None
             else self._DEFAULT_DRIVE_COMMAND_DURATION
         )
-        self.round_driving_direction: Literal["CLOCKWISE", "COUNTERCLOCKWISE"] | None = None
+        self.round_driving_direction: Literal["CLOCKWISE",
+                                              "COUNTERCLOCKWISE"] | None = None
         self.time_provider = time_provider
 
         self.walls_and_obstacles: WallsAndObstacles | None = None
@@ -167,7 +175,8 @@ class ObstacleChallengeStateMachine(StateMachine[
         self.previous_correction: float = 90.0
 
         self.lap_counter = 0
-        self.last_lap_time = self.time_provider() + 20.0  # Seeing the parking lot at the start of the challenge should not count as a lap, so we set this to a value greater than the lap cooldown.
+        # Seeing the parking lot at the start of the challenge should not count as a lap, so we set this to a value greater than the lap cooldown.
+        self.last_lap_time = self.time_provider() + 20.0
 
         self._setup_start_time: float | None = None
 
@@ -207,7 +216,6 @@ class ObstacleChallengeStateMachine(StateMachine[
         if self.current_state == "parallel_park" and self.parallel_parking_state_machine is not None:
             self.parallel_parking_state_machine.update(walls_and_obstacles)
 
- 
     def _populate_transition_params(
         self,
         walls_and_obstacles: WallsAndObstacles,
@@ -239,7 +247,7 @@ class ObstacleChallengeStateMachine(StateMachine[
             self.wall_error) * 90 + 90, self.previous_correction)
         self.corner_turn_correction = calculate_EMA(-self.corner_turn.tick(
             self.wall_error) * 90 + 90, self.previous_correction) - 10 if self.round_driving_direction == "CLOCKWISE" else calculate_EMA(-self.corner_turn.tick(
-            self.wall_error) * 90 + 90, self.previous_correction) + 10
+                self.wall_error) * 90 + 90, self.previous_correction) + 10
 
         if self.target_position is not None:
             frame_center = GLOBAL_CONFIG().CameraConfig.OUTPUT_WIDTH / 2
@@ -275,8 +283,9 @@ class ObstacleChallengeStateMachine(StateMachine[
         """Execute the command for the active state and detect completion.
 
         Straight, turning, and obstacle-avoidance states submit their current
-        correction. The final state returns ``True`` after its settling delay;
-        all other states return ``False``.
+        correction. The parallel-park state delegates to its child machine.
+        Completion is reported only when the parking routine reaches its final
+        state.
 
         :returns: ``True`` when the obstacle challenge is complete.
         :rtype: bool
@@ -312,9 +321,10 @@ class ObstacleChallengeStateMachine(StateMachine[
                 if self.parallel_parking_state_machine is not None:
                     return self.parallel_parking_state_machine.handle_state_actions()
                 else:
-                    logger.error("Parallel parking state machine is not initialized.")
+                    logger.error(
+                        "Parallel parking state machine is not initialized.")
                     raise RuntimeError("Parallel parking state machine is not initialized."
-                    " This should not happen if the transition to parallel parking was triggered correctly.")
+                                       " This should not happen if the transition to parallel parking was triggered correctly.")
 
         return False  # Return False to indicate that the challenge is not finished yet
 
@@ -324,10 +334,11 @@ class ObstacleChallengeStateMachine(StateMachine[
         :return: True if the setup is complete and the state machine is ready to proceed, False otherwise.
         """
         if self.round_driving_direction is None:
-            self.round_driving_direction =  (
-                ("COUNTERCLOCKWISE" if self.walls_and_obstacles.walls.left < self.walls_and_obstacles.walls.right else "CLOCKWISE")
+            self.round_driving_direction = (
+                ("COUNTERCLOCKWISE" if self.walls_and_obstacles.walls.left <
+                 self.walls_and_obstacles.walls.right else "CLOCKWISE")
                 if self.walls_and_obstacles is not None else None
-            ) 
+            )
 
             if self.round_driving_direction is not None:
                 self.parallel_parking_state_machine = self.parallel_parking_state_machine_type(
@@ -337,7 +348,8 @@ class ObstacleChallengeStateMachine(StateMachine[
                 )
 
         if not self.round_driving_direction:
-            logger.warning("Walls and obstacles data is not available. Cannot determine which side to exit from.")
+            logger.warning(
+                "Walls and obstacles data is not available. Cannot determine which side to exit from.")
             return False
 
         now = self.time_provider()
@@ -371,7 +383,6 @@ class ObstacleChallengeStateMachine(StateMachine[
                 90,
             )
             return False
-
 
         logger.success("Exiting parking lot complete. Starting main loop...")
         return True

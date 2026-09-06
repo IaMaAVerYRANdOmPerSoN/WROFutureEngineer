@@ -19,6 +19,7 @@ from loguru import logger
 from ..lib import GLOBAL_CONFIG, export
 from ..utils import async_pipe_reader as utils_async_pipe_reader, async_pipe_reader_fifo as utils_async_pipe_reader_fifo
 
+
 @export
 class Recorder:
     """Record camera frames from shared memory into an MP4 video.
@@ -33,30 +34,32 @@ class Recorder:
     :ivar timestamp: Unix timestamp assigned when recording starts.
     """
 
-    _DEFAULT_RESOLUTION: tuple[int, int, int] = GLOBAL_CONFIG().CameraConfig.OUTPUT_SHAPE
+    _DEFAULT_RESOLUTION: tuple[int, int,
+                               int] = GLOBAL_CONFIG().CameraConfig.OUTPUT_SHAPE
     _DEFAULT_FPS: float = GLOBAL_CONFIG().CameraConfig.FPS
     async_pipe_reader = staticmethod(utils_async_pipe_reader)
     async_pipe_reader_fifo = staticmethod(utils_async_pipe_reader_fifo)
 
-    def __init__(self, writer: cv2.VideoWriter=cv2.VideoWriter(), resolution: tuple[int, int] | None=None, fps: float | None = None) -> None:
+    def __init__(self, writer: cv2.VideoWriter = cv2.VideoWriter(), resolution: tuple[int, int] | None = None, fps: float | None = None) -> None:
         """Initialize a recorder with an OpenCV writer and output settings.
 
         :param writer: OpenCV video writer to open and populate on context
             entry.
-        :param resolution: Output frame dimensions as ``(height, width)``;
-            defaults to the configured camera shape.
+        :param resolution: Three-dimensional frame shape as
+            ``(height, width, channels)``; defaults to the configured camera
+            shape. The writer receives the first two dimensions as its size.
         :param fps: Output frame rate; defaults to camera configuration.
         :returns: ``None``.
         :rtype: None
         """
         self.resolution = (
-            resolution 
-            if resolution is not None 
+            resolution
+            if resolution is not None
             else self._DEFAULT_RESOLUTION
         )
         self.fps = (
-            fps 
-            if fps is not None 
+            fps
+            if fps is not None
             else self._DEFAULT_FPS
         )
 
@@ -72,7 +75,8 @@ class Recorder:
         if self.writer.isOpened():
             self.writer.write(frame)
         else:
-            raise RuntimeError("VideoWriter is not opened. use the context manager first.")
+            raise RuntimeError(
+                "VideoWriter is not opened. use the context manager first.")
 
     def __enter__(self) -> Self:
         """Enter the context manager.
@@ -95,12 +99,17 @@ class Recorder:
     def __exit__(self, exc_type: type[BaseException], exc_value: BaseException, traceback: TracebackType) -> None:
         """Exit the context manager and release the video writer."""
         self.writer.release()
-        
+
     async def record(self, shm_name: str, receiver: PipeConnection) -> NoReturn: # pyright: ignore[reportReturnType]
         """Read frame notifications and write changed shared-memory frames.
 
         :param shm_name: Name of the shared-memory segment containing frames.
         :param receiver: Pipe connection that signals when a frame is ready.
+        Each notification reads the current shared-memory buffer, computes a
+        checksum, and writes the frame only when that checksum differs from the
+        previous one. The shared-memory handle is held for the recording
+        lifetime and is not unlinked by this method.
+
         :returns: Never returns during normal recording; cancellation or a
             pipe error ends the loop.
         :rtype: NoReturn
@@ -111,7 +120,8 @@ class Recorder:
             previous_checksum = None
 
             async for _ in self.async_pipe_reader_fifo(receiver):
-                frame = np.array(existing_shm.buf, dtype=np.uint8).reshape(self.resolution)
+                frame = np.array(existing_shm.buf, dtype=np.uint8).reshape(
+                    self.resolution)
                 checksum = np.sum(frame)
 
                 if checksum != previous_checksum:

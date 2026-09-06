@@ -53,7 +53,16 @@ logger.add(sys.stderr, level="WARNING", backtrace=True,
 
 
 def configure_logging(level: Literal["CRITICAL", "ERROR", "WARNING", "SUCCESS", "INFO", "DEBUG"]) -> None:
-    """Configure shared logging sinks for the Pi client package."""
+    """Configure console and rotating file sinks for the package.
+
+    ``logs/log.txt`` rotates at 5 MB and is retained for 10 days. ``INFO`` and
+    ``DEBUG`` additionally create ``logs/verbose.txt`` with 1 MB rotation and
+    3-day retention. Existing Loguru sinks are removed first.
+
+    :param level: Minimum Loguru level for the console and standard log file.
+    :returns: ``None``.
+    :rtype: None
+    """
     logger.remove()
     logger.add(
         "logs/log.txt",

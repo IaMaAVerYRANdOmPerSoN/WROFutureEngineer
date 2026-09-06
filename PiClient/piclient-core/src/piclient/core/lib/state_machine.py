@@ -14,6 +14,7 @@ HandlerParams = ParamSpec("HandlerParams")
 PExternal = ParamSpec("PExternal")
 PTransition = ParamSpec("PTransition")
 
+
 @export
 class StateMachine(Generic[HandlerParams, PExternal, PTransition, T], ABC):
     """Abstract asynchronous state machine for robot control behavior.
@@ -26,6 +27,7 @@ class StateMachine(Generic[HandlerParams, PExternal, PTransition, T], ABC):
     :ivar transition_manager: Object that evaluates state transitions.
     :ivar drive_command_executor: Asynchronous drive command sink.
     """
+
     def __init__(self, initial_state: T, transition_manager: TransitionManager[P, T], drive_command_executor: DriveCommandExecutor) -> None:
         """Initialize the state machine.
 
@@ -50,11 +52,18 @@ class StateMachine(Generic[HandlerParams, PExternal, PTransition, T], ABC):
     def update(self, *args: PExternal.args, **kwargs: PExternal.kwargs,) -> None:
         """Update the state machine by checking for possible transitions.
 
-        :param args: Positional arguments used to determine the next state and update internals.
-        :param kwargs: Same as args, but as keyword arguments.
+        Subclasses may transform the external arguments in
+        :meth:`_populate_transition_params` before the transition manager sees
+        them. If a determinant wins, its destination becomes
+        :attr:`current_state`.
+
+        :param args: External positional inputs for transition evaluation.
+        :param kwargs: External keyword inputs for transition evaluation.
         """
-        new_args, new_kwargs = self._populate_transition_params(*args, **kwargs)
-        next_state = self.transition_manager.check_transitions(*new_args, **new_kwargs)
+        new_args, new_kwargs = self._populate_transition_params(
+            *args, **kwargs)
+        next_state = self.transition_manager.check_transitions(
+            *new_args, **new_kwargs)
         if next_state is not None:
             self.current_state = next_state
 
@@ -71,7 +80,9 @@ class StateMachine(Generic[HandlerParams, PExternal, PTransition, T], ABC):
     def handle_state_actions(self, *args: HandlerParams.args, **kwargs: HandlerParams.kwargs) -> bool:
         """Handle actions based on the current state.
 
-        This method should be overridden in subclasses to define specific actions for each state.
+        Subclasses should override this method to define actions for each state.
+        The base body only runs :meth:`setup` once and stores its result; it
+        does not itself return that result despite the boolean annotation.
 
         :param args: Positional arguments to pass to the state action handlers.
         :param kwargs: Keyword arguments to pass to the state action handlers.
@@ -80,17 +91,21 @@ class StateMachine(Generic[HandlerParams, PExternal, PTransition, T], ABC):
         if not self._setup_complete:
             self._setup_complete = self.setup(*args, **kwargs)
 
-
     def setup(self, *args: HandlerParams.args, **kwargs: HandlerParams.kwargs) -> bool:
-        """
-        Perform any necessary operations before the core loop starts. This method can be overridden in subclasses to provide custom setup logic.
-        For example, a robot might need to exit a parking lot before starting the main loop. This method can be used to implement such behavior.
-        :param args: Positional arguments to pass to the setup method.
-        :param kwargs: Keyword arguments to pass to the setup method.
-        :return: True if the setup is complete and the state machine is ready to proceed, False otherwise.
+        """Perform one-time preparation before normal state actions.
+
+        Override this method for startup maneuvers such as leaving a parking
+        lot. The default implementation does nothing and returns ``True``;
+        subclasses can return ``False`` until their preparation is complete.
+
+        :param args: Setup inputs supplied by the caller.
+        :param kwargs: Setup keyword inputs supplied by the caller.
+        :returns: Whether setup is complete.
+        :rtype: bool
         """
         # TODO: May want to overhaul this, we are getting closer to a state machine which can contain multiple sub-state machines.
         # I'm not sure how to implement this yet, but it would be nice to have a state machine which can contain other state machines as states.
         # Perhaps we just use the name of the StateMachine instance as the state name, and then we can have a transition manager which can handle
         # nested transitions.
-        return True  # Default implementation does nothing and returns True, indicating that the setup is complete.
+        # Default implementation does nothing and returns True, indicating that the setup is complete.
+        return True

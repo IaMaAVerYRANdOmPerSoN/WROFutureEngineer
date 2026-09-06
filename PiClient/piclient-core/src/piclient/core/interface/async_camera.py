@@ -22,7 +22,8 @@ from ..lib.exporter import export
 picamera2: Any = None
 
 try:
-    import picamera2 # pyright: ignore[reportMissingImports, reportMissingTypeStubs]
+    # pyright: ignore[reportMissingImports, reportMissingTypeStubs]
+    import picamera2
 except ImportError:
     # Probably not on Pi
     logger.warning("picamera2 import failed, are you running on a Raspberry Pi? "
@@ -63,8 +64,10 @@ class AsyncCamera:
         ``GLOBAL_CONFIG().CameraConfig.CONTROLS_CONFIG``.
     :ivar _cam: Internal :class:`picamera2.Picamera2` instance, initialized by
         :meth:`__aenter__` and ``None`` before entry.
-    :ivar frame_width: Infered width of frame from configuration values
-    :ivar frame_height: Infered height of frame from configuration values
+    :ivar frame_width: Cropped frame width in pixels, derived from ``size`` and
+        the second ROI slice.
+    :ivar frame_height: Cropped frame height in pixels, derived from ``size``
+        and the first ROI slice.
     :ivar loop: Asyncio event loop to run capture coroutines
     :ivar _executor: Internal :class:`concurrent.futures.ThreadPoolExecutor`
         created by :meth:`__aenter__` for running blocking camera calls.
@@ -82,11 +85,16 @@ class AsyncCamera:
     ) -> None:
         """Initialize the async camera wrapper.
 
-        :param config: Camera format configuration dict (default: ``CameraGLOBAL_CONFIG().FORMAT``).
-        :param sensor_config: Sensor mode configuration dict (default: ``CameraGLOBAL_CONFIG().SENSOR_CONFIG``).
-        :param controls_config: Camera controls configuration dict (default: ``CameraGLOBAL_CONFIG().CONTROLS_CONFIG``).
-        :param executor_threads: The number of executor threads for the internal executor (default: ``CameraGLOBAL_CONFIG().EXECUTOR_THREADS``)
-        :param max_concurrent_captures: The maxmimum number of concurretn captures permitted by the internal semaphore (default: ``CameraGLOBAL_CONFIG().MAX_CONCURRENT_CAPTURES``)
+        :param config: Picamera2 format dictionary, defaulting to
+            ``GLOBAL_CONFIG().CameraConfig.FORMAT``.
+        :param sensor_config: Sensor mode dictionary, defaulting to the global
+            camera configuration.
+        :param controls_config: Picamera2 controls dictionary, defaulting to
+            the global camera configuration.
+        :param initial_roi: Three-dimensional ``(rows, columns, channels)``
+            crop applied after capture.
+        :param executor_threads: Number of threads for blocking camera calls.
+        :param max_concurrent_captures: Maximum simultaneous capture calls.
         """
         self.config: dict[str, Any] = config
         self.sensor_config: dict[str, Any] = sensor_config
@@ -198,11 +206,13 @@ class AsyncCamera:
 
         :param shm: Optional shared-memory destination. When supplied, the
             cropped frame is copied there and ``None`` is returned.
-        :param timeout: Maximum capture time in seconds before retrying.
+        :param timeout: Maximum time in seconds for one underlying capture;
+            capture timeouts and other capture errors are retried indefinitely.
         :returns: The cropped ``uint8`` frame when *shm* is not supplied;
             otherwise ``None``.
         :rtype: numpy.ndarray or None
         :raises AttributeError: If the camera context has not been entered.
+        :raises ValueError: If *shm* is too small for the cropped frame.
         """
 
         while True:
@@ -248,6 +258,8 @@ class AsyncCamera:
 
         :param num_frames: Number of frames to capture.
         :param timeout: Maximum time in seconds allowed for each capture.
+            The outer ``asyncio.wait_for`` can raise ``TimeoutError`` even
+            though :meth:`get_frame_async` retries internally.
         :returns: List of captured ``uint8`` frames; a frame is ``None`` only
             when the underlying capture method returns no array.
         :rtype: list[numpy.ndarray | None]
@@ -260,6 +272,10 @@ class AsyncCamera:
 
         :param shm_name: Name of the shared-memory block receiving frames.
         :param senders: Pipe connections notified after each captured frame.
+        Each captured frame is copied into the named shared-memory block and
+        ``True`` is sent through every supplied pipe. The shared-memory handle
+        is closed when the coroutine exits; the block itself is not unlinked.
+
         :yields: No values; this coroutine runs until cancelled or until an
             unrecoverable capture error occurs.
         :rtype: NoReturn

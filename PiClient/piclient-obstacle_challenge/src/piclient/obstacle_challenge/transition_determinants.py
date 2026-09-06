@@ -1,3 +1,9 @@
+"""Predicates used to select Obstacle Challenge state transitions.
+
+Each predicate receives the current vision sample, state, target, and lap count
+and returns whether its destination state is eligible.
+"""
+
 from typing import Literal
 
 from piclient.core.vision import WallsAndObstacles
@@ -14,7 +20,7 @@ ChallengeState = Literal[
 type Target = tuple[int, int] | None
 type LapCount = int
 
-TypedTranisitionManager = TransitionManager[
+TypedTransitionManager = TransitionManager[
     [
         WallsAndObstacles,
         ChallengeState,
@@ -58,11 +64,10 @@ def is_straight(walls_and_obstacles: WallsAndObstacles) -> bool:
 
 
 def is_turn(walls_and_obstacles: WallsAndObstacles) -> bool:
-    """Return whether a turn is currently considered active, with cooldown enforcement.
+    """Return whether the center wall fill indicates a turn.
 
-    This helper combines the straight-path check with a cooldown timer so the
-    challenge does not repeatedly trigger turn transitions from the same wall
-    geometry over a short period of time.
+    No time or cooldown state is consulted; hysteresis and priorities are
+    applied by :class:`TransitionManager`.
 
     :param walls_and_obstacles: The latest :class:`WallsAndObstacles` sample
         used to evaluate the corridor geometry.
@@ -123,9 +128,6 @@ def should_straight(
         target is visible.
     :param lap_count: The number of laps completed; this parameter is unused by
         this rule.
-    :param last_turn_time: Time of the most recent turn transition.
-    :param turn_counter: Number of completed turns; this parameter is unused.
-    :param start_time: Start time of the challenge; this parameter is unused.
     :returns: ``True`` when the robot should drive straight again, otherwise
         ``False``.
     :rtype: bool
@@ -144,17 +146,13 @@ def should_turn(
     """Decide whether the wall geometry requires a turn transition.
 
     This predicate is used when the robot should leave the straight path and
-    begin following the corner geometry. It checks the current wall fill against
-    the turn cooldown so the transition is only triggered after a sustained turn
-    condition.
+    begin following corner geometry. Sustained conditions are handled by the
+    transition manager's hysteresis.
 
     :param walls_and_obstacles: The current :class:`WallsAndObstacles` sample.
     :param state: The active challenge state.
     :param target: Target coordinates from the vision system, or ``None`` when no target is visible.
     :param lap_count: The number of laps completed; this parameter is unused.
-    :param last_turn_time: Timestamp of the last turn event used for cooldown.
-    :param turn_counter: Number of completed turns; this parameter is unused.
-    :param start_time: Challenge start timestamp; this parameter is unused.
     :returns: ``True`` when the robot should transition into the turn state,
         otherwise ``False``.
     :rtype: bool
@@ -172,9 +170,9 @@ def should_parallel_park(
 ) -> bool:
     """Determine whether the robot should enter the parallel parking state.
 
-    This rule is triggered when the robot is in a turn and a visible target is
-    present. It is used to transition from normal wall-following into the
-    parallel parking maneuver.
+    This rule becomes eligible after at least three laps when a closer parking
+    marker exists below the configured entry threshold. It accepts the normal
+    driving states and does not use *target*.
 
     :param walls_and_obstacles: The latest :class:`WallsAndObstacles` sample
         containing wall and obstacle geometry.

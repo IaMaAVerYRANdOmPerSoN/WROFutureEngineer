@@ -7,12 +7,25 @@ Provides :class:`PD`, a simple proportional-derivative controller.
 from loguru import logger
 from .exporter import export
 
+
 @export
 def calculate_EMA(latest: float, accumulated: float | None, alpha: float = 0.6) -> float:
-    """Calculate the Exponential Moving Average of a series of values."""
+    """Return one exponential moving-average update.
+
+    If no prior value exists, ``latest`` is returned unchanged. Otherwise the
+    result is ``alpha * latest + (1 - alpha) * accumulated``; callers normally
+    provide ``alpha`` in ``[0, 1]``.
+
+    :param latest: New measurement.
+    :param accumulated: Previous average, or ``None`` for the first sample.
+    :param alpha: Weight assigned to the new measurement.
+    :returns: Updated average.
+    :rtype: float
+    """
     if accumulated is None:
         return latest
     return alpha * latest + (1 - alpha) * accumulated
+
 
 @export
 class PD:
@@ -42,8 +55,10 @@ class PD:
         If *target* is ``None``, *value* is treated as the error directly
         (e.g. when tracking a difference signal).
 
-        :param value: Current measured value
-        :param target: Target setpoint. If set to ``None`` *value* is treated as error directly (equavivlent to ``target=0``)
+        :param value: Current measured value, or the error itself when
+            ``target`` is ``None``.
+        :param target: Target setpoint. When supplied, error is calculated as
+            ``target - value``; otherwise ``value`` is already the error.
         :returns: Control output (proportional + derivative).
         :rtype: float
         """

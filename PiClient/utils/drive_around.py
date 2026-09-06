@@ -1,6 +1,7 @@
-"""
-Use this script to drive the robot around using the wasd
-Used for testing the robot remotely, when manually moving the robot is not possible.
+"""Drive the robot manually from an OpenCV camera preview.
+
+The script requires Raspberry Pi camera hardware and an Arduino serial
+connection. Key presses produce short normalized-speed drive commands.
 """
 import asyncio
 import cv2
@@ -17,9 +18,12 @@ STEERING_OFFSET = 30.0
 def move(longitudinal: float, theta: float, key: int) -> tuple[float, float, bool]:
     """Update the robot's movement from a cv2 key code.
 
-    The cv2 window does not provide key-up events, so this script uses
-    key presses as persistent drive commands. Press space to stop and
-    ``q`` or escape to quit.
+    The OpenCV window does not provide key-up events, so state persists between
+    calls. ``w``/``s`` select ``-0.35``/``0.35`` longitudinal speed, ``x`` or
+    space stops, ``a``/``d`` select steering angles 120/60 degrees, ``z`` or
+    space centers steering, and ``q``/Escape requests quit.
+
+    :returns: Updated ``(longitudinal_speed, steering_angle, should_quit)``.
     """
     if key in (ord("q"), 27):
         return longitudinal, theta, True
@@ -40,8 +44,14 @@ def move(longitudinal: float, theta: float, key: int) -> tuple[float, float, boo
 
     return longitudinal, theta, False
 
+
 async def drive_around() -> None:
-    """Drive the robot around using the OpenCV preview window."""
+    """Open camera/serial contexts and drive until the user quits.
+
+    Camera frames are displayed with current command state. Context managers
+    stop the robot and release camera, serial, executor, and GUI resources on
+    normal exit or failure.
+    """
     cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
     cv2.resizeWindow(
         WINDOW_NAME,
@@ -50,7 +60,7 @@ async def drive_around() -> None:
     )
 
     longitudinal = 0.0
-    theta = 0.0
+    theta = STEERING_CENTER
 
     async with AsyncCamera() as camera:
         async with Client() as client, DriveCommandExecutor(client) as executor:
@@ -83,8 +93,10 @@ async def drive_around() -> None:
 
                     cv2.imshow(WINDOW_NAME, frame)
                     key = cv2.waitKey(1) & 0xFF
-                    longitudinal, theta, should_quit = move(longitudinal, theta, key)
-                    executor.submit(longitudinal, theta, DRIVE_COMMAND_DURATION)
+                    longitudinal, theta, should_quit = move(
+                        longitudinal, theta, key)
+                    executor.submit(longitudinal, theta,
+                                    DRIVE_COMMAND_DURATION)
 
                     if should_quit:
                         break

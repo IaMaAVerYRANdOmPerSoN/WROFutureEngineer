@@ -5,7 +5,6 @@ Runner for the obstacle challenge.
 from functools import partial
 from pathlib import Path
 from time import time
-import traceback
 from loguru import logger
 
 from piclient.core.interface import AsyncCamera, DriveCommandExecutor, Client, Recorder
@@ -15,7 +14,7 @@ from piclient.core.vision import ObstacleChallengeAsyncMultiprocessingVisionProc
 from .obstacle_challenge import ObstacleChallengeStateMachine
 from .video_tools import DriveCommand, PickleLogWriter, build_log_record, default_output_paths, replay_video
 from .transition_determinants import (
-    TypedTranisitionManager,
+    TypedTransitionManager,
     should_avoid_obstacle,
     should_straight,
     should_turn,
@@ -78,7 +77,7 @@ async def run_obstacle_challenge() -> None:
             initial_state="straight",
             drive_command_executor=drive_executor,
             parallel_parking_state_machine=ParallelParkingStateMachine,
-            transition_manager=TypedTranisitionManager(
+            transition_manager=TypedTransitionManager(
                 hysteresis_values=[GLOBAL_CONFIG().SharedChallengeConfig.HYSTERESIS] * 4,
                 priorities=[3, 1, 2, 4],  # parallel_park > obstacle_avoidance > turn > straight
                 obstacle_avoidance=should_avoid_obstacle,

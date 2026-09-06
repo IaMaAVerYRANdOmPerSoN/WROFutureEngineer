@@ -50,8 +50,10 @@ class OpenChallengeAsyncMultiprocessingVisionProcessor(OpenChallengeVisionProces
     ) -> NoReturn:  # pyright: ignore[reportReturnType] STFU
         """Full async vision pipeline for the Open Challenge.
 
-        Reads frames from shared memory, computes wall distances, and
-        sends results through the multiprocessing pipe.
+        Reads ``True`` frame-ready notifications, converts each shared-memory
+        BGR frame to HSV, computes :class:`Walls`, and sends one result through
+        *sender*. Receiver, sender, and the shared-memory handle are closed on
+        exit; the shared-memory block is not unlinked.
 
         :param shm_name: Name of the shared memory block.
         :param receiver: Pipe connection for frame-ready signals.
@@ -80,7 +82,7 @@ class OpenChallengeAsyncMultiprocessingVisionProcessor(OpenChallengeVisionProces
                 f"Pipe broken or shared memory closed, shutting down vision processor: {e}")
         except Exception as e:
             logger.critical(f"Vision processor crashed unexpectedly")
-            raise # To logger.catch(reraise=True) in the runner
+            raise  # To logger.catch(reraise=True) in the runner
         finally:
             try:
                 receiver.close()

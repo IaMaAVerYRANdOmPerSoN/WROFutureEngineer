@@ -94,7 +94,7 @@ class Freezeable:
         :returns: ``None``.
         :rtype: None
         """
-        super().__setattr__("_frozen", True) # Allow calling freeze() multiple times without error
+        super().__setattr__("_frozen", True)  # Allow calling freeze() multiple times without error
         for _, value in vars(self).items():
             self._freeze_recursively(value)
 
@@ -237,8 +237,8 @@ class Config(Freezeable):
     def set_nested_attr(self, path: str, value: object, sep: str = ".") -> None:
         """Set an existing nested configuration attribute from a path.
 
-        Unknown leaf attributes are ignored so command-line arguments can be
-        filtered against the configuration shape without creating new state.
+        Unknown leaf attributes are ignored, but missing parent components still
+        raise ``AttributeError`` while the dotted parent path is resolved.
 
         :param path: Attribute path relative to this configuration object.
         :param value: Replacement value for the existing leaf attribute.
@@ -304,14 +304,16 @@ class Config(Freezeable):
         The TOML file is expected to contain one table per nested dataclass section,
         such as ``CameraConfig`` or ``ClientConfig``. Each table is unpacked as
         keyword arguments to the corresponding dataclass constructor and then
-        assigned onto the live :class:`Config` instance.
+        assigned onto the live :class:`Config` instance, replacing each entire
+        section named in the file. Dataclass construction supplies defaults for
+        omitted fields but does not coerce arbitrary TOML values.
 
         :param path: Filesystem path to the TOML configuration file to parse.
         :returns: This same :class:`Config` instance after the values have been
             hydrated.
         :rtype: Config
-        :raises AttributeError: If a table name does not exist on the config or if
-            the values do not match the dataclass definition.
+        :raises AttributeError: If a table name is unknown, is not a TOML table,
+            or contains a keyword not accepted by its dataclass constructor.
         """
 
         with open(path, "rb") as toml:
@@ -350,6 +352,10 @@ class Config(Freezeable):
 
         :returns: This same :class:`Config` instance after applying environment
             overrides.
+        Boolean values are true only for case-insensitive ``true``, ``1``, and
+        ``yes``; other values become ``False``. Unknown section names raise
+        ``KeyError`` while processing the environment.
+
         :rtype: Config
         """
         conversion_map: dict[str, str] = {
@@ -378,10 +384,10 @@ class Config(Freezeable):
 
     @dataclass
     class GeneralConfig(Freezeable):
-        """
-        General Configuration.
+        """Global logging level and selected challenge.
 
-        Controls logging level and which challenge to run.
+        :ivar LEVEL: Loguru level used by package logging.
+        :ivar CHALLENGE: Challenge name, either ``"open"`` or ``"obstacle"``.
         """
         LEVEL: Literal["CRITICAL", "ERROR", "WARNING",
                        "SUCCESS", "INFO", "DEBUG"] = "SUCCESS"
@@ -391,8 +397,29 @@ class Config(Freezeable):
     class CameraConfig(Freezeable):
         """Camera hardware and frame-capture settings.
 
-        Controls picamera2 format, resolution, thread pool size,
-        timeouts, sensor/control parameters, and the initial crop ROI.
+        Controls picamera2 format, resolution, thread pool size, timeouts,
+        sensor/control parameters, and the initial crop ROI. Output dimensions,
+        shared-memory size, and FPS are derived in :meth:`__post_init__`.
+
+        :ivar FORMAT: Picamera2 main-stream format and ``(width, height)`` size.
+        :ivar INITIAL_ROI: ``(rows, columns, channels)`` crop applied to frames.
+        :ivar OUTPUT_WIDTH: Derived cropped width in pixels.
+        :ivar OUTPUT_HEIGHT: Derived cropped height in pixels.
+        :ivar OUTPUT_CHANNELS: Number of BGR channels.
+        :ivar OUTPUT_SHAPE: Derived NumPy frame shape.
+        :ivar SHM_SIZE: Derived frame-buffer size in bytes.
+        :ivar EXECUTOR_THREADS: Camera blocking-call worker count.
+        :ivar MAX_CONCURRENT_CAPTURES: Capture semaphore limit.
+        :ivar BUFFER_COUNT: Picamera2 buffer count.
+        :ivar HW_INIT_TIMEOUT: Hardware initialization timeout in seconds.
+        :ivar CONFIGURE_TIMEOUT: Camera configuration timeout in seconds.
+        :ivar START_TIMEOUT: Camera start timeout in seconds.
+        :ivar CAPTURE_RETRY_SLEEP_SECONDS: Delay after capture timeout.
+        :ivar CAPTURE_ERROR_SLEEP_SECONDS: Delay after other capture errors.
+        :ivar SENSOR_CONFIG: Picamera2 sensor configuration mapping.
+        :ivar CONTROLS_CONFIG: Picamera2 controls mapping; frame duration is in
+            microseconds.
+        :ivar FPS: Derived frames per second from the frame-duration limit.
         """
         FORMAT: dict[str, Any] = field(default_factory=lambda: {
             "format": "BGR888",
@@ -452,8 +479,23 @@ class Config(Freezeable):
     @dataclass
     class ClientConfig(Freezeable):
         """Serial client communication settings.
-        Defines the serial port, baud rate, timeouts, TID range,
-        servo limits, and motor parameters.
+        Defines the serial port, baud rate, timeouts, transaction-ID range,
+        servo limits, and motor parameters. Time values are seconds unless
+        stated otherwise.
+
+        :ivar SERIAL_PORT: Arduino serial device path.
+        :ivar SERIAL_BAUD: Serial baud rate.
+        :ivar SERIAL_TIMEOUT: Serial read timeout.
+        :ivar REQUEST_TIMEOUT: Default request timeout.
+        :ivar WAIT_PATTERN: Pattern for Arduino processing delays in ms.
+        :ivar TID_START: First transaction ID.
+        :ivar TID_END: Last transaction ID before cycling.
+        :ivar WHEELBASE: Robot wheelbase in the controller's distance units.
+        :ivar MAX_SPEED: Absolute motor speed represented by normalized 1.0.
+        :ivar CONNECT_RETRIES: Maximum connection attempts.
+        :ivar SERVO_MIN_ANGLE: Minimum servo angle in degrees.
+        :ivar SERVO_MAX_ANGLE: Maximum servo angle in degrees.
+        :ivar SERVO_TRIM: Servo trim in degrees.
         """
         SERIAL_PORT: str = '/dev/ttyACM0'
         SERIAL_BAUD: int = 115200
@@ -478,6 +520,9 @@ class Config(Freezeable):
 
         Includes the perspective-transform homography matrix, HSV colour
         thresholds for wall/line detection, and region-of-interest slices.
+
+        HSV hue uses OpenCV's 0..179 range; saturation and value use 0..255.
+        ROI slices use image row/column coordinates.
         """
         PERSPECTIVE_TRANSFORM: np.ndarray[tuple[int, int], np.dtype[np.float32]] = field(default_factory=lambda: np.array([
             [1, 0, 0],
@@ -528,6 +573,12 @@ class Config(Freezeable):
 
         Includes PD gains, speeds, hysteresis thresholds, shared memory
         settings, and lap-length constants.
+
+        :ivar WALL_FOLLOW_KPKD: Ordered ``(KP, KD)`` gains where applicable.
+        :ivar DRIVE_COMMAND_DURATION: Motor command duration in seconds.
+        :ivar TURN_DURATION: Turn duration in seconds.
+        :ivar HYSTERESIS: Consecutive frames required for a transition.
+        :ivar TURN_COOLDOWN: Minimum time between turns in seconds.
         """
         SHM_NAME: str = "camera_frame"
         DRIVE_COMMAND_DURATION: float = 0.2
@@ -544,6 +595,11 @@ class Config(Freezeable):
         """Tuning parameters for the Open Challenge.
         Includes PD gains, speeds, hysteresis thresholds, shared memory
         settings, and lap-length constants.
+
+        :ivar WALL_FOLLOW_KPKD: ``(KP, KD)`` wall-following gains.
+        :ivar CORNER_TURN_KPKD: ``(KP, KD)`` corner-turn gains.
+        :ivar STRAIGHT_SPEED: Normalized straight-driving speed.
+        :ivar TURN_SPEED: Normalized turning speed.
         """
         WALL_FOLLOW_KPKD: tuple[float, float] = (1.0, 0.4)
         CORNER_TURN_KPKD: tuple[float, float] = (1.8, 0.2)
@@ -552,7 +608,11 @@ class Config(Freezeable):
 
     @dataclass
     class ParallelParkingConfig(Freezeable):
-        """Tuning values for the end-of-challenge parallel parking maneuver."""
+        """Tuning values for the end-of-challenge parallel parking maneuver.
+
+        Distances and coordinates are normalized unless a field explicitly says
+        seconds or degrees; speeds are normalized drive-client values.
+        """
         MIN_ENTRY_Y: float = 0.5
         WALL_FOLLOW_OFFSET_FACTOR: float = 2.75
         WALL_FOLLOW_KPKD: tuple[float, float] = (1.2, 0.2)
@@ -570,6 +630,16 @@ class Config(Freezeable):
 
         Includes PD gains for wall-following, corner turning, and obstacle
         avoidance, along with speeds and shared memory settings.
+
+        :ivar WALL_FOLLOW_KPKD: ``(KP, KD)`` wall-following gains.
+        :ivar CORNER_TURN_KPKD: ``(KP, KD)`` corner-turn gains.
+        :ivar OBSTACLE_AVOID_KPKD: ``(KP, KD)`` obstacle gains.
+        :ivar STRAIGHT_SPEED: Normalized straight-driving speed.
+        :ivar TURN_SPEED: Normalized turning speed.
+        :ivar OBSTACLE_AVOID_SPEED: Normalized avoidance speed.
+        :ivar OBSTACLE_BASE_OFFSET: Base target offset in pixels.
+        :ivar OBSTACLE_OFFSET_SCALING_FACTOR: Target offset multiplier for
+            detected obstacle width.
         """
         WALL_FOLLOW_KPKD: tuple[float, float] = (0.6, 0.35)
         CORNER_TURN_KPKD: tuple[float, float] = (0.65, 0.25)
@@ -577,8 +647,9 @@ class Config(Freezeable):
         STRAIGHT_SPEED: float = 0.4
         TURN_SPEED: float = 0.4
         OBSTACLE_AVOID_SPEED: float = 0.4
-        OBSTACLE_BASE_OFFSET: float = 0 # Base offset in pixels to avoid the obstacle
-        OBSTACLE_OFFSET_SCALING_FACTOR: float = 3 # Scaling factor * width of obstacle to account for distance changes
+        OBSTACLE_BASE_OFFSET: float = 0  # Base offset in pixels to avoid the obstacle
+        # Scaling factor * width of obstacle to account for distance changes
+        OBSTACLE_OFFSET_SCALING_FACTOR: float = 3
 
     @dataclass
     class LiDARConfig(Freezeable):
@@ -586,6 +657,13 @@ class Config(Freezeable):
 
         Defines the UART port, baud rate, packet framing constants,
         and timeouts.
+
+        :ivar SERIAL_PORT: LiDAR serial device path.
+        :ivar SERIAL_BAUD: UART baud rate.
+        :ivar SERIAL_TIMEOUT: Serial read timeout in seconds.
+        :ivar PACKET_HEADER: LD19 framing header byte.
+        :ivar PACKET_VER_LEN: LD19 version/length byte.
+        :ivar PACKET_LEN: Encoded packet length in bytes.
         """
         SERIAL_PORT: str = '/dev/ttyAMA0'
         SERIAL_BAUD: int = 230400

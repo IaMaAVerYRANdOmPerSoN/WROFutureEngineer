@@ -60,12 +60,15 @@ class VisionProcessor:
         upper_black: np.ndarray[tuple[int, ...],
                                 np.dtype[np.uint8]] | None = None,
     ) -> None:
-        """Initialise the vision processor.
+        """Initialise preprocessing, threshold, and perspective settings.
 
-        :param use_transform: If ``True``, apply perspective transform to detected contours.
-        :param perspective_transform: 3x3 homography matrix (default from Config).
-        :param src: 4x2 source points to compute a homography from.
-        :param dst: 4x2 destination points to compute a homography from.
+        :param use_transform: If ``True``, apply the selected homography to
+            detected contours; it does not warp the whole frame.
+        :param perspective_transform: 3x3 homography matrix. Cannot be used
+            with ``src`` or ``dst``.
+        :param src: Four source points, used together with ``dst`` to compute a
+            homography. Supplying only one point array is invalid.
+        :param dst: Four destination points corresponding to ``src``.
         :param initial_roi: NumPy slice for the initial crop (default from Config).
         :param lower_black: Lower HSV bound for black detection (default from Config).
         :param upper_black: Upper HSV bound for black detection (default from Config).
@@ -103,7 +106,8 @@ class VisionProcessor:
         """Convert a BGR frame to HSV.
 
         :param frame: Raw BGR frame as a numpy array.
-        :returns: Preprocessed HSV frame.
+        :returns: Preprocessed HSV frame. The configured ``initial_roi`` is not
+            applied by this method.
         """
         return cv2.cvtColor(frame, cv2.COLOR_BGR2HSV).astype(np.uint8)
 
@@ -154,8 +158,9 @@ class VisionProcessor:
     def _find_blocks(self, masks: Sequence[np.ndarray], colors: Sequence[str], simplify: bool = True, key: Callable[[tuple[str, np.ndarray]], float] = lambda x: cv2.contourArea(x[1]), min_area: int = 300, max_results: int = 10) -> tuple[VisionObject, ...]:
         """Extract contours from binary masks and return sorted :class:`VisionObject` instances.
 
-        Filters small contours, sorts by area (largest first), and limits
-        to the top 10 results.
+        Filters contours whose area is less than or equal to ``min_area``,
+        sorts the remainder using ``key`` (largest first by default), and
+        returns at most ``max_results`` objects.
 
         :param masks: List of binary masks (numpy arrays).
         :param colors: List of colour labels matching each mask.
@@ -194,9 +199,11 @@ class VisionProcessor:
     def get_perspective_transform(src: np.ndarray, dst: np.ndarray) -> cv2.typing.MatLike | np.ndarray[tuple[int, ...], np.dtype[np.float32 | np.float64]]:
         """Compute a perspective-transform matrix from source to destination points.
 
-        :param src: Four source points defining the original quadrilateral.
-        :param dst: Four destination points defining the transformed
-            quadrilateral.
+        :param src: Four source points in a consistent quadrilateral order,
+            typically a floating-point ``(4, 2)`` array.
+        :param dst: Four destination points in the corresponding order and
+            shape. OpenCV validates the arrays and may reject integer or
+            incorrectly shaped inputs.
 
         :returns: 3x3 perspective transform matrix.
         :rtype: np.ndarray

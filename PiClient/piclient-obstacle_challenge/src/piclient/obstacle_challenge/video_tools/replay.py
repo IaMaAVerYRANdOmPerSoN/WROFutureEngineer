@@ -14,8 +14,9 @@ from piclient.core.vision import VisionObject
 
 from .records import LogRecord
 
-# Number of extra rows reserved below the cropped frame for textual overlays
+# Number of extra rows reserved below the cropped frame for textual overlays.
 PAD_ROWS = 700
+"""Number of pixels appended below each replay frame for telemetry text."""
 
 
 def load_log_records(log_path: Path) -> list[LogRecord]:
@@ -123,7 +124,9 @@ def draw_replay_overlay(frame: np.ndarray, record: LogRecord) -> np.ndarray:
     The returned image includes additional black rows below the original frame
     for the textual record details; the input array is never modified.
 
-    :param frame: Cropped BGR camera frame with the configured output shape.
+    :param frame: Cropped BGR camera frame with shape ``(height, width, 3)``.
+        Obstacle contours must use the same pixel coordinate system; normalized
+        parking-marker fields are rendered from their stored contours.
     :param record: Telemetry and vision data to visualize.
     :returns: Copy of *frame* with graphical and textual annotations.
     :rtype: numpy.ndarray
@@ -132,20 +135,22 @@ def draw_replay_overlay(frame: np.ndarray, record: LogRecord) -> np.ndarray:
     # camera output shape.
     overlay = frame.copy()
 
-
     if record.walls_and_obstacles is not None:
         if record.walls_and_obstacles.obstacles is not None:
             for obstacle in record.walls_and_obstacles.obstacles:
-                cv2.drawContours(overlay, [obstacle.contour], -1, (0, 0, 255) if obstacle.color == "red" else (0, 255, 0), 2)
+                cv2.drawContours(overlay, [
+                                 obstacle.contour], -1, (0, 0, 255) if obstacle.color == "red" else (0, 255, 0), 2)
         if record.walls_and_obstacles.parking_lot.closer is not None:
-            cv2.drawContours(overlay, [record.walls_and_obstacles.parking_lot.closer.contour], -1, (255, 0, 255), 2)
+            cv2.drawContours(overlay, [
+                             record.walls_and_obstacles.parking_lot.closer.contour], -1, (255, 0, 255), 2)
         if record.walls_and_obstacles.parking_lot.further is not None:
-            cv2.drawContours(overlay, [record.walls_and_obstacles.parking_lot.further.contour], -1, (255, 0, 255), 2)
+            cv2.drawContours(overlay, [
+                             record.walls_and_obstacles.parking_lot.further.contour], -1, (255, 0, 255), 2)
 
     c_roi = GLOBAL_CONFIG().VisionConfig.CENTER_WALL_ROI
     l_roi = GLOBAL_CONFIG().VisionConfig.LEFT_WALL_ROI
     r_roi = GLOBAL_CONFIG().VisionConfig.RIGHT_WALL_ROI
-    cv2.rectangle( # Draws center ROI
+    cv2.rectangle(  # Draws center ROI
         overlay,
         (c_roi[1].start, c_roi[0].start),
         (c_roi[1].stop, c_roi[0].stop),
@@ -165,7 +170,8 @@ def draw_replay_overlay(frame: np.ndarray, record: LogRecord) -> np.ndarray:
         (255, 0, 0), 2
     )
 
-    cv2.circle(overlay, (int(record.target[0]), int(record.target[1])), 5, (0, 0, 255), -1) if record.target is not None else None
+    cv2.circle(overlay, (int(record.target[0]), int(
+        record.target[1])), 5, (0, 0, 255), -1) if record.target is not None else None
 
     height, width = overlay.shape[:2]
     center_x = width // 2
@@ -173,10 +179,12 @@ def draw_replay_overlay(frame: np.ndarray, record: LogRecord) -> np.ndarray:
     normalized = (record.command.angle - 90.0) / 90.0
     line_length = max(40, width // 4)
     x_offset = -int(normalized * line_length)
-    cv2.line(overlay, (center_x, bottom_y), (center_x + x_offset, max(0, bottom_y - line_length // 2)), (0, 255, 0), 2)
+    cv2.line(overlay, (center_x, bottom_y), (center_x + x_offset,
+             max(0, bottom_y - line_length // 2)), (0, 255, 0), 2)
     cv2.circle(overlay, (center_x, bottom_y), 4, (0, 255, 0), -1)
 
-    padded_overlay = np.zeros((overlay.shape[0] + PAD_ROWS, overlay.shape[1], overlay.shape[2]), dtype=np.uint8)
+    padded_overlay = np.zeros(
+        (overlay.shape[0] + PAD_ROWS, overlay.shape[1], overlay.shape[2]), dtype=np.uint8)
     padded_overlay[:overlay.shape[0], :, :] = overlay
 
     cv2.putText(
@@ -196,9 +204,10 @@ def draw_replay_overlay(frame: np.ndarray, record: LogRecord) -> np.ndarray:
 def replay_video(video_path: Path, log_path: Path, output_video: Path | None = None, display: bool = False) -> Path:
     """Replay a source video with synchronized overlay annotations.
 
-    Each source frame is paired with its corresponding log record and written
-    to an output video. The output defaults to a replay filename beside the
-    source video.
+    Each source frame consumes the next log record, with the final record reused
+    if the source has more frames. The output uses MP4V and the source FPS, or
+    the configured camera FPS when the source does not report one. Interactive
+    display stops on ``q`` or Escape.
 
     :param video_path: Source video to decode.
     :param log_path: Pickle telemetry stream produced during processing.
@@ -220,11 +229,13 @@ def replay_video(video_path: Path, log_path: Path, output_video: Path | None = N
     if video_fps <= 0:
         video_fps = GLOBAL_CONFIG().CameraConfig.FPS
 
-    output_video = output_video or video_path.with_name(f"{video_path.stem}_replay.mp4")
+    output_video = output_video or video_path.with_name(
+        f"{video_path.stem}_replay.mp4")
     ok, frame = capture.read()
     if not ok:
         capture.release()
-        raise RuntimeError(f"Could not read any frames from replay video: {video_path}")
+        raise RuntimeError(
+            f"Could not read any frames from replay video: {video_path}")
 
     record_index = 0
     current_record = records[0]
@@ -242,14 +253,16 @@ def replay_video(video_path: Path, log_path: Path, output_video: Path | None = N
     )
     if not writer.isOpened():
         capture.release()
-        raise RuntimeError(f"Could not open replay output for writing: {output_video}")
+        raise RuntimeError(
+            f"Could not open replay output for writing: {output_video}")
 
     frame_index = 0
 
     try:
         writer.write(draw_replay_overlay(frame, current_record))
         if display:
-            cv2.imshow("Obstacle Challenge Replay", draw_replay_overlay(frame, current_record))
+            cv2.imshow("Obstacle Challenge Replay",
+                       draw_replay_overlay(frame, current_record))
             delay_ms = max(1, int(1000 / video_fps))
             if cv2.waitKey(delay_ms) & 0xFF in (ord("q"), 27):
                 return output_video
@@ -267,7 +280,7 @@ def replay_video(video_path: Path, log_path: Path, output_video: Path | None = N
                     break
                 record_index += 1
                 current_record = next_record
-                #logger.info(format_log_record(current_record))
+                # logger.info(format_log_record(current_record))
 
             overlay = draw_replay_overlay(frame, current_record)
             writer.write(overlay)

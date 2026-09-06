@@ -1,6 +1,6 @@
-"""Async Open Challenge vision processor.
+"""Async Obstacle Challenge vision processor.
 
-Combines :class:`OpenChallengeVisionProcessor` with
+Combines :class:`ObstacleChallengeVisionProcessor` with
 :class:`AsyncMultiprocessingVisionProcessor` for subprocess-based
 wall-distance measurement.
 """
@@ -45,20 +45,24 @@ class ObstacleChallengeAsyncMultiprocessingVisionProcessor(ObstacleChallengeVisi
         """Async wrapper around the synchronous target computation method.
 
         :param walls_and_obstacles: Walls and obstacles data.
-        :returns: Target point as (x, y) tuple.
+        :returns: Target point as ``(x, y)`` tuple, or ``None`` when no obstacle
+            is available. The processor must be entered before this call.
         """
         return await self.loop.run_in_executor(self._executor, super(ObstacleChallengeAsyncMultiprocessingVisionProcessor, self).get_target, walls_and_obstacles)
-    
+
     async def comprehensive_analysis(
         self,
         shm_name: str,
         receiver: PipeConnection,
         sender: PipeConnection,
-        ) -> NoReturn: # pyright: ignore[reportReturnType]
+    ) -> NoReturn:  # pyright: ignore[reportReturnType]
         """Full async vision pipeline for the Obstacle Challenge.
 
-        Reads frames from shared memory, computes wall distances, and
-        sends results through the multiprocessing pipe.
+        Reads ``True`` frame-ready notifications, converts each shared-memory
+        BGR frame to HSV, computes :class:`WallsAndObstacles` and its target,
+        and sends the tuple ``(walls_and_obstacles, target)`` through *sender*.
+        Pipe and shared-memory handles are closed on exit; unexpected errors
+        are logged and swallowed after the critical log entry.
 
         :param shm_name: Name of the shared memory block.
         :param receiver: Pipe connection for frame-ready signals.

@@ -13,12 +13,12 @@ import numpy as np
 from ..lib import export
 
 
-
 def get_pose(contour: np.ndarray) -> tuple[float, float, float]:
-    """Calculate the centroid of a contour.
+    """Calculate a contour's centroid and principal-axis angle.
 
-    :param contour: OpenCV contour (Nx1x2 array of points).
-    :return: Centroid coordinates (x, y).
+    :param contour: OpenCV contour with shape ``(N, 1, 2)``.
+    :returns: ``(x, y, theta)`` where ``theta`` is the principal-axis angle in
+        degrees.
     """
     M = cv2.moments(contour)
     if M["m00"] == 0:
@@ -39,23 +39,29 @@ class VisionObject:
 
     :ivar contour: OpenCV contour (Nx1x2 array of points).
     :ivar color: Colour label string (e.g. ``"green"``, ``"red"``).
-    :ivar bbox: Bounding rectangle ``(x, y, w, h)``.
-    :ivar x_centroid: X coordinate of the bounding-box centre.
-    :ivar y_centroid: Y coordinate of the bounding-box centre.
-    :ivar rotation: Normalised rotation angle of the contour (-1 to 1).
+    :ivar bbox: Bounding rectangle ``(x, y, width, height)``. Values are pixel
+        coordinates until a :class:`ParkingLot` normalises them.
+    :ivar x_centroid: X coordinate of the contour centroid, in pixels unless
+        normalised by :class:`ParkingLot`.
+    :ivar y_centroid: Y coordinate of the contour centroid, in pixels unless
+        normalised by :class:`ParkingLot`.
+    :ivar rotation: Principal-axis angle scaled from degrees to the range
+        ``[-1, 1]`` by dividing by 90.
     """
     contour: np.ndarray
     color: str
     bbox: tuple[float, float, float, float] = None # pyright: ignore[reportAssignmentType]
-    x_centroid: float = None # pyright: ignore[reportAssignmentType]
-    y_centroid: float = None # pyright: ignore[reportAssignmentType]
-    rotation: float = None # pyright: ignore[reportAssignmentType]
+    x_centroid: float = None  # pyright: ignore[reportAssignmentType]
+    y_centroid: float = None  # pyright: ignore[reportAssignmentType]
+    rotation: float = None  # pyright: ignore[reportAssignmentType]
 
     def __post_init__(self) -> None:
-        """Compute bounding-box and centroid properties after dataclass init."""
+        """Derive the bounding box, centroid, and normalised rotation in place."""
         # Added custom type stub, default type stubs use Sequence[int]
-        self.bbox = cast(tuple[float, float, float, float], cv2.boundingRect(self.contour))
-        self.x_centroid, self.y_centroid, self.rotation = get_pose(self.contour)
+        self.bbox = cast(tuple[float, float, float, float],
+                         cv2.boundingRect(self.contour))
+        self.x_centroid, self.y_centroid, self.rotation = get_pose(
+            self.contour)
         self.x_centroid = float(self.x_centroid)
         self.y_centroid = float(self.y_centroid)
         self.rotation = float(np.clip(self.rotation / 90.0, -1.0, 1.0))
@@ -66,12 +72,14 @@ class VisionObject:
 class Walls:
     """Normalised wall-distance measurements.
 
-    Distances are expressed as the fraction of black pixels in the
-    left and right regions of interest, divided by ROI area.
+    Values are black-pixel counts divided by the corresponding ROI area; they
+    are fill ratios, not physical distances.
 
-    :ivar left: Normalised distance to the left wall (0-1).
-    :ivar right: Normalised distance to the right wall (0-1).
-    :ivar area: Total pixel area of the ROI used for normalisation.
+    :ivar left: Left ROI black-pixel fill ratio, normally in ``[0, 1]``.
+    :ivar right: Right ROI black-pixel fill ratio, normally in ``[0, 1]``.
+    :ivar center: Center ROI black-pixel fill ratio, normally in ``[0, 1]``.
+    :ivar area: Denominator (pixel area) for the left and right ratios.
+    :ivar center_area: Denominator (pixel area) for the center ratio.
     """
     left: float
     right: float
@@ -80,7 +88,11 @@ class Walls:
     center_area: float
 
     def __post_init__(self) -> None:
-        """Normalise wall distances by dividing by ROI area."""
+        """Replace raw black-pixel counts with in-place ROI fill ratios.
+
+        Both denominators must be non-zero for meaningful measurements; Python
+        raises ``ZeroDivisionError`` otherwise.
+        """
         self.left = self.left / self.area  # Can only be 0 - 1
         self.right = self.right / self.area
         self.center = self.center / self.center_area
@@ -91,8 +103,10 @@ class Walls:
 class ParkingLot:
     """Detected parking lot in the camera frame.
 
-    :ivar closer: The closer vision object representing nearest edge of the parking lot.
-    :ivar further: The further vision object representing the far edge of the parking lot.
+    :ivar closer: Marker nearest the robot after ordering by image ``y``.
+    :ivar further: Farther marker, or ``None`` if only one marker was detected.
+    :ivar max_x: Frame width used to normalise marker coordinates.
+    :ivar max_y: Frame height used to normalise marker coordinates.
 
     If the two mangenta parking lot restrictions contours are detected, the *closer* and *further* vision objects will be set accordingly.
     If only one restriction is visible from the current viewing angle, only *closer* will be set and *further* will be None.
@@ -104,9 +118,15 @@ class ParkingLot:
     max_y: float
 
     def __post_init__(self) -> None:
-        """Ensure that the closer and further vision objects are correctly assigned based on their y-centroid values, then normalise."""
+        """Order markers and mutate their coordinates to frame-relative values.
+
+        The closer marker has the larger image ``y`` coordinate. Bounding-box
+        coordinates, centroids, and rotations are normalised in place by the
+        supplied frame maxima; non-positive maxima map coordinates to ``0.0``.
+        """
         if self.closer is not None and self.further is not None:
-            if self.closer.y_centroid < self.further.y_centroid: # Image coordinates have origin at top-left, so larger y values are further down the image
+            # Image coordinates have origin at top-left, so larger y values are further down the image
+            if self.closer.y_centroid < self.further.y_centroid:
                 # Swap the two if they are in the wrong order
                 self.closer, self.further = self.further, self.closer
 
@@ -117,25 +137,28 @@ class ParkingLot:
             return float(value / axis_max)
 
         if self.closer is not None:
-            self.closer.x_centroid = _normalise(self.closer.x_centroid, self.max_x)
-            self.closer.y_centroid = _normalise(self.closer.y_centroid, self.max_y)
+            self.closer.x_centroid = _normalise(
+                self.closer.x_centroid, self.max_x)
+            self.closer.y_centroid = _normalise(
+                self.closer.y_centroid, self.max_y)
             self.closer.bbox = (
                 _normalise(self.closer.bbox[0], self.max_x),
                 _normalise(self.closer.bbox[1], self.max_y),
                 _normalise(self.closer.bbox[2], self.max_x),
                 _normalise(self.closer.bbox[3], self.max_y),
             )
-            self.closer.rotation = float(np.clip(self.closer.rotation / 90.0, -1.0, 1.0))
         if self.further is not None:
-            self.further.x_centroid = _normalise(self.further.x_centroid, self.max_x)
-            self.further.y_centroid = _normalise(self.further.y_centroid, self.max_y)
+            self.further.x_centroid = _normalise(
+                self.further.x_centroid, self.max_x)
+            self.further.y_centroid = _normalise(
+                self.further.y_centroid, self.max_y)
             self.further.bbox = (
                 _normalise(self.further.bbox[0], self.max_x),
                 _normalise(self.further.bbox[1], self.max_y),
                 _normalise(self.further.bbox[2], self.max_x),
                 _normalise(self.further.bbox[3], self.max_y),
             )
-            self.further.rotation = float(np.clip(self.further.rotation / 90.0, -1.0, 1.0))
+
 
 
 @export
@@ -143,11 +166,14 @@ class ParkingLot:
 class WallsAndObstacles:
     """Normalised wall-distance and obstacle measurements.
 
-    Wall distances are expressed as the distance between the centroid of the wall contour and the center of the frame,
-    while obstacles are expressed as visionObjects in the camera frame.
+    Wall values are ROI black-pixel fill ratios. Obstacles remain detected
+    :class:`VisionObject` instances, while parking markers are normalised by
+    :class:`ParkingLot`.
 
     :ivar walls: Normalised wall distances.
-    :ivar obstacles: Normalised obstacle distances.
+    :ivar obstacles: Detected obstacles, or ``None`` when no obstacle result is
+        available for the frame.
+    :ivar parking_lot: Detected parking markers and their normalisation bounds.
     """
     walls: Walls
     obstacles: Sequence[VisionObject] | None

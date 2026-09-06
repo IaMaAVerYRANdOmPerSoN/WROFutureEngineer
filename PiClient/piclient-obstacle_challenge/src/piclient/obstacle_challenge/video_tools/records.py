@@ -16,7 +16,9 @@ from ..transition_determinants import ChallengeState
 class DriveCommand:
     """Describe one motor command issued during an obstacle-challenge frame.
 
-    The record preserves the requested signed speed, steering angle, and
+    Speed is the normalized signed value expected by the drive client (usually
+    in ``[-1, 1]``); angle is an absolute servo angle in degrees. The record
+    preserves the requested signed speed, steering angle, and
     command duration so offline replay can show exactly what the controller
     submitted.
 
@@ -81,6 +83,9 @@ class PickleLogWriter:
     The writer creates parent directories when entered, appends records using
     the highest available pickle protocol, and flushes after every write so a
     partially completed offline run remains readable.
+
+    Pickle is not a safe interchange format for untrusted files: loading a
+    stream can execute embedded code. Only open logs from trusted sources.
 
     :ivar log_path: Destination path for the append-only pickle stream.
     :ivar _fp: Open binary stream, or ``None`` while the writer is closed.
@@ -175,7 +180,7 @@ def build_log_record(
     :param timestamp_s: Frame timestamp in seconds.
     :param state: Active obstacle-challenge state.
     :param lap_counter: Number of laps completed so far.
-    :param last_lap_time_s: Timestamp of the most recent completed lap.
+    :param last_lap_time: Timestamp of the most recent completed lap.
     :param target: Selected target point as ``(x, y)``, or ``None``.
     :param walls_and_obstacles: Vision result containing wall and obstacle
         detections, or ``None``.

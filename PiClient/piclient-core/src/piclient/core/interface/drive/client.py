@@ -21,10 +21,11 @@ from ...lib import GLOBAL_CONFIG, export
 
 @export
 class Client:
-    """Async serial client for the Arduino communication protocol.
+    """Async serial client used by the drive command executor.
 
-    Manages a TID-based request/response pipeline with a background
-    serial listener. Supports motor, servo, LED, and ping commands.
+    This is the drive-interface client and is distinct from the lower-level
+    :class:`piclient.core.interface.comm_protocol.Client`; both speak the same
+    request/response protocol but expose separate package APIs.
 
     :ivar _serial: Underlying :class:`aioserial.AioSerial` instance.
     :ivar port: Serial port path.
@@ -48,16 +49,21 @@ class Client:
             loop: asyncio.AbstractEventLoop | None = None,
     ):
         """
-        The constructor for the `Client` class
+        Construct a client without opening the serial device.
 
-        :param self: The instance of Client
         :param port: The serial port passed to `aioserial.AioSerial`.
         :param baud: The baudrate of the serial protocol.
         :param timeout: Default timeout for granular requests.
         :param tid_start: First transaction ID (inclusive).
         :param tid_end: Last transaction ID (inclusive) before cycling.
-        :param wait_re_pattern: Regex pattern for Arduino WAITMS responses.
-        :param trim: Servo trim value.
+        :param wait_re_pattern: Regex pattern for Arduino ``WAITMS`` responses.
+        :param trim: Servo trim value applied by servo commands.
+        :param retries: Number of connection attempts used by
+            :meth:`verify_connection`.
+        :param max_speed: Absolute motor speed represented by normalized speed
+            ``1.0``.
+        :param loop: Event loop used for request futures; defaults to the
+            current event loop.
 
         :returns self: an instance of `Client`
         """
@@ -184,8 +190,8 @@ class Client:
         responses by re-registering the future with an extended timeout.
 
         :param command: The command string to send (e.g. ``"SET_MOTOR 50 0.5"``).
-        :param type: The command type string (used only for logging).
-        :param timeout: Maximum time in seconds to wait for a response.
+        :param timeout: Maximum time in seconds to wait for a response. A
+            ``WAITMS`` response schedules a follow-up wait.
         :returns: The response string from the Arduino, or an error string.
         :raises AttributeError: If the serial interface is not initialized.
         """

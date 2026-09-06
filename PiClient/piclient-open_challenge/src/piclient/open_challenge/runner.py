@@ -23,8 +23,15 @@ from piclient.core.vision import OpenChallengeAsyncMultiprocessingVisionProcesso
 @export
 @logger.contextualize(process="MAIN")
 async def run_open_challenge() -> None:
-    """
-    asynchronous runner for the *open challenge*
+    """Run the live Open Challenge control loop.
+
+    Creates the camera shared-memory block and camera/vision processes, opens
+    the Arduino client and drive executor, and submits wall-following commands
+    until the configured lap sequence completes. Processes and shared memory
+    are cleaned up in the runner's finalization path.
+
+    :returns: ``None`` after completion or a failed connection check.
+    :rtype: None
     """
 
     wall_follow = PD(
@@ -97,7 +104,7 @@ async def run_open_challenge() -> None:
                     f"Couldn't establish connection to Arduino, is the USB cable plugged in? The selected USB port is {client.port}, baud {client.baud} (check Config.py).")
                 return
 
-            await client.drive_motors(0, 0, 0.1)  # Turn straight
+            await client.drive_motors(0, 90, 0.1)  # Turn straight
 
             try:
                 async with DriveCommandExecutor(client) as drive:
@@ -115,7 +122,7 @@ async def run_open_challenge() -> None:
                         corner_turn_correction = corner_turn.tick(
                             walls.right - walls.left)
                         is_turn_detected = walls.center > GLOBAL_CONFIG(
-                        ).SharedChallengeConfig.CENTER_FILL_THRESHOLD                
+                        ).SharedChallengeConfig.CENTER_FILL_THRESHOLD
 
                         match state:
                             case "Straight":
@@ -127,7 +134,8 @@ async def run_open_challenge() -> None:
                                     if hysteresis_counter >= GLOBAL_CONFIG().SharedChallengeConfig.HYSTERESIS:
                                         turn_counter += 1
                                         last_turn_time: float = time.perf_counter()
-                                        state = "Final Turn" if turn_counter >= GLOBAL_CONFIG().SharedChallengeConfig.LAP_LENGTH_IN_TURNS else "Turn"
+                                        state = "Final Turn" if turn_counter >= GLOBAL_CONFIG(
+                                        ).SharedChallengeConfig.LAP_LENGTH_IN_TURNS else "Turn"
                                         hysteresis_counter = 0
                                 else:
                                     hysteresis_counter = 0
@@ -187,7 +195,8 @@ async def run_open_challenge() -> None:
                                 state = "Straight"
 
                         h, w, c = GLOBAL_CONFIG().CameraConfig.OUTPUT_SHAPE
-                        debug_frame = np.ndarray((h, w, c), dtype=np.uint8, buffer=shm.buf)
+                        debug_frame = np.ndarray(
+                            (h, w, c), dtype=np.uint8, buffer=shm.buf)
 
                         cv2.line(debug_frame, (w // 2, h), (int(w / 2 - turn_correction *
                                  # Draws the turning vector

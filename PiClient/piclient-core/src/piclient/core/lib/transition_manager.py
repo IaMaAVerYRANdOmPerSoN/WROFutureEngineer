@@ -34,9 +34,13 @@ class TransitionManager(Generic[P, T]):
     def __init__(self, *, hysteresis_values: Sequence[int], priorities: Sequence[int], **transition_determinants: Callable[P, bool]) -> None:
         """Initialise the transition manager.
 
-        :param transitions_determinants: Callables that determine whether a transition should occur.
-        :param hysteresis_values: Number of consecutive True calls required to trigger a transition for each determinant.
-        :param priorities: Priorities for each transition determinant.
+        :param transition_determinants: Keyword callables keyed by destination
+            state. Their insertion order defines the pairing with the two
+            sequences below.
+        :param hysteresis_values: Consecutive true-call counts required for
+            each determinant; zero triggers on a single true result.
+        :param priorities: Unique non-negative priorities paired by insertion
+            order; the highest eligible priority wins.
         """
 
         if len(transition_determinants) != len(hysteresis_values):
@@ -73,12 +77,17 @@ class TransitionManager(Generic[P, T]):
             name: False for name in self._transition_determinants.keys()}
 
     def check_transitions(self, *args: P.args, **kwargs: P.kwargs) -> T | None:
-        """Check all transition determinants and update hysteresis counters.
-        Automatically resets hysteresis counters when a transition occurs to avoid immediate re-triggering of the same transition.
+        """Evaluate determinants, apply hysteresis, and select one transition.
+
+        Arguments are signature-filtered independently for each determinant;
+        callbacks that cannot bind the supplied arguments are skipped and
+        logged. ``debug_entries`` records which thresholds were met during this
+        call. When a transition is selected, every hysteresis counter is reset.
 
         :param args: Arguments to pass to each transition determinant.
         :param kwargs: Keyword arguments to pass to each transition determinant.
-        :returns: string indicating which state to transition to based on priority, or None if no transition should occur.
+        :returns: Destination state with the highest eligible priority, or
+            ``None`` when no determinant reaches its threshold.
         """
         result = None
         incremented_states: list[T] = []

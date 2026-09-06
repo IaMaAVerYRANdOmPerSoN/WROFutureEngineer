@@ -1,6 +1,4 @@
-"""
-Some bullshit we won't actually use I'm a fucking idiot
-"""
+"""Latest-wins executor for following robot-relative waypoint paths."""
 from typing import NoReturn
 
 import asyncio
@@ -15,23 +13,24 @@ from .drive import DriveCommandExecutor
 
 
 class RelativePathFollower(DriveCommandExecutor):
-    """
-    A fully-async, single-consumer executor for following a relative path.
-    The path is defined as a sequence of (x, y) points in the robot's local coordinate frame,
-    where (0, 0) is the robot's current position and orientation.
-    Path points are cached, and the robot will follow the path until it reaches the end or a new path is submitted.
-    The robot will always act on the most recent path instead of replaying a stale backlog.
-    Path points are assumed to be relative to the robot's current position and orientation at the time of submission.
+    """Follow waypoints expressed in the robot's local camera coordinate frame.
+
+    Waypoints are replaced with latest-wins semantics. The follower estimates
+    position from submitted normalized speed, steering angle, duration, and
+    wheelbase; this is command-based odometry rather than wheel-encoder data.
     """
 
     def __init__(self, client: Client, speed: float, frame_height: int, wheelbase: float, min_confidence_before_refresh: float, refresh_hystersis: int, max_frames_before_refresh: int) -> None:
-        """
+        """Initialize path-following parameters and refresh thresholds.
+
         :param client: The `Client` whose `drive_motors` the worker will call.
         :param speed: The speed at which to follow the path.
         :param frame_height: The height of the frame in the robot's local coordinate frame.
         :param wheelbase: The distance between the robot's wheels.
         :param min_confidence_before_refresh: The minimum confidence required before refreshing the path.
-        :param refresh_hystersis: The number of frames to where an angle is below the minimum confidence before refreshing the path.
+        :param refresh_hystersis: Number of consecutive low-confidence frames
+            before requesting a path refresh. The misspelling is retained in
+            the public parameter for compatibility.
         :param max_frames_before_refresh: The maximum number of frames to wait before refreshing the path.
         """
         super().__init__(client)
@@ -138,10 +137,11 @@ class RelativePathFollower(DriveCommandExecutor):
         self._last_odometry_update = current_time
 
     def _calc_next_command(self) -> tuple[float, float, float]:
-        """
-        Calculate the next drive command based on the current path points and the robot's position.
-        This is done by finding the closest path point to the robot's current position and calculating the angle and distance to that point.
-        :returns: A tuple of (speed, angle, duration) for the next drive command.
+        """Derive the next ``(speed, angle, duration)`` command.
+
+        The highest-``y`` remaining waypoint is selected, with angle measured
+        by ``atan2(y, x)`` in degrees. An empty path requests a refresh and
+        returns a zero command.
         """
         if self._dynamic_path_points.shape[0] == 0:
             self._request_refresh.set()
@@ -169,12 +169,11 @@ class RelativePathFollower(DriveCommandExecutor):
         return (self.speed, angle, duration)
 
     def submit_path(self, path_points: np.ndarray[tuple[int, int], np.dtype[np.float64]]) -> asyncio.Event:
-        """
-        Submit a new path to follow. The path points are assumed to be relative to the robot's current position and orientation at the time of submission.
-        The path points are cached, and the robot will follow the path until it reaches the end or a new path is submitted. If a new path is submitted while the robot is already following a path,
-        the new path will replace the old path, and the robot will start following the new path immediately. The robot will always act on the most recent path instead of replaying a stale backlog.
-        :param path_points: A NumPy array of shape (N, 2) containing the (x, y) coordinates of the path points in the robot's local coordinate frame.
-        :returns: An asyncio.Event that will be set when the path is completed or a new path is submitted. The event can be used to wait for the path to be completed or to check if the path is still being followed.
+        """Replace the active path with an ``(N, 2)`` floating-point array.
+
+        Points are copied, sorted by increasing ``y``, and interpreted relative
+        to the robot pose at submission time. The returned event is cleared for
+        the new path and set when the path is exhausted or a refresh is needed.
         """
         self._path_points_cache = path_points.copy()[np.argsort(
             path_points[:, 1])]  # Sort by y-coordinate (increasing downwards)
@@ -183,12 +182,11 @@ class RelativePathFollower(DriveCommandExecutor):
         return self._request_refresh
 
     def tick(self) -> None:
-        """
-        Tick the path follower to update odometry and submit the next drive command.
-        This should be called in a loop until the path is completed or a new path is submitted.
+        """Update refresh counters and submit the command for the next tick.
 
-        This synchronizes the path follower with the main loop,
-        so it can accurately measure frame counts and request path refreshes when the path is not updated frequently enough.
+        Call this once per vision/control frame while a path is active. It can
+        set the returned :meth:`submit_path` event when the refresh limit is
+        reached.
         """
         self._frame_counter += 1
         if self._frame_counter >= self.max_frames_before_refresh:

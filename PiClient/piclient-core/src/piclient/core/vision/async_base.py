@@ -92,7 +92,12 @@ class AsyncMultiprocessingVisionProcessor(VisionProcessor):
     async def comprehensive_analysis(self, *args: Any, **kwargs: Any) -> NoReturn:
         """Run the full vision analysis pipeline (abstract).
 
-        Subclasses must override this method.
+        Subclasses must override this method. Implementations are expected to
+        consume frame-ready notifications, read the named shared-memory frame,
+        and send analysis results through the supplied output pipe.
+
+        :param args: Implementation-specific shared-memory and pipe arguments.
+        :param kwargs: Implementation-specific options.
 
         :raises NotImplementedError: Always, unless overridden.
         """
@@ -117,7 +122,10 @@ class AsyncMultiprocessingVisionProcessor(VisionProcessor):
         :param frame_receiver: Pipe connection to receive frame-ready signals.
         :param data_sender: Pipe connection to send vision results.
         :param executor_size: Thread-pool size.
-        :param loop: Asyncio event loop (optional).
+        :param loop: Asyncio event loop (optional). The child process normally
+            creates its own loop when this is omitted.
+        :raises Exception: Logs and re-raises failures from the child vision
+            pipeline.
         """
         async def _run() -> NoReturn:
             """Run the configured vision analysis loop in this process."""

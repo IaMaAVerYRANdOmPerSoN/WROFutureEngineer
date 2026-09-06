@@ -25,20 +25,19 @@ from .argument_parser import TypedArgumentParser
 def _parse_args() -> argparse.Namespace:
     """Parse command-line arguments for the challenges.
 
-    :returns: Parsed namespace.
+    The parser reads and mutates the process-wide :func:`GLOBAL_CONFIG` when
+    explicitly supplied options are present.
+
+    :returns: Namespace containing only explicitly supplied options.
     """
     return TypedArgumentParser(GLOBAL_CONFIG()).parse_args()
 
 
 async def _init_sentry() -> None:
-    """
-    Initialize Sentry SDK for error tracking if SENTRY_DSN is set in the environment.
+    """Initialize Sentry only when ``SENTRY_DSN`` is configured.
 
-    "In async programs, we recommend to initialize the
-    Sentry SDK inside an async function to ensure async
-    code is instrumented properly. If possible, call
-    sentry_sdk.init() at the beginning of the first
-    async function you call" --- sentry sdk docs
+    Missing Sentry installation or a missing environment variable is ignored;
+    no exception is raised in either case.
     """
     dsn: str | None = os.getenv("SENTRY_DSN")
     if not dsn:
@@ -61,9 +60,9 @@ async def _init_sentry() -> None:
 def main() -> NoReturn:
     """Main entry point for the Pi Client.
 
-    Configures logging, selects the challenge based on CLI arguments,
-    and runs the appropriate async challenge loop. Handles graceful
-    shutdown on KeyboardInterrupt and logs fatal exceptions.
+    Configures logging, freezes the global configuration, selects exactly one
+    challenge from CLI/environment/TOML settings, and runs its async loop.
+    This function always terminates by calling :func:`sys.exit`.
     """
     asyncio.run(_init_sentry())
 
@@ -90,7 +89,8 @@ def main() -> NoReturn:
                 logger.warning("Nothing to run!")
             exitcode = 0
     except KeyboardInterrupt:
-        logger.error("SIGINT received, shutting down... (Send SIGINT [CTRL+C] again to force)")
+        logger.error(
+            "SIGINT received, shutting down... (Send SIGINT [CTRL+C] again to force)")
         exitcode = 0
     except Exception:
         logger.critical("Robot Crashed Unexpectedly (See above for Traceback)")

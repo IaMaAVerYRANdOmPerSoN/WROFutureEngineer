@@ -21,6 +21,7 @@ from loguru import logger
 from ..lib import GLOBAL_CONFIG, export
 from ..utils import async_pipe_reader as utils_async_pipe_reader, async_pipe_reader_fifo as utils_async_pipe_reader_fifo
 
+
 @export
 @dataclass
 class LiDARPacket:
@@ -37,7 +38,9 @@ class LiDARPacket:
     :vartype timestamp: int
     :ivar crc: CRC byte from the packet for integrity checking.
     :vartype crc: int
-    :ivar points: list of measurement points, each containing:
+    :ivar points: List of measurement dictionaries. Each dictionary contains
+        ``x`` and ``y`` in millimetres using the LiDAR frame's polar-axis
+        convention, plus an integer ``confidence`` byte.
     :vartype points: list[dict[str, Any]]
     """
     speed: float
@@ -129,7 +132,9 @@ class LiDAR:
         with interpolated angles.
 
         :param packet: Raw 47-byte packet from the serial stream.
-        :returns: Parsed :class:`LiDARPacket`, or ``None`` if invalid.
+        :returns: Parsed :class:`LiDARPacket`, or ``None`` when the byte length
+            is not ``PACKET_LEN``. The implementation checks framing length but
+            does not validate the stored CRC byte.
         """
         if len(packet) != self.PACKET_LEN:
             return None
@@ -293,7 +298,8 @@ class LiDAR:
     async def capture_packet(self, timeout: float = 1.0) -> bool:
         """Wait for the next available LiDAR packet.
 
-        Clears :attr:`_packet_event` and waits for the listener to set it.
+        Clears :attr:`_packet_event` and waits for the listener to set it. The
+        packet itself is retrieved separately with :meth:`get_latest_packet`.
 
         :param timeout: Maximum wait time in seconds.
         :returns: ``True`` if a new packet was captured, ``False`` on timeout.
