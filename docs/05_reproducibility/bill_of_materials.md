@@ -17,10 +17,10 @@ This document lists all components used to build the robot, including electronic
 | Servo Motor | [Hitec HS-5055MG](https://hitecrcd.com/hs-5055mg-economy-metal-gear-feather-servo/) | Steering control | 1 | $25 |
 | Camera | [OV5647 5MP 1080P](https://www.amazon.ca/dp/B0D324RKRZ) | Wall, pillar, and corner line detection | 1 | $35 |
 | Battery | [Gens Ace 1300mAh 2S LiPo 45C](https://genstattu.com/gens-ace-1300mah-2s-7-4v-45c-g-tech-lipo-battery-pack-with-deans-plug/) | Main power source | 1 | $21 |
-| Voltage Regulator | Yahboom Step-Down (5V) | Powers Raspberry Pi from battery | 1 | $30 |
+| Voltage Regulator | [Yahboom Regulator](https://category.yahboom.net/products/asrm?srsltid=AfmBOoq43PT68v2hMJWeWC1laU7sbZsMzVec32_oD88Ob5BD8jPdT2T3) | Lowers 7.4V from battery to Pi | 1 | $15 |
 | Power Switch | — | Main battery on/off | 1 | — |
 | Deans-T Connector | — | Battery main connector | 2 | — |
-| Differential (1/4 gear ratio)| 1 | — |
+
 
 ---
 
@@ -29,7 +29,7 @@ This document lists all components used to build the robot, including electronic
 | Component | Purpose | Quantity | Price (CAD) |
 | ----------- | --------- | ---------- | ------------- |
 | Wheels (35mm rubber, 1/28 scale) | [1/28 RC Drift Tires](https://www.amazon.ca/AllinRC-Pre-glued-Compatible-WLtoys-Racing/dp/B0B4DH61L9) | Rear and front wheels (4) | $27 (pack) |
-| RC Differential Gearbox | Drive power to rear wheels | 1 | — |
+| RC Differential Gearbox (1/4 ratio) | Drive power to rear wheels | 1 | — |
 | 6mm Ball Bearings | Axle support in rear body mount | 4 | — |
 | M2 Screws | Securing small components | ~20 | — |
 | M2.5 Screws | Raspberry Pi mounting (nylon) | ~8 | — |
@@ -60,6 +60,6 @@ This document lists all components used to build the robot, including electronic
 | Electronics | ~$419 |
 | Mechanical | ~$27 |
 | Filament | ~$10 |
-| **Total** | **~$45f6** |
+| **Total** | **~$456** |
 
 *Prices are approximate and based on retail cost at time of purchase. Some components were sourced from existing supplies.*

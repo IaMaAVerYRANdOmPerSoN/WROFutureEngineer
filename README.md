@@ -25,7 +25,7 @@ We are a three-person team from Explorer Robotics in Whitby, Ontario, Canada. We
 
 <p align="center">
   <img src="docs/img/Elvis.png" width="200">
-  <img src="docs/img/Micheal.png" width="200">
+  <img src="docs/img/michael.png" width="200">
   <img src="docs/img/Ryan.png" width="200">
 </p>
 <p align="center">Elvis &nbsp;&nbsp;&nbsp; Michael &nbsp;&nbsp;&nbsp; Ryan</p>
@@ -194,7 +194,6 @@ To get our current design, we took inspiration from our previous robot we used l
 #### Old Design
 ![Photo 1](docs/img/old_robot_left.webp)
 
-*add old robot photo*
 
 #### Improvements
 - Make the robot thinner for more clearence and better weight distribution
@@ -278,7 +277,10 @@ The first path goes through our Yahboom voltage regulator board, which steps the
 
 The second path runs through the ESC. The ESC takes power directly from the battery and has its own built-in BEC (battery eliminator circuit) to regulate it. On the output side, the ESC's voltage pin powers the servo, and the ESC also drives the brushless motor directly since the motor doesn't need to be stepped down first.
 
-**Insert Schematic**
+<p align="center">
+  <img src="docs/diagrams/schematic.webp" width="500">
+</p>
+<p align="center"><i>Full electronics schematic showing power distribution and signal connections.</i></p>
 
 The Raspberry Pi is the brain, it runs the vision pipeline, figures out where objects are, and decides what the robot should do next. The Arduino doesn't make any decisions, it just takes the drive commands the Pi sends it and turns them into precise PWM signals, since the Pi can't reliably time PWM output on its own while it's busy processing frames. The camera is the robot's only sense of the outside world, it feeds every frame the vision pipeline uses to find walls, corners, and pillars.
 
@@ -652,6 +654,11 @@ Detailed records:
   <img src="docs/diagrams/architecture.webp" width="750">
 </p>
 <p align="center"><i>Full software architecture diagram.</i></p>
+
+<p align="center">
+  <img src="docs/diagrams/schematic.webp" width="500">
+</p>
+<p align="center"><i>Full electronics schematic showing power distribution and signal connections.</i></p>
 
 ### Videos
 ### Open Challenge Run

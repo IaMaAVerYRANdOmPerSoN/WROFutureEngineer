@@ -371,22 +371,19 @@ The first versions of all 3D printed parts were adapted from last year's robot. 
 - Axle connectors too loose for the differential output ([Week 30](#week-30-jul-1420))
 - Axle slipping in the differential gearbox ([Week 32](#week-32-jul-28aug-3))
 - Switching differential ([Week 35](#week-35-aug-1824))
-
-The differential was the single most persistent hardware problem throughout the build. The team began with an adapted online design which immediately failed under load as the teeth did not mesh properly. Three custom printed versions followed, each addressing a different failure mode - poor tooth geometry, axle slipping, and excessive friction from FDM surface finish limitations. After the third printed version melted from heat generated under high speed, the decision was made to purchase an off-the-shelf differential. The first purchased unit was too large and dragged on the ground. Rather than modifying the chassis, the coach sourced a smaller gearbox from a salvaged RC car kit which fit the existing axle geometry and had a higher gear ratio which resolved the issue and the robot moved reliably. Each failure drove a different solution, and the team learned that components cannot be evaluated in isolation from the rest of the system.
+The differential was the single biggest hardware headache all build. Honestly the part that got us down the most. The team started with an adapted online design which failed right away under load because the teeth didn't mesh properly. Three custom printed versions came after that, each one fixing a different problem, bad tooth shape, axle slipping, and too much friction from the 3D printing itself. After the third printed one melted from heat at high speed, we decided to just buy an off-the-shelf differential instead. The first one we bought was too big and dragged on the ground. Instead of changing the chassis, the coach found a smaller gearbox from an old RC car kit that fit our axles and had a better gear ratio, which finally fixed it and the robot ran smoothly. Every failure pushed us to a different fix, and we learned that you can't look at one part on its own, everything on the robot affects everything else. Looking back it's kind of funny that months of work came down to one small gearbox from the coach's old RC kit.
  
 ### 2. Camera
  
 - Error persisted for three weeks ([Week 12](#week-12-mar-1016), [Week 13](#week-13-mar-1723))
 - Confirmed hardware fault - I2C error on OV5647 sensor; resolved by borrowing a replacement ([Week 15](#week-15-mar-31apr-6))
-
-The camera stopped working during testing and the cause was not immediately clear. Initial suspicion fell on software or configuration issues. After exhaustive debugging including re-seating the CSI ribbon cable multiple times, checking config.txt overlays, and re-imaging the OS with no change, diagnostics finally pointed to a hardware fault. The dmesg output showed an I2C read error on the OV5647 sensor (error -121) and the I2C bus at address 0x36 was completely empty, confirming the sensor itself had failed. A replacement camera was borrowed from a teammate to continue development.
+The camera stopped working during testing and the cause was clear at first. We assumed it had to do something with the software or configuration. After a lot of debugging including re-seating the CSI ribbon cable multiple times, checking config.txt overlays, and re-imaging the OS with no change, we finally figured out it was a hardware fault. The dmesg output showed an I2C read error on the OV5647 sensor (error -121) and the I2C bus at address 0x36 was completely empty, confirming the sensor itself had failed. Later that week, a replacement camera was borrowed from a teammate.
  
 ### 3. Raspberry Pi
  
 - First Pi broke for unknown reasons ([Week 18](#week-18-apr-2127))
 - Second Pi broke - LED error code 4 long 3 short (RP1 not found), unknown cause ([Week 32](#week-32-jul-28aug-3))
-
-The team went through two Raspberry Pi 5 units during the build. The first failed after a connection issue that could not be resolved even after reflashing the SD card. The second showed LED error code 4 long 3 short, indicating a hardware-level failure of the main I/O chip. A burning smell had been noticed days before the second failure, suggesting it may have been caused by a power event or short circuit. Both times the coach had a backup unit available which allowed development to continue. The fan was configured to always run on the replacement unit to reduce the risk of thermal damage.
+We ent through two Raspberry Pi 5 units during the build. The first failed after a connection issue that could not be resolved even after reflashing the SD card. The second showed LED error code 4 long 3 short, meaning a hardware-level failure of the main I/O chip. We noticed a burning smell days before the second failure, so it was probably caused by a power event or short circuit. Both times the coach had a backup unit available which allowed us to continue. Now the fan is configured to always run on the replacement unit to reduce the risk of thermal damage.
  
 ### 4. Power System
  
@@ -394,16 +391,14 @@ The team went through two Raspberry Pi 5 units during the build. The first faile
 - Voltage regulator short circuited; port broke ([Week 19](#week-19-apr-28may-4))
 - Wiring broke and required re-soldering ([Week 31](#week-31-jul-2127))
 - Servo failed completely; no backup available ([Week 34](#week-34-aug-1117))
-
-The power system experienced several failures throughout the build. The Deans-T connector melted early on due to undersized wiring carrying more current than it was rated for. All wiring was replaced with correctly rated wire after this incident. The step-down voltage regulator later short circuited when wires were caught in the motor system, breaking the regulator port entirely. Wiring to the motor also disconnected during testing and had to be re-soldered. Late in the build the servo motor failed completely for the first time despite correct wiring, with no clear cause. A replacement was ordered via express shipping and arrived within a few days.
+The power system broke down a bunch of times througout the build. The Deans-T connector melted early on because of undersized wiring carrying more current than it was rated for. We later replaced all wiring with correctly rated wire after. The step-down voltage regulator later short circuited when wires were caught in the motor system, breaking the regulator port entirely. The wiring to the motor also disconnected during testing and had to be re-soldered. Also, late in the build the servo motor failed completely for the first time, with no clear cause. We ordered a replacement via express shipping and it arrived within a few days.
  
 ### 5. Open Challenge Code
  
 - Unnecessary Hybrid state and oscillation bug between Turn and Follow Wall states ([Week 17](#week-17-apr-1420))
 - PD values poorly tuned; robot crashed into inner walls ([Week 24](#week-24-jun-28))
 - Lap counting issues ([Week 24](#week-24-jun-28))
-
-The first version of the open challenge code included a Hybrid state in addition to Follow Wall and Turn, which was intended to handle the transition zone at corners. The coach identified this as unnecessary and pointed out it created 6 possible state transitions instead of 2, making the logic much harder to debug. It was removed and replaced with a simpler two-state machine using hysteresis to prevent oscillation between states. PD tuning proved difficult without consistent hardware - the robot frequently crashed into inner walls when switching states because the gains were set too aggressively. Lap counting was also unreliable because single-frame detections of the corner line were being counted multiple times. These issues were resolved through careful tuning on the track over several weeks.
+The first version of the open challenge code had a Hybrid state on top of Follow Wall and Turn, which was intended to handle the transition zone at corners. Our coach said it was unnecessary and pointed out it created 6 possible state transitions instead of 2, making the logic much harder to debug. We then removed and replaced it with a simpler two-state machine using hysteresis to prevent oscillation between states. The PD tuning proved difficult without consistent hardware and the robot frequently crashed into inner walls when switching states because the gains were set too aggressively. Lap counting was also unreliable because single-frame detections of the corner line were being counted multiple times. These issues were resolved through careful tuning on the track over several weeks.
  
 ### 6. Obstacle Challenge
  
@@ -411,9 +406,8 @@ The first version of the open challenge code included a Hybrid state in addition
 - Wall distances appearing swapped in vision output ([Week 27](#week-27-jun-2329))
 - Color encoding bug causing wrong pillar colors in replay ([Week 28](#week-28-jun-30jul-6))
 - Steering gimbal broke multiple times ([Week 27](#week-27-jun-2329), [Week 34](#week-34-aug-1117))
-
-The obstacle challenge development uncovered several bugs that were difficult to identify without the replay system. The robot was observed driving sideways despite the steering indicator pointing straight ahead, which the coach identified as a sign that the left and right wall distances were swapped in the vision output - the robot was steering in the wrong direction relative to what it thought it was doing. A separate color encoding bug caused red pillars to appear the wrong color in the replay video due to a BGR/RGB mix-up in the pipeline. The steering gimbal broke repeatedly under the stress of sharp corrections during obstacle avoidance, requiring multiple reprints. These issues were worked through iteratively using the video replay system which allowed the team to diagnose problems without needing the physical robot running.
-
+Working on the obstacle challenge turned up a bunch of bugs that would've been almost impossible to find without the replay system. The robot was driving sideways even though the steering indicator showed it going straight, which the coach figured out meant the left and right wall distances were swapped in the vision output, so the robot was steering the wrong way without knowing it. There was also a color bug where red pillars showed up as the wrong color in the replay because of a BGR/RGB mix-up in the code. The steering gimbal kept breaking from the sharp corrections during obstacle avoidance, so we had to reprint it more than once. We worked through all of it using the video replay system, which let us figure out problems without needing the actual robot running. This was probably the most confusing stretch of debugging all year, none of the robot's behavior made sense until the replay let us actually see what the vision was doing.
+ 
 ---
  
 # Reflection
@@ -422,46 +416,52 @@ The obstacle challenge development uncovered several bugs that were difficult to
  
 ### Hardware
  
-- Start with an off-the-shelf differential from the beginning. Five iterations of a printed differential cost months of build time. The PLA material limitations were a known risk that should have been identified earlier.
-- Keep more spare parts from the start. Running out of steering gimbals and having no backup servo during critical testing weeks caused significant downtime.
-- Better cable management and strain relief from the beginning would have prevented the melted connector, short-circuited regulator, and disconnected motor wire.
-- Test components individually before integrating them. The camera fault persisted for three weeks partly because the fault was not isolated quickly enough.
+We should have started with an off-the-shelf differential from the very beginning, because five rounds of printing our own cost us months of build time we didn't need to lose. The PLA material limits were a risk we should have seen coming a lot earlier than we did. We also should have kept more spare parts on hand from the start, since running out of steering gimbals and having no backup servo during important testing weeks cost us a lot of time we couldn't get back. Better cable management and strain relief from day one would have stopped the melted connector, the short-circuited regulator, and the motor wire coming loose. We also should have tested each component on its own before putting it all together, since the camera issue dragged on for three weeks partly because we didn't isolate it fast enough.
+ 
 ### Software
  
-- The codebase was over-engineered early on with async, multiprocessing, and shared memory before the basic wall-following was working reliably. Getting a simple working solution first and adding complexity later would have saved debugging time.
-- HSV threshold tuning should have been standardized earlier with a proper tool and documented values, rather than being re-done informally each session.
-- The obstacle challenge was started too late relative to the competition timeline, leaving insufficient time for testing and tuning.
+The codebase got over-engineered early on with async processing, multiprocessing, and shared memory before we even had basic wall-following working reliably, and getting something simple working first would have saved us a lot of debugging time later. HSV threshold tuning should have been standardized much earlier with a proper tool and documented values instead of being redone informally almost every session. The obstacle challenge also got started too late compared to the competition timeline, which left us without enough time to actually test and tune it properly.
+ 
 ### Process
  
-- More track time earlier. A lot of issues such as PD tuning, lap counting, and state machine bugs only surfaced during real runs and took weeks to resolve because track access was limited.
-- Primary coder dependency was a risk that materialized when Michael left for China. More knowledge sharing across the team would have reduced the bottleneck.
+We needed more track time earlier on, since a lot of our biggest issues, like PD tuning, lap counting, and state machine bugs, only ever showed up during real runs and took weeks to fix because we didn't have enough access to a track. Relying so heavily on one person to understand the code was a risk that caught up with us the moment Michael left for China. Ryan and Elvis ended up spending an entire four hour class period just trying to figure out how to even connect to the robot and make a basic code change, since Michael had always been the one handling that part and nobody else really knew the process. If we had shared that knowledge across the whole team earlier, that day alone would have taken twenty minutes instead of four hours.
+ 
 ---
  
 ## Future Improvements
  
 ### Hardware
  
-- Replace the OV5647 camera with the Raspberry Pi Camera Module 3 Wide (1536x864 at 120fps) for more headroom in the vision pipeline, especially for the obstacle challenge at higher speeds.
-- Design a proper PCB for power distribution instead of point-to-point wiring. This would reduce failure modes and make the electronics more compact and reliable.
-- Integrate the LiDAR into the challenge runners. The LD19 is already wired and parsing data but was never connected to the control loop. Wall following with LiDAR would be significantly more reliable than pixel counting under variable lighting.
-- Design an Ackermann steering geometry to eliminate tire scrub during turns, which would improve path accuracy at higher speeds.
+We want to replace the OV5647 camera with the Raspberry Pi Camera Module 3 Wide, since its higher resolution and 120fps would give the vision pipeline a lot more headroom, especially for the obstacle challenge at higher speeds. We'd also like to design a proper PCB for power distribution instead of relying on point-to-point wiring, which would cut down on failure points and make the electronics a lot more compact and reliable. The LD19 LiDAR is already wired up and parsing data but was never actually connected to the control loop, so integrating it into the challenge runners would make wall following a lot more reliable than counting pixels under lighting that keeps changing. We also want to design a proper Ackermann steering geometry to get rid of the tire scrub we get during turns, which should improve how accurately the robot follows its path at higher speeds.
+ 
 ### Software
  
-- Implement adaptive HSV thresholds that adjust to ambient lighting rather than requiring manual recalibration before each run.
-- Add odometry or dead-reckoning using encoder feedback or IMU data to improve lap counting reliability and reduce dependence on vision alone.
-- Complete the parallel parking implementation for the obstacle challenge.
-- Publish the piclient package to PyPI properly so setup is a single pip install without needing to build from source.
-- Expand the test suite with more integration tests using recorded video so software changes can be validated without physical track time.
+We want to build adaptive HSV thresholds that adjust to the lighting automatically instead of needing to be recalibrated by hand before every run. Adding odometry or dead-reckoning using encoder feedback or IMU data would also help lap counting be more reliable and take some of the pressure off relying on vision alone. We still need to finish the parallel parking implementation for the obstacle challenge. We'd also like to properly publish the piclient package to PyPI so setup is just a single pip install instead of needing to build from source every time. Expanding the test suite with more integration tests using recorded video would also let us validate software changes without needing physical track time for every little check.
+ 
 ### Process
  
-- Start hardware iteration earlier and in parallel with software development rather than sequentially.
-- Maintain a shared calibration log so HSV values and PD gains from each session are recorded and comparable over time.
-- Cross-train all team members on both hardware and software so single points of failure are eliminated.
+We want to start hardware iteration earlier and run it alongside software development instead of doing them one after the other. We also want to keep a shared calibration log so HSV values and PD gains from each session are actually written down and easy to compare over time instead of living in someone's head. Most importantly, we want to cross-train everyone on both hardware and software so we never end up in a situation like the one after Michael left, where Ryan and Elvis lost a whole class period just trying to figure out how to connect to the robot and push a code change.
+ 
+---
+ 
+## what did we learn?
+ 
+Getting a simple solution working first matters more than building something elegant. We spent a lot of time on a complex pipeline before the basic wall-following was even reliable, and that cost us weeks we could have spent testing.
+ 
+Knowledge needs to be shared across the whole team. When Michael left for China, Ryan and Elvis sat down to make what should have been a quick code change and ended up spending an entire four hour class just trying to figure out how to even connect to the robot in the first place. Michael had always been the one who handled that side of things, so nobody else really knew the steps. A team where only one person understands the code is a team with a single point of failure, and that class was proof of it.
+ 
+Looking back at the whole build, it definitely wasn't a straight line. Some weeks we felt like we were almost done, other weeks it felt like everything that could break just did. What got us through was that every failure, the differential, the camera, the Pi, taught us something we wouldn't have figured out any other way. We're proud of where the robot ended up, not because we avoided the setbacks, but because of how we worked through them.
 
 ---
 
-## what did we learn?
+**Heres a photo of Michael hard at work**
+<p align="center">
+  <img src="../../docs/img/michael_working.jpg" width="500">
+</p>
+<p align="center">
 
-Getting a simple solution working first matters more than building something elegant. We spent a lot of time on a complex pipeline before the basic wall-following was even reliable, and that cost us weeks we could have spent testing.
-
-Knowledge needs to be shared across the whole team. When our primary coder was away, the rest of the team had a hard time navigating the code. A team where only one person understands the code is a team with a single point of failure.
+**Heres a photo of Ryan, Elvis, and our previous teammate last year**
+<p align="center">
+  <img src="../../docs/img/lastyear.jpg" width="500">
+</p>
+<p align="center">
