@@ -80,7 +80,6 @@ We are a three-person team from Explorer Robotics in Whitby, Ontario, Canada. We
   - [3D Printed Parts](#3d-printed-parts)
   - [Full Robot](#full-robot)
 - [2. Power and Sensor Architecture](#2-power-and-sensor-architecture)
-  - [Files](#files)
   - [Power](#power)
   - [Voltage and Current Requirements](#voltage-and-current-requirements)
     - [5V Rail (Raspberry Pi, Arduino, Servo)](#5v-rail-raspberry-pi-arduino-servo)
@@ -103,7 +102,6 @@ We are a three-person team from Explorer Robotics in Whitby, Ontario, Canada. We
     - [Obstacle Challenge](#obstacle-challenge)
   - [Running the Robot](#running-the-robot)
 - [4. Systems Engineering and Design Decisions](#4-systems-engineering-and-design-decisions)
-  - [Files](#files-1)
   - [Constraints](#constraints)
   - [Trade-offs](#trade-offs)
   - [Design Iteration](#design-iteration)
@@ -111,7 +109,6 @@ We are a three-person team from Explorer Robotics in Whitby, Ontario, Canada. We
   - [Subsystem Interactions](#subsystem-interactions)
   - [Summary](#summary-1)
 - [5. Reproducibility](#5-reproducibility)
-  - [Files](#files-2)
   - [Software Setup](#software-setup)
   - [Hardware Setup](#hardware-setup)
   - [Testing](#testing)
@@ -124,7 +121,15 @@ We are a three-person team from Explorer Robotics in Whitby, Ontario, Canada. We
 - [Version History](#version-history)
 - [Contribution and Documentation Rules](#contribution-and-documentation-rules)
 - [Final Notes](#final-notes)
+- [View Journal](docs/journal/CHANGELOG.md)
 
+---
+### GitHub Releases
+[GitHub releases page](https://github.com/IaMaAVerYRANdOmPerSoN/WROFutureEngineer/releases/tag/v0.1.0)
+- Source Code
+- Cad File
+
+ 
 ---
 
 ## Repository Structure
@@ -153,7 +158,7 @@ We are a three-person team from Explorer Robotics in Whitby, Ontario, Canada. We
     - `src_min/` – a minimal/leaner variant of the same modules
     - `utils/tools/` – standalone calibration and debug tools (contours, lidar, manual control)
     - `tests/` – test and experiment scripts
-- `EDA/` – KiCad PCB project (schematic, layout, project files)
+- `EDA/` – KiCad PCB project 
     - `FAB/` – fabrication outputs (Gerbers, BOM, pick-and-place positions)
     - `lib/` – imported component symbol/footprint libraries
 
@@ -288,7 +293,7 @@ The first path goes through our Yahboom voltage regulator board, which steps the
 The second path runs through the ESC. The ESC takes power directly from the battery and has its own built-in BEC (battery eliminator circuit) to regulate it. On the output side, the ESC's voltage pin powers the servo, and the ESC also drives the brushless motor directly since the motor doesn't need to be stepped down first.
 
 <p align="center">
-  <img src="docs/diagrams/schematic.webp" width="500">
+  <img src="docs/diagrams/schematic.webp" width="300">
 </p>
 <p align="center"><i>Full electronics schematic showing power distribution and signal connections.</i></p>
 
@@ -633,6 +638,8 @@ pip install piclient[all]
 
 - **Bill of materials**: Full component list including electronics, mechanical parts, 3D printed parts, and tools
     - [Bill of materials](docs/05_reproducibility/bill_of_materials.md)
+- **Build Guide** How to print, assemble, and build our robot
+    - [Build Guide](docs/05_reproducibility/build_guide.md)
 ---
 
 ### Testing
@@ -676,7 +683,7 @@ Detailed records:
 <p align="center"><i>Full software architecture diagram.</i></p>
 
 <p align="center">
-  <img src="docs/diagrams/schematic.webp" width="500">
+  <img src="docs/diagrams/schematic.webp" width="300">
 </p>
 <p align="center"><i>Full electronics schematic showing power distribution and signal connections.</i></p>
 
@@ -691,31 +698,14 @@ Suggested folders:
 - `docs/images/`
 - `docs/diagrams/`
 
----
-
-## CAD and Wiring Files
-- `cad/` – CAD files and exports
-- `wiring/` – wiring diagrams and connection references
-
-Brief notes:
-- CAD software used:
-- file format(s):
-- wiring diagram tool used:
 
 ---
 
 ## Version History
-Briefly summarize major milestones here.
-
-See full details in:
 
 - [`Journal`](docs/journal/CHANGELOG.md)
 
-Example:
-- **v0.1** – initial repo structure
-- **v0.2** – first rolling prototype
-- **v0.3** – improved steering and sensor placement
-- **v0.4** – implemented lane following and obstacle response
+
 
 ---
 
