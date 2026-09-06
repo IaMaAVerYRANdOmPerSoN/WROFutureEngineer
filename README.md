@@ -23,19 +23,67 @@ This repo is organized to show:
 
 We are a three-person team from Explorer Robotics in Whitby, Ontario, Canada. We have been competing in WRO for several years. This year we set out to build a fully autonomous self-driving robot from scratch, designing our own chassis, differential gear system, and vision pipeline.
 
-<p align="center">
-  <img src="docs/img/Elvis.png" width="200">
-  <img src="docs/img/michael.png" width="200">
-  <img src="docs/img/Ryan.png" width="200">
-</p>
-<p align="center">Elvis &nbsp;&nbsp;&nbsp; Michael &nbsp;&nbsp;&nbsp; Ryan</p>
+## Elvis Wang
+<table>
+<tr>
+  <td align="center" width="40%">
+    <img src="docs/img/Elvis.png" width="100%"/><br>
+    <em>Elvis</em>
+  </td>
 
-## Our Coach
+  <td valign="top" width="60%">
+
+  ### Information
+  - *I love building!!!!!!!*
+  - 15 years old
+  </td>
+</tr>
+</table>
+
+---
+
+## Michael Xie
+<table>
+<tr>
+  <td align="center" width="40%">
+    <img src="docs/img/michael.png" width="100%"/><br>
+    <em>Michael</em>
+  </td>
+
+  <td valign="top" width="60%">
+
+  ### Information
+  - *I love coding!!!!!!*
+  - 14 years old
+  </td>
+</tr>
+</table>
+
+---
+
+## Ryan Rao
+<table>
+<tr>
+  <td align="center" width="40%">
+    <img src="docs/img/Ryan.png" width="100%"/><br>
+    <em>Ryan</em>
+  </td>
+
+  <td valign="top" width="60%">
+
+  ### Information
+  - *I love dogs*
+  - 15 years old
+  </td>
+</tr>
+</table>
+
+## Coach Rice
 <table>
 <tr>
   <td align="center" width="40%">
     <img src="docs/img/coach.png" width="100%"/><br>
-    <em>Our Coach</em>
+    <em>Coach Rice</em>
   </td>
 
   <td valign="top" width="60%">
@@ -62,6 +110,12 @@ We are a three-person team from Explorer Robotics in Whitby, Ontario, Canada. We
 
 ---
 
+## Journal
+- [View Journal](docs/journal/CHANGELOG.md)
+- [View Journal PDF](docs/journal/CHANGELOG.pdf)
+
+---
+
 ## Table of Contents
 
 - [Project Overview](#project-overview)
@@ -80,7 +134,6 @@ We are a three-person team from Explorer Robotics in Whitby, Ontario, Canada. We
   - [3D Printed Parts](#3d-printed-parts)
   - [Full Robot](#full-robot)
 - [2. Power and Sensor Architecture](#2-power-and-sensor-architecture)
-  - [Files](#files)
   - [Power](#power)
   - [Voltage and Current Requirements](#voltage-and-current-requirements)
     - [5V Rail (Raspberry Pi, Arduino, Servo)](#5v-rail-raspberry-pi-arduino-servo)
@@ -103,7 +156,6 @@ We are a three-person team from Explorer Robotics in Whitby, Ontario, Canada. We
     - [Obstacle Challenge](#obstacle-challenge)
   - [Running the Robot](#running-the-robot)
 - [4. Systems Engineering and Design Decisions](#4-systems-engineering-and-design-decisions)
-  - [Files](#files-1)
   - [Constraints](#constraints)
   - [Trade-offs](#trade-offs)
   - [Design Iteration](#design-iteration)
@@ -111,7 +163,6 @@ We are a three-person team from Explorer Robotics in Whitby, Ontario, Canada. We
   - [Subsystem Interactions](#subsystem-interactions)
   - [Summary](#summary-1)
 - [5. Reproducibility](#5-reproducibility)
-  - [Files](#files-2)
   - [Software Setup](#software-setup)
   - [Hardware Setup](#hardware-setup)
   - [Testing](#testing)
@@ -124,7 +175,15 @@ We are a three-person team from Explorer Robotics in Whitby, Ontario, Canada. We
 - [Version History](#version-history)
 - [Contribution and Documentation Rules](#contribution-and-documentation-rules)
 - [Final Notes](#final-notes)
+- [View Journal](docs/journal/CHANGELOG.md)
 
+---
+### GitHub Releases
+[GitHub releases page](https://github.com/IaMaAVerYRANdOmPerSoN/WROFutureEngineer/releases/tag/v0.1.0)
+- Source Code
+- Cad File
+
+ 
 ---
 
 ## Repository Structure
@@ -151,9 +210,9 @@ We are a three-person team from Explorer Robotics in Whitby, Ontario, Canada. We
 - `PiClient/` – Python code on the Raspberry Pi
     - `src/` – main vision processing, control, and Arduino communication logic
     - `src_min/` – a minimal/leaner variant of the same modules
-    - `utils/tools/` – standalone calibration and debug tools (contours, lidar, manual control)
+    - `utils/tools/` – standalone calibration and debug tools (contours, manual control)
     - `tests/` – test and experiment scripts
-- `EDA/` – KiCad PCB project (schematic, layout, project files)
+- `EDA/` – KiCad PCB project 
     - `FAB/` – fabrication outputs (Gerbers, BOM, pick-and-place positions)
     - `lib/` – imported component symbol/footprint libraries
 
@@ -288,7 +347,7 @@ The first path goes through our Yahboom voltage regulator board, which steps the
 The second path runs through the ESC. The ESC takes power directly from the battery and has its own built-in BEC (battery eliminator circuit) to regulate it. On the output side, the ESC's voltage pin powers the servo, and the ESC also drives the brushless motor directly since the motor doesn't need to be stepped down first.
 
 <p align="center">
-  <img src="docs/diagrams/schematic.webp" width="500">
+  <img src="docs/diagrams/schematic.webp" width="300">
 </p>
 <p align="center"><i>Full electronics schematic showing power distribution and signal connections.</i></p>
 
@@ -407,8 +466,8 @@ Because of the decently short battery life, we have had between 4-5 batteries.
 ### Summary
 - battery: Gens Ace 1300mAh 2S LiPo (7.4V, 45C)
 - voltage regulation: Buck regulator for Pi (5V); ESC BEC for servo
-- main sensors: OV5647 camera (CSI-2), LD19 LiDAR (USB serial)
-- sensor placement strategy: Camera mounted at front with downward tilt for field of view; LiDAR mounted on top for 360-degree wall detection
+- main sensors: OV5647 camera (CSI-2)
+- sensor placement strategy: Camera mounted at front with downward tilt for field of view
 - calibration approach: HSV color thresholds tuned under competition lighting using interactive tuning tools in `utils/`
 
 ---
@@ -455,7 +514,7 @@ All settings are stored in `piclient.toml`. Nothing is hardcoded — speed, PD g
 
 - **Settings file**: `piclient.toml` at the root of the repo
     - [Config details](docs/03_software/config.md)
-- **Override priority**: CLI flag > environment variable > piclient.toml > code defaults
+- **Override priority**: CLI flag > environment variable > `piclient.toml` > code defaults
 
 ---
 
@@ -463,15 +522,15 @@ All settings are stored in `piclient.toml`. Nothing is hardcoded — speed, PD g
 
 ### Wall Following
 
-`open_challenge.py:95-104` (and the "Straight" branch of `obstacle_challenge.py`): the vision pipeline finds black wall contours per frame (`vision_processing.py:126-130`) and measures each wall's pixel distance from frame-center (`get_wall_distance`). The difference between right and left distance is fed into a PD controller (`wall_follow.tick(right - left)`), and the output is sent as a steering command via `client.drive_motors(...)`. If the right wall is further than the left, the correction steers left, and vice versa. It only cares about relative position, not absolute distance, which is why the perspective transform can be skipped. Camera distortion does not change which wall is closer.
+`open_challenge.py:95-104` the vision pipeline counts the number of black pixels in the left, right, and center regions of the image. The difference between right and left distance is fed into a PD controller (`wall_follow.tick(right - left)`), and the output is sent as a steering command via `client.drive_motors(...)`. If the right wall is further than the left, the correction steers left, and vice versa. It only cares about relative position, not absolute distance, which is why the perspective transform can be skipped. Camera distortion does not change which wall is closer.
 
 ### Obstacle Detection
 
-`vision_processing.py:100-106`: red and green pillars are found the same way as walls, but by color-thresholding the UV plane instead of the Y plane. Once a pillar is found, `get_obstacle_path_x` calculates a target x position by finding the midpoint of the gap between the obstacle and the nearest wall, then interpolates linearly toward a lookahead point ahead. A separate PD controller (`obstacle_avoid`) steers toward that target x position rather than centering between walls. This only runs in `obstacle_challenge.py`'s "Straight" state, and only when `obstacles` is non-empty. Otherwise it falls back to plain wall following.
+`vision_processing.py:100-106`: red and green pillars are found the same way as walls, but contours (as NumPy arrays) are used instead of simple pixel counts. Once a pillar is found, `_get_target` calculates a target x position by offsetting the pillar's x position proportionally to the width of the pillar. A separate PD controller (`obstacle_avoid`) steers toward that target x position rather than centering between walls, while maintaining 20% wall-follow weight to keep general awareness. This only runs in `obstacle_challenge.py`'s "obstacle_avoid" state, and only when `obstacles` is non-empty. Otherwise, it falls back to plain wall following.
 
 - **Open Challenge**: Counts black pixels in left, right, and center regions. More black pixels means the wall is closer. Corner detection triggers when the center region fills up.
     - [Open challenge vision details](docs/03_software/vision.md#open-challenge)
-- **Obstacle Challenge**: Finds red and green pillars using HSV color detection and calculates the gap between each pillar and the nearby wall. The midpoint of that gap becomes the steering target.
+- **Obstacle Challenge**: Finds red and green pillars using HSV color detection and calculates an offset target x position to steer toward the gap between the pillar and the wall.
     - [Obstacle challenge vision details](docs/03_software/vision.md#obstacle-challenge)
 
 
@@ -505,6 +564,13 @@ The robot uses a finite state machine (FSM) to decide what to do at any given mo
 - [Open challenge runner details](docs/03_software/challenge_running.md#open-challenge)
 
 ### Obstacle Challenge
+
+| State | Trigger | Action |
+|-------|---------|--------|
+| Straight | Default | Wall follow with PD controller |
+| Turn | Corner detected | Hard steer toward missing wall |
+| Obstacle Avoid | Vision returns a pillar target | Steers toward the gap between pillar and wall |
+| Parallel Parking | Vision returns a parking lot target and the 3rd lap is complete | Steers toward the parking lot and executes a parallel parking maneuver |
 
 Same as the open challenge with one extra state. When a pillar is detected, the robot steers toward the gap between the pillar and the wall. Green pillars are passed on the left, red on the right.
 
@@ -633,6 +699,8 @@ pip install piclient[all]
 
 - **Bill of materials**: Full component list including electronics, mechanical parts, 3D printed parts, and tools
     - [Bill of materials](docs/05_reproducibility/bill_of_materials.md)
+- **Build Guide** How to print, assemble, and build our robot
+    - [Build Guide](docs/05_reproducibility/build_guide.md)
 ---
 
 ### Testing
@@ -676,7 +744,7 @@ Detailed records:
 <p align="center"><i>Full software architecture diagram.</i></p>
 
 <p align="center">
-  <img src="docs/diagrams/schematic.webp" width="500">
+  <img src="docs/diagrams/schematic.webp" width="300">
 </p>
 <p align="center"><i>Full electronics schematic showing power distribution and signal connections.</i></p>
 
@@ -691,31 +759,14 @@ Suggested folders:
 - `docs/images/`
 - `docs/diagrams/`
 
----
-
-## CAD and Wiring Files
-- `cad/` – CAD files and exports
-- `wiring/` – wiring diagrams and connection references
-
-Brief notes:
-- CAD software used:
-- file format(s):
-- wiring diagram tool used:
 
 ---
 
 ## Version History
-Briefly summarize major milestones here.
-
-See full details in:
 
 - [`Journal`](docs/journal/CHANGELOG.md)
 
-Example:
-- **v0.1** – initial repo structure
-- **v0.2** – first rolling prototype
-- **v0.3** – improved steering and sensor placement
-- **v0.4** – implemented lane following and obstacle response
+
 
 ---
 

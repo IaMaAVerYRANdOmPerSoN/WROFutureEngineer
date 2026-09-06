@@ -70,12 +70,12 @@ The Micro Komodo spins smoothly at all speeds, which is important for our wall-f
 **Gear ratio:** 1:4 (motor to wheel)
 The WRO Future Engineer rules do not allow differential drive or omnidirectional wheels, Thus narrowing the solution space to effectively 3 options: Rear-Wheel Drive (RWD), Front-Wheel Drive (FWD), and 4-Wheel Drive (4WD). Each of these options has its own advantages and disadvantages, which are summarized in the table below.
 
-| | **RWD** | **FWD** | **4WD** |
-| - | --- | --- | --- |
-| **Advantages** | Simplest design, fewer parts, lighter weight, better acceleration | Better traction on slippery surfaces | Maximum traction, better handling on rough terrain |
-| **Disadvantages** | Less stable at high speeds, more difficult to control | Not as stable as 4WD, can be prone to skidding, Complex steering mechanism | Extremely complex and difficult to design, test, and maintain, especially in a competition environment |
+| | **RWD** | **FWD** |
+| - | --- | --- |
+| **Advantages** | Simplest design, fewer parts, lighter weight, better acceleration | Better traction on slippery surfaces |
+| **Disadvantages** | Less stable at high speeds, more difficult to control | Prone to skidding, Complex steering mechanism |
 
-We chose RWD because it is the simplest design, which makes it easier to build and maintain. It is also lighter than FWD or 4WD, which improves acceleration and reduces power consumption. The robot will not be moving at high speeds, so stability is not a major concern. With FWD and 4WD, the steering mechanism is extremely complex, especially considering that the vast majority of components are designed in-house and 3D printed. The complexity of FWD and 4WD would make it difficult to design, test, and maintain the robot in a competition environment. We couldn't make a reliable and robust 3D printed differential gear, let alone a complete FWD or 4WD system. RWD is the best option for our robot because it is the simplest option that satisfies our design constraints (We do not operate at speeds where RWD becomes problematic.) It is also the most reliable option, which is important in a competition environment.
+We chose RWD because it is the simplest design, which makes it easier to build and maintain. It is also lighter than FWD, which improves acceleration and reduces power consumption. The robot will not be moving at high speeds, so stability is not a major concern. With FWD, the steering mechanism is extremely complex, especially considering that the vast majority of components are designed in-house and 3D printed. The complexity of FWD would make it difficult to design, test, and maintain the robot in a competition environment. We couldn't make a reliable and robust 3D printed differential gear, let alone a complete FWD system. RWD is the best option for our robot because it is the simplest option that satisfies our design constraints (We do not operate at speeds where RWD becomes problematic.) It is also the most reliable option, which is important in a competition environment.
 
 ## Steering System
 

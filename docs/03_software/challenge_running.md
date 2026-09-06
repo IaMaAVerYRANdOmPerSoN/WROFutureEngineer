@@ -50,42 +50,35 @@ Gains `Kp` and `Kd` are set separately for wall following and corner turning in 
 
 ---
 
----
- 
 ## How Vision and the State Machine Work Together
- 
+
 The vision process and the state machine run as separate processes but are tightly coupled through a pipe. Every camera frame produces a set of measurements — wall distances, pillar positions, corner fill — and these measurements are what the state machine acts on.
- 
+
 The key relationship is:
- 
+
 - **Vision tells the state machine what it sees.** It does not make decisions — it only reports numbers.
 - **The state machine decides what to do with those numbers.** It evaluates the measurements against thresholds, applies hysteresis, and chooses a state.
 - **The state determines which drive command gets sent.** Different states use different PD gains and speeds.
 This separation means the vision code can be tested independently using a recorded video, and the state machine logic can be reasoned about without worrying about how the measurements were produced.
- 
+
 ---
- 
+
 ## How HSV Detection Works
- 
-The camera captures frames in BGR format. Before any detection is done, each frame is converted to HSV (Hue, Saturation, Value) color space. HSV separates color information from brightness, which makes detection more stable under different lighting conditions — a red pillar in shadow still has roughly the same hue and saturation, only its value changes.
- 
+
+The camera captures frames in BGR format. Before any detection is done, each frame is converted to HSV (Hue, Saturation, Value) color space. HSV separates color information from brightness, which makes detection more stable under different lighting conditions — a red pillar in shadow still has roughly the same hue and saturation, only its value changes. We swap the B and R channels to avoid maintaining two thresholds for red, since red wraps around the hue wheel at both 0° and 180°. The OpenCV `inRange` function is used to create binary masks for each color of interest.
 **Walls** are detected by masking for black pixels — low value, low saturation. The amount of black in the left, right, and center regions of the frame is counted and used as a proxy for wall distance.
- 
 **Pillars** are detected by masking for red and green:
- 
+
 - **Green** sits around hue 40–80 in OpenCV's 0–180 scale. A single mask covers the full green range.
-- **Red** wraps around the hue wheel at both 0° and 180°, so two masks are needed and combined with a bitwise OR.
+- **Red** is swapped to the blue channel, so it sits around hue 0–20. A single mask covers the full red range.
+
 ```python
-# Red requires two ranges due to hue wrap-around
-mask_red = cv2.bitwise_or(
-    cv2.inRange(hsv, lower_red_1, upper_red_1),
-    cv2.inRange(hsv, lower_red_2, upper_red_2)
-)
 mask_green = cv2.inRange(hsv, lower_green, upper_green)
+mask_red = cv2.inRange(hsv, lower_red, upper_red)
 ```
- 
+
 Once masked, contours are found and the largest one is taken as the detected pillar. The position of that contour relative to the nearby wall determines the steering target.
- 
+
 All HSV threshold values are set in `piclient.toml` under `[VisionConfig]` and should be tuned under competition lighting before each run.
 
 ---
@@ -94,15 +87,14 @@ All HSV threshold values are set in `piclient.toml` under `[VisionConfig]` and s
 
 ### [`StateMachine`](https://apostla-api-reference.web.app/lib.html#piclient.core.lib.StateMachine)
 
-Same as the open challenge with one extra state:
+Introduces `obstacle_avoid` and `parallel_parking` states.
 
 | State | What triggers it | What the robot does |
 | ----- | ---------------- | ------------------- |
 | Straight | Default | Wall follow using [`PD`](https://apostla-api-reference.web.app/lib.html#piclient.core.lib.PD) controller |
 | Turn | Corner detected | Hard steer toward missing wall |
 | Obstacle Avoid | Vision returns a pillar target | Steers toward the gap between pillar and wall |
-| Final Turn | Last turn of last lap | Same as Turn |
-| Final Straight | After final turn | Drive to stop |
+| Parallel Parking | Vision returns a parking lot target and the 3rd lap is complete | Steers toward the parking lot and executes a parallel parking maneuver |
 
 ### Obstacle Avoidance
 

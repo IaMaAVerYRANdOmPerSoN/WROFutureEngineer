@@ -9,7 +9,7 @@
 
 ## Hardware Setup
 
-First, you should assemble the robot according to the instructions in [Hardware Assembly](./hardware_assembly.md). Please make sure to follow the assembly instructions carefully, as improper assembly can lead to hardware damage or malfunction. Please ensure all electrical connections are secure and insulated, and that the robot is powered off when making adjustments.
+First, you should assemble the robot according to the instructions in [Build Guide](./build_guide.md). Please make sure to follow the assembly instructions carefully, as improper assembly can lead to hardware damage or malfunction. Please ensure all electrical connections are secure and insulated, and that the robot is powered off when making adjustments.
 
 ## Software Setup
 
