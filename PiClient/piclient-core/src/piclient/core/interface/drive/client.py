@@ -44,6 +44,7 @@ class Client:
             tid_start: int = GLOBAL_CONFIG().ClientConfig.TID_START,
             tid_end: int = GLOBAL_CONFIG().ClientConfig.TID_END,
             wait_re_pattern: str = GLOBAL_CONFIG().ClientConfig.WAIT_RE_PATTERN,
+            trim: int = GLOBAL_CONFIG().ClientConfig.SERVO_TRIM,
             loop: asyncio.AbstractEventLoop | None = None,
     ):
         """
@@ -56,6 +57,7 @@ class Client:
         :param tid_start: First transaction ID (inclusive).
         :param tid_end: Last transaction ID (inclusive) before cycling.
         :param wait_re_pattern: Regex pattern for Arduino WAITMS responses.
+        :param trim: Servo trim value.
 
         :returns self: an instance of `Client`
         """
@@ -69,6 +71,7 @@ class Client:
         self.max_speed: int = max_speed
         self._wait_re: re.Pattern[str] = re.compile(wait_re_pattern)
         self.is_connected = False
+        self.trim: int = trim
 
         self.loop: asyncio.AbstractEventLoop = loop if loop else asyncio.get_event_loop()
 
@@ -266,11 +269,12 @@ class Client:
         :returns: ``True`` if the command was acknowledged, ``False`` otherwise.
         :rtype: bool
         """
-        if GLOBAL_CONFIG().ClientConfig.SERVO_MAX_ANGLE <= angle:
+        angle += self.trim
+        if GLOBAL_CONFIG().ClientConfig.SERVO_MAX_ANGLE < angle:
             logger.warning(
                 f"Invalid request clamped: 'SET_SERVO {angle}'. {angle} is not in [{GLOBAL_CONFIG().ClientConfig.SERVO_MIN_ANGLE}, {GLOBAL_CONFIG().ClientConfig.SERVO_MAX_ANGLE}]")
             angle = GLOBAL_CONFIG().ClientConfig.SERVO_MAX_ANGLE
-        elif GLOBAL_CONFIG().ClientConfig.SERVO_MIN_ANGLE >= angle:
+        elif GLOBAL_CONFIG().ClientConfig.SERVO_MIN_ANGLE > angle:
             logger.warning(
                 f"Invalid request clamped: 'SET_SERVO {angle}'. {angle} is not in [{GLOBAL_CONFIG().ClientConfig.SERVO_MIN_ANGLE}, {GLOBAL_CONFIG().ClientConfig.SERVO_MAX_ANGLE}]")
             angle = GLOBAL_CONFIG().ClientConfig.SERVO_MIN_ANGLE

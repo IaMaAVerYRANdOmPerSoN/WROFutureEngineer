@@ -59,13 +59,12 @@ class TestGlobalConfig(unittest.TestCase):
     def test_defaults_present(self):
         cfg = Config()
         self.assertEqual(cfg.CameraConfig.OUTPUT_WIDTH, 512)
-        self.assertEqual(cfg.OpenChallengeConfig.WALL_FOLLOW_KPKD, (0.7, 0.5))
+        self.assertEqual(cfg.OpenChallengeConfig.WALL_FOLLOW_KPKD, (1.0, 0.4))
         self.assertEqual(cfg.GeneralConfig.CHALLENGE, "open")
 
     def test_parallel_parking_config_present(self):
         cfg = GLOBAL_CONFIG()
         self.assertTrue(hasattr(cfg, "ParallelParkingConfig"))
-        self.assertTrue(cfg.ParallelParkingConfig.WALL_FOLLOW_TARGET_DISTANCE)
         self.assertTrue(cfg.ParallelParkingConfig.ARC_ONE_SERVO_ANGLE)
 
 

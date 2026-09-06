@@ -36,6 +36,7 @@ class StateMachine(Generic[HandlerParams, PExternal, PTransition, T], ABC):
         self.current_state = initial_state
         self.transition_manager = transition_manager
         self.drive_command_executor = drive_command_executor
+        self._setup_complete = False
 
     async def __aenter__(self) -> Self:
         """Enter the asynchronous context manager."""
@@ -76,10 +77,9 @@ class StateMachine(Generic[HandlerParams, PExternal, PTransition, T], ABC):
         :param kwargs: Keyword arguments to pass to the state action handlers.
         :return: True if the state machine has completed its setup and is ready to proceed, False otherwise.
         """
-        if not self._setup_complete and not self.setup(*args, **kwargs):
-            self._setup_complete = True
-        else:
-            return False
+        if not self._setup_complete:
+            self._setup_complete = self.setup(*args, **kwargs)
+
 
     def setup(self, *args: HandlerParams.args, **kwargs: HandlerParams.kwargs) -> bool:
         """

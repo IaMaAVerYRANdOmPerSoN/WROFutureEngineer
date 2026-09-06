@@ -67,6 +67,16 @@ def _format_obstacles(obstacles: Sequence[VisionObject] | None) -> str:
     return result
 
 
+def _format_parking_marker(marker: VisionObject | None) -> str:
+    """Format one normalized parking-lot marker for the replay overlay."""
+    if marker is None:
+        return "None"
+    return (
+        f"x={marker.x_centroid:.3f}, y={marker.y_centroid:.3f}, "
+        f"bbox={tuple(round(value, 3) for value in marker.bbox)}"
+    )
+
+
 def format_log_record(record: LogRecord) -> str:
     """Format one telemetry record for display beneath a replay frame.
 
@@ -79,9 +89,8 @@ def format_log_record(record: LogRecord) -> str:
         f"Frame: {record.frame_index}\n"
         f"Replay Timestamp: {record.timestamp_s:.3f}s\n"
         f"State: {record.state}\n"
-        f"Turn Count: {record.turn_counter}\n"
-        f"Last Turn Time: {record.last_turn_time_s:.3f}s\n"
-        f"Final Straight Start Time: {f'{record.start_time_s:.3f}s' if record.start_time_s is not None else 'None'}\n"
+        f"Lap Count: {record.lap_counter}\n"
+        f"Last Lap Time: {record.last_lap_time_s:.3f}s\n"
         f"Target: {record.target}\n"
         f"Obstacle Count: {record.obstacle_count}\n"
     )
@@ -91,6 +100,9 @@ def format_log_record(record: LogRecord) -> str:
         f"    Right Wall: {record.walls_and_obstacles.walls.right:.3f}\n"
         f"    Top Wall: {record.walls_and_obstacles.walls.center:.3f}\n"
         f"{_format_obstacles(record.walls_and_obstacles.obstacles)}"
+        f"    Parking Lot:\n"
+        f"        Closer: {_format_parking_marker(record.walls_and_obstacles.parking_lot.closer)}\n"
+        f"        Further: {_format_parking_marker(record.walls_and_obstacles.parking_lot.further)}\n"
     ) if record.walls_and_obstacles is not None else ""
     res += (
         f"Wall Error: {record.wall_error:.3f}\n"
@@ -120,23 +132,37 @@ def draw_replay_overlay(frame: np.ndarray, record: LogRecord) -> np.ndarray:
     # camera output shape.
     overlay = frame.copy()
 
-    if record.walls_and_obstacles is not None:
-        if record.walls_and_obstacles.walls.left_raw is not None:
-            cv2.drawContours(overlay, [record.walls_and_obstacles.walls.left_raw.contour], -1, (0, 255, 0), 2)
-        if record.walls_and_obstacles.walls.right_raw is not None:
-            cv2.drawContours(overlay, [record.walls_and_obstacles.walls.right_raw.contour], -1, (0, 255, 0), 2)
 
+    if record.walls_and_obstacles is not None:
         if record.walls_and_obstacles.obstacles is not None:
             for obstacle in record.walls_and_obstacles.obstacles:
-                cv2.drawContours(overlay, [obstacle.contour], -1, (0, 0, 255), 2)
+                cv2.drawContours(overlay, [obstacle.contour], -1, (0, 0, 255) if obstacle.color == "red" else (0, 255, 0), 2)
+        if record.walls_and_obstacles.parking_lot.closer is not None:
+            cv2.drawContours(overlay, [record.walls_and_obstacles.parking_lot.closer.contour], -1, (255, 0, 255), 2)
+        if record.walls_and_obstacles.parking_lot.further is not None:
+            cv2.drawContours(overlay, [record.walls_and_obstacles.parking_lot.further.contour], -1, (255, 0, 255), 2)
 
     c_roi = GLOBAL_CONFIG().VisionConfig.CENTER_WALL_ROI
-    cv2.rectangle(
+    l_roi = GLOBAL_CONFIG().VisionConfig.LEFT_WALL_ROI
+    r_roi = GLOBAL_CONFIG().VisionConfig.RIGHT_WALL_ROI
+    cv2.rectangle( # Draws center ROI
         overlay,
         (c_roi[1].start, c_roi[0].start),
         (c_roi[1].stop, c_roi[0].stop),
-        (0, 255, 0),
+        (255, 0, 0),
         2,
+    )
+    cv2.rectangle(  # Draws left ROI
+        overlay,
+        (0, l_roi[0].start),
+        (l_roi[1].stop, l_roi[0].stop),
+        (255, 0, 0), 2
+    )
+    cv2.rectangle(  # Draws right ROI
+        overlay,
+        (r_roi[1].start, r_roi[0].start),
+        (overlay.shape[1], r_roi[0].stop),
+        (255, 0, 0), 2
     )
 
     cv2.circle(overlay, (int(record.target[0]), int(record.target[1])), 5, (0, 0, 255), -1) if record.target is not None else None
@@ -146,7 +172,7 @@ def draw_replay_overlay(frame: np.ndarray, record: LogRecord) -> np.ndarray:
     bottom_y = height - 1
     normalized = (record.command.angle - 90.0) / 90.0
     line_length = max(40, width // 4)
-    x_offset = int(normalized * line_length)
+    x_offset = -int(normalized * line_length)
     cv2.line(overlay, (center_x, bottom_y), (center_x + x_offset, max(0, bottom_y - line_length // 2)), (0, 255, 0), 2)
     cv2.circle(overlay, (center_x, bottom_y), 4, (0, 255, 0), -1)
 
@@ -156,7 +182,7 @@ def draw_replay_overlay(frame: np.ndarray, record: LogRecord) -> np.ndarray:
     cv2.putText(
         padded_overlay,
         format_log_record(record),
-        (10, 250),
+        (10, 300),
         cv2.FONT_HERSHEY_PLAIN,
         0.9,
         (0, 255, 255),

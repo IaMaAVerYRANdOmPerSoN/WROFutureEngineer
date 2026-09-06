@@ -11,7 +11,7 @@ import cv2
 import numpy as np
 
 from piclient.core.lib import GLOBAL_CONFIG
-from piclient.core.vision import ObstacleChallengeWalls, VisionObject, WallsAndObstacles, ParkingLot
+from piclient.core.vision import Walls, VisionObject, WallsAndObstacles, ParkingLot
 
 from piclient.obstacle_challenge.transition_determinants import ChallengeState
 from piclient.obstacle_challenge.video_tools.records import DriveCommand, LogRecord
@@ -35,16 +35,12 @@ def make_walls_and_obstacles(*, center_pixels: float, obstacle_count: int = 0) -
     width = GLOBAL_CONFIG().CameraConfig.OUTPUT_WIDTH
     height = GLOBAL_CONFIG().CameraConfig.OUTPUT_HEIGHT
 
-    left_raw = make_vision_object(0, 0, 40, "walls")
-    right_raw = make_vision_object(width - 40, 0, 40, "walls")
-    walls = ObstacleChallengeWalls(
+    walls = Walls(
         left=40,
         right=40,
         center=center_pixels,
-        max_distance=width / 2,
+        area=100.0,
         center_area=100.0,
-        left_raw=left_raw,
-        right_raw=right_raw,
     )
 
     obstacles: tuple[VisionObject, ...] | None = None
@@ -68,9 +64,8 @@ def make_log_record(
     frame_index: int = 0,
     timestamp_s: float = 0.0,
     state: ChallengeState = "straight",
-    turn_counter: int = 0,
-    last_turn_time_s: float = 0.0,
-    start_time_s: float | None = None,
+    lap_counter: int = 0,
+    last_lap_time: float = 0.0,
     target: tuple[int, int] | None = None,
     walls_and_obstacles: WallsAndObstacles | None = None,
     wall_error: float = 0.0,
@@ -89,9 +84,8 @@ def make_log_record(
         frame_index=frame_index,
         timestamp_s=timestamp_s,
         state=state,
-        turn_counter=turn_counter,
-        last_turn_time_s=last_turn_time_s,
-        start_time_s=start_time_s,
+        lap_counter=lap_counter,
+        last_lap_time_s=last_lap_time,
         target=target,
         obstacle_count=0 if walls_and_obstacles is None or walls_and_obstacles.obstacles is None else len(walls_and_obstacles.obstacles),
         walls_and_obstacles=walls_and_obstacles,
@@ -130,16 +124,12 @@ def write_test_video(path: Path, *, frame_count: int = 3) -> Path:
 @contextmanager
 def fixed_perf_counter(timestamp_s: float) -> Generator[None, None, None]:
     """Temporarily replace the obstacle-challenge perf counters with a fixed time."""
-    transition_determinants = importlib.import_module("piclient.obstacle_challenge.transition_determinants")
     obstacle_challenge_module = importlib.import_module("piclient.obstacle_challenge.obstacle_challenge")
 
-    original_transition_perf_counter = getattr(transition_determinants, "perf_counter")
     original_state_machine_perf_counter = getattr(obstacle_challenge_module, "perf_counter")
 
-    setattr(transition_determinants, "perf_counter", lambda: timestamp_s)
     setattr(obstacle_challenge_module, "perf_counter", lambda: timestamp_s)
     try:
         yield
     finally:
-        setattr(transition_determinants, "perf_counter", original_transition_perf_counter)
         setattr(obstacle_challenge_module, "perf_counter", original_state_machine_perf_counter)

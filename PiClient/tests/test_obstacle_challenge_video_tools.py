@@ -10,12 +10,19 @@ import cv2
 
 from piclient.core.lib import GLOBAL_CONFIG
 
-from piclient.obstacle_challenge.video_tools import load_log_records, process_video, replay_video
+from piclient.obstacle_challenge.video_tools import format_log_record, load_log_records, process_video, replay_video
 
-from .obstacle_challenge_test_helpers import write_test_video
+from .obstacle_challenge_test_helpers import make_log_record, make_walls_and_obstacles, write_test_video
 
 
 class TestObstacleChallengeVideoTools(unittest.TestCase):
+    def test_format_log_record_includes_parking_lot_data(self) -> None:
+        formatted = format_log_record(make_log_record(walls_and_obstacles=make_walls_and_obstacles(center_pixels=0.0)))
+
+        self.assertIn("Parking Lot:", formatted)
+        self.assertIn("Closer: None", formatted)
+        self.assertIn("Further: None", formatted)
+
     def test_process_and_replay_round_trip(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             tmp_path = Path(tmp_dir)

@@ -1,8 +1,8 @@
 """Vision data structures.
 
-Defines :class:`VisionObject` for detected contours and :class:`Walls`
-for normalised wall-distance measurements.
+Defines dataclasses for vision data, including detected objects, open challenge interfaces, and obstacle challenge interfaces.
 """
+from typing import cast
 
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -46,7 +46,7 @@ class VisionObject:
     """
     contour: np.ndarray
     color: str
-    bbox: cv2.typing.Rect = None # pyright: ignore[reportAssignmentType]
+    bbox: tuple[float, float, float, float] = None # pyright: ignore[reportAssignmentType]
     x_centroid: float = None # pyright: ignore[reportAssignmentType]
     y_centroid: float = None # pyright: ignore[reportAssignmentType]
     rotation: float = None # pyright: ignore[reportAssignmentType]
@@ -54,7 +54,7 @@ class VisionObject:
     def __post_init__(self) -> None:
         """Compute bounding-box and centroid properties after dataclass init."""
         # Added custom type stub, default type stubs use Sequence[int]
-        self.bbox: cv2.typing.Rect = cv2.boundingRect(self.contour)
+        self.bbox = cast(tuple[float, float, float, float], cv2.boundingRect(self.contour))
         self.x_centroid, self.y_centroid, self.rotation = get_pose(self.contour)
         self.x_centroid = float(self.x_centroid)
         self.y_centroid = float(self.y_centroid)
@@ -63,7 +63,7 @@ class VisionObject:
 
 @export
 @dataclass(slots=True)
-class OpenChallengeWalls:
+class Walls:
     """Normalised wall-distance measurements.
 
     Distances are expressed as the fraction of black pixels in the
@@ -84,35 +84,6 @@ class OpenChallengeWalls:
         self.left = self.left / self.area  # Can only be 0 - 1
         self.right = self.right / self.area
         self.center = self.center / self.center_area
-
-
-@export
-@dataclass(slots=True)
-class ObstacleChallengeWalls:
-    """Normalised wall-distance measurements for the Obstacle Challenge.
-
-    Distances are expressed as the distance between the bounding box of the wall contour and the center of the frame, divided by the maximum possible distance (half the frame width).
-    (This is a different metric than the Open Challenge, which uses pixel counts.)
-
-    The :class:`ObstacleChallengeWalls` dataclass also bundles raw contours for further processing, such as calculating the midpoint to an obstacle.
-
-    :ivar left: Normalised distance to the left wall (0-1).
-    :ivar right: Normalised distance to the right wall (0-1).
-    :ivar area: Total pixel area of the ROI used for normalisation.
-    """
-    left: float
-    right: float
-    center: float
-    max_distance: float
-    center_area: float
-    left_raw: VisionObject | None
-    right_raw: VisionObject | None
-
-    def __post_init__(self) -> None:
-        """Normalise wall distances by dividing by ROI area."""
-        self.left = float(self.left / self.max_distance)  # Can only be 0 - 1
-        self.right = float(self.right / self.max_distance)
-        self.center = float(self.center / self.center_area)
 
 
 @export
@@ -148,9 +119,23 @@ class ParkingLot:
         if self.closer is not None:
             self.closer.x_centroid = _normalise(self.closer.x_centroid, self.max_x)
             self.closer.y_centroid = _normalise(self.closer.y_centroid, self.max_y)
+            self.closer.bbox = (
+                _normalise(self.closer.bbox[0], self.max_x),
+                _normalise(self.closer.bbox[1], self.max_y),
+                _normalise(self.closer.bbox[2], self.max_x),
+                _normalise(self.closer.bbox[3], self.max_y),
+            )
+            self.closer.rotation = float(np.clip(self.closer.rotation / 90.0, -1.0, 1.0))
         if self.further is not None:
             self.further.x_centroid = _normalise(self.further.x_centroid, self.max_x)
             self.further.y_centroid = _normalise(self.further.y_centroid, self.max_y)
+            self.further.bbox = (
+                _normalise(self.further.bbox[0], self.max_x),
+                _normalise(self.further.bbox[1], self.max_y),
+                _normalise(self.further.bbox[2], self.max_x),
+                _normalise(self.further.bbox[3], self.max_y),
+            )
+            self.further.rotation = float(np.clip(self.further.rotation / 90.0, -1.0, 1.0))
 
 
 @export
@@ -164,6 +149,6 @@ class WallsAndObstacles:
     :ivar walls: Normalised wall distances.
     :ivar obstacles: Normalised obstacle distances.
     """
-    walls: ObstacleChallengeWalls
+    walls: Walls
     obstacles: Sequence[VisionObject] | None
     parking_lot: ParkingLot

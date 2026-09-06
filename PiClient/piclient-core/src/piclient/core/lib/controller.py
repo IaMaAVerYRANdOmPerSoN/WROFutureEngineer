@@ -7,6 +7,12 @@ Provides :class:`PD`, a simple proportional-derivative controller.
 from loguru import logger
 from .exporter import export
 
+@export
+def calculate_EMA(latest: float, accumulated: float | None, alpha: float = 0.6) -> float:
+    """Calculate the Exponential Moving Average of a series of values."""
+    if accumulated is None:
+        return latest
+    return alpha * latest + (1 - alpha) * accumulated
 
 @export
 class PD:

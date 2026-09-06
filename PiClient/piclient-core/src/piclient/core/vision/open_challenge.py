@@ -12,7 +12,7 @@ import numpy as np
 
 from ..lib import GLOBAL_CONFIG, export
 from .base import VisionProcessor
-from .data import OpenChallengeWalls
+from .data import Walls
 
 
 @export
@@ -65,7 +65,7 @@ class OpenChallengeVisionProcessor(VisionProcessor):
 
         :param frame: Preprocessed HSV frame.
         :returns: Normalised wall distances.
-        :rtype: OpenChallengeWalls
+        :rtype: Walls
         """
         left_area = frame[self.left_wall_roi]
         right_area = frame[self.right_wall_roi]
@@ -82,7 +82,7 @@ class OpenChallengeVisionProcessor(VisionProcessor):
         right_pixels = cv2.countNonZero(right_masked)
         center_pixels = cv2.countNonZero(center_masked)
 
-        return OpenChallengeWalls(
+        return Walls(
             left_pixels,
             right_pixels,
             center_pixels,

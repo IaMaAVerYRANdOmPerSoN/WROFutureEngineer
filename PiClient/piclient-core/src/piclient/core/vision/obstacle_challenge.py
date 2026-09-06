@@ -8,14 +8,13 @@ from typing import Any
 import cv2
 import numpy as np
 
-from loguru import logger
 from ..lib import GLOBAL_CONFIG, export
-from .base import VisionProcessor
-from .data import VisionObject, WallsAndObstacles, ObstacleChallengeWalls, ParkingLot
+from .open_challenge import OpenChallengeVisionProcessor
+from .data import VisionObject, WallsAndObstacles, Walls, ParkingLot
 
 
 @export
-class ObstacleChallengeVisionProcessor(VisionProcessor):
+class ObstacleChallengeVisionProcessor(OpenChallengeVisionProcessor):
     """Vision processor specialised for the Obstacle Challenge.
 
     Measures normalised black-pixel density in left and right ROIs
@@ -48,7 +47,6 @@ class ObstacleChallengeVisionProcessor(VisionProcessor):
 
     _DEFAULT_OBSTACLE_BASE_OFFSET: float = GLOBAL_CONFIG().ObstacleChallengeConfig.OBSTACLE_BASE_OFFSET
     _DEFAULT_OBSTACLE_OFFSET_SCALING_FACTOR: float = GLOBAL_CONFIG().ObstacleChallengeConfig.OBSTACLE_OFFSET_SCALING_FACTOR
-    _DEFAULT_OBSTACLE_SCALING_EXPONENT: float = GLOBAL_CONFIG().ObstacleChallengeConfig.OBSTACLE_SCALING_EXPONENT
 
     def __init__(
         self,
@@ -70,7 +68,8 @@ class ObstacleChallengeVisionProcessor(VisionProcessor):
         frame_height: int | None = None,
         obstacle_base_offset: float | None = None,
         obstacle_offset_scaling_factor: float | None = None,
-        obstacle_scaling_exponent: float | None = None,
+        obstacle_tracking_radius: float | None = None,
+        obstacle_invalidation_roi: tuple[float, float, float] | None = None,
         *args: Any,
         **kwargs: Any
     ):
@@ -149,12 +148,9 @@ class ObstacleChallengeVisionProcessor(VisionProcessor):
             if obstacle_offset_scaling_factor is not None
             else self._DEFAULT_OBSTACLE_OFFSET_SCALING_FACTOR
         )
-        self.obstacle_scaling_exponent = (
-            obstacle_scaling_exponent
-            if obstacle_scaling_exponent is not None
-            else self._DEFAULT_OBSTACLE_SCALING_EXPONENT
-        )
         self.max_distance = float(np.hypot(self.frame_width / 2, self.frame_height))
+        self._tracked_obstacle: VisionObject | None = None
+        self._invalidated_obstacle: VisionObject | None = None
 
     @staticmethod
     def get_segments_and_vertices(contour: np.ndarray[tuple[int, int], np.dtype[np.int32]]) -> tuple[
@@ -214,15 +210,10 @@ class ObstacleChallengeVisionProcessor(VisionProcessor):
         :returns: Normalised wall distances.
         :rtype: WallsAndObstacles
         """
+        walls: Walls = self.get_normalized_relative_wall_distances(frame)
 
-        center_area = frame[self.center_wall_roi]
         obstacle_area = frame[self.obstacle_roi]
 
-
-        wall_masked = cv2.inRange(
-            frame, self.lower_black, self.upper_black)
-        center_masked = cv2.inRange(
-            center_area, self.lower_black, self.upper_black)
         obstacle_masked_red = cv2.inRange(
             obstacle_area, self.lower_red_obstacle, self.upper_red_obstacle)
         obstacle_masked_green = cv2.inRange(
@@ -230,69 +221,15 @@ class ObstacleChallengeVisionProcessor(VisionProcessor):
         parking_masked = cv2.inRange(
             frame, self.lower_parking_lot, self.upper_parking_lot)
 
-        walls = self._find_blocks([wall_masked], ["walls"])
-        center_pixels = cv2.countNonZero(center_masked)
         obstacles = self._find_blocks(
-            [obstacle_masked_red, obstacle_masked_green], ["red", "green"])
+            [obstacle_masked_red, obstacle_masked_green], ["red", "green"], min_area=200, max_results=3)
         if len(obstacles) == 0:
             obstacles = None
         parking_lot = list(self._find_blocks([parking_masked], ["parking_lot"]))
         parking_lot.sort(key=lambda marker: marker.y_centroid, reverse=True)  # Y increases downwards (bigger = closer)
 
-        left_wall = None
-        right_wall = None
-        left_dist = float('inf')
-        right_dist = float('inf')
-
-        # Walls is already sorted by size, the biggest walls are first.
-        for wall in walls:
-            if wall.x_centroid < self.frame_width / 2:
-                left_wall = wall
-                left_dist = self.horizontal_distance(
-                    wall, self.frame_width / 2)
-                break
-
-        for wall in walls:
-            if wall.x_centroid >= self.frame_width / 2:
-                right_wall = wall
-                right_dist = self.horizontal_distance(
-                    wall, self.frame_width / 2)
-                break
-
-        if not left_wall or not right_wall:
-            logger.debug(
-                "Could not find both walls. Returning walls and obstacles with None for missing walls.")
-
-            return WallsAndObstacles(
-                walls=ObstacleChallengeWalls(
-                    left=left_dist,
-                    left_raw=left_wall if left_wall is not None else None,
-                    right=right_dist,
-                    right_raw=right_wall if right_wall is not None else None,
-                    center=center_pixels,
-                    max_distance=self.frame_width // 2,
-                    # Adjust for number of channels
-                    center_area=center_area.size // center_area.shape[2]
-                ),
-                obstacles=obstacles,
-                parking_lot=ParkingLot(
-                    closer=parking_lot[0] if parking_lot else None,
-                    further=parking_lot[1] if len(parking_lot) > 1 else None,
-                    max_x=self.frame_width,
-                    max_y=self.frame_height
-                )
-            )
-
-        walls_and_obstacles = WallsAndObstacles(
-            walls=ObstacleChallengeWalls(
-                left=left_dist,
-                left_raw=left_wall if len(walls) >= 2 else None,
-                right=right_dist,
-                right_raw=right_wall if len(walls) >= 2 else None,
-                center=center_pixels,
-                max_distance=self.frame_width // 2,
-                center_area=center_area.size // center_area.shape[2]
-            ),
+        return WallsAndObstacles(
+            walls=walls,
             obstacles=obstacles,
             parking_lot=ParkingLot(
                 closer=parking_lot[0] if parking_lot else None,
@@ -302,8 +239,6 @@ class ObstacleChallengeVisionProcessor(VisionProcessor):
             )
         )
 
-        logger.debug(f"Walls and Obstacles: {walls_and_obstacles}")
-        return walls_and_obstacles
 
     def get_parking_lot_markers(self, frame: np.ndarray) -> tuple[VisionObject, ...]:
         """Detect magenta parking-lot markers in a preprocessed HSV frame."""
@@ -311,22 +246,14 @@ class ObstacleChallengeVisionProcessor(VisionProcessor):
         markers = self._find_blocks([parking_mask], ["parking_lot"], min_area=200, max_results=4)
         return tuple(sorted(markers, key=lambda marker: marker.x_centroid))
 
-    def _get_target_point(self, obstacle: VisionObject, walls: ObstacleChallengeWalls) -> tuple[float, float]:
+    def _get_target_point(self, obstacle: VisionObject) -> tuple[float, float]:
         """
         Compute a target point that is offset from the obstacle's centroid.
 
         Returns:
             (x, y) tuple of the geometric midpoint
         """
-
-        robot_x = self.frame_width / 2
-        robot_y = self.frame_height
-        dx = obstacle.x_centroid - robot_x
-        dy = obstacle.y_centroid - robot_y
-        distance = float(np.hypot(dx, dy))
-        proximity = max(0.0, (self.max_distance - distance) / self.max_distance) if self.max_distance > 0 else 0.0
-        scaled_proximity = proximity ** self.obstacle_scaling_exponent # Increase the effect of proximity on the offset by raising it to a power
-        dynamic_offset = self.obstacle_base_offset + (self.obstacle_offset_scaling_factor * scaled_proximity)
+        dynamic_offset = obstacle.bbox[2] * self.obstacle_offset_scaling_factor + self.obstacle_base_offset
 
         target_x = obstacle.x_centroid + dynamic_offset if obstacle.color == "red" else obstacle.x_centroid - dynamic_offset # Green left, red right
         target_y = (obstacle.y_centroid) / 2
@@ -336,18 +263,21 @@ class ObstacleChallengeVisionProcessor(VisionProcessor):
     def get_target(self, walls_and_obstacles: WallsAndObstacles) -> tuple[float, float] | None:
         """Compute target point based on wall and obstacle information.
 
+        Keeps track of the largest obstacle across frames and ignores a stale
+        invalidated obstacle until it moves significantly away from the last
+        observed invalidation point.
+
         :param walls_and_obstacles: Walls and obstacles data.
         :returns: Target point as (x, y) tuple or None if no target.
         :rtype: tuple[float, float] | None
         """
-        target_point: tuple[float, float] | None = None
 
         if walls_and_obstacles.obstacles is None:
-            return target_point
+            return None
 
         largest_obstacle = walls_and_obstacles.obstacles[0]
-        if largest_obstacle and largest_obstacle.contour.size > 0:
-            target_point = self._get_target_point(
-                largest_obstacle, walls_and_obstacles.walls)
 
-        return target_point
+        if largest_obstacle and largest_obstacle.contour.size > 0:
+            return self._get_target_point(largest_obstacle)
+
+        return None

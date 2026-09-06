@@ -48,6 +48,6 @@ classifiers = [
 
 [project.optional-dependencies]
 cli = ["piclient-cli"]
-open_challenge = ["piclient-open-challenge"]
-obstacle_challenge = ["piclient-obstacle-challenge"]
-all = ["piclient-cli", "piclient-open-challenge", "piclient-obstacle-challenge"]
+open_challenge = ["piclient-open_challenge"]
+obstacle_challenge = ["piclient-obstacle_challenge"]
+all = ["piclient-cli", "piclient-open_challenge", "piclient-obstacle_challenge"]

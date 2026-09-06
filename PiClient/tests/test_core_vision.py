@@ -10,10 +10,9 @@ import unittest
 import numpy as np
 
 from piclient.core.vision import (
+    Walls,
     ObstacleChallengeVisionProcessor,
-    ObstacleChallengeWalls,
     OpenChallengeVisionProcessor,
-    OpenChallengeWalls,
     VisionObject,
     VisionProcessor,
     WallsAndObstacles,
@@ -44,30 +43,27 @@ class TestVisionObject(unittest.TestCase):
 
 class TestWallsDataStructures(unittest.TestCase):
     def test_open_challenge_walls_normalisation(self):
-        walls = OpenChallengeWalls(
+        walls = Walls(
             left=50, right=25, center=10, area=100, center_area=20)
         self.assertAlmostEqual(walls.left, 0.5)
         self.assertAlmostEqual(walls.right, 0.25)
         self.assertAlmostEqual(walls.center, 0.5)
 
     def test_obstacle_challenge_walls_normalisation(self):
-        walls = ObstacleChallengeWalls(
+        walls = Walls(
             left=128,
             right=64,
             center=10,
-            max_distance=256,
+            area=256,
             center_area=20,
-            left_raw=None,
-            right_raw=None,
         )
         self.assertAlmostEqual(walls.left, 0.5)
         self.assertAlmostEqual(walls.right, 0.25)
         self.assertAlmostEqual(walls.center, 0.5)
 
     def test_walls_and_obstacles_container(self):
-        walls = ObstacleChallengeWalls(
-            left=0, right=0, center=0, max_distance=1, center_area=1,
-            left_raw=None, right_raw=None,
+        walls = Walls(
+            left=0, right=0, center=0, area=1, center_area=1,
         )
         container = WallsAndObstacles(walls=walls, obstacles=None, parking_lot=ParkingLot(closer=None, further=None, max_x=1, max_y=1))
         self.assertIs(container.walls, walls)
@@ -148,9 +144,9 @@ class TestOpenChallengeVisionProcessor(unittest.TestCase):
         self.processor = OpenChallengeVisionProcessor()
 
     def test_all_black_frame_is_fully_walled(self):
-        frame = np.zeros((208, 512, 3), dtype=np.uint8)  # HSV value 0 -> black
+        frame = np.zeros((260, 512, 3), dtype=np.uint8)  # HSV value 0 -> black
         walls = self.processor.get_normalized_relative_wall_distances(frame)
-        self.assertIsInstance(walls, OpenChallengeWalls)
+        self.assertIsInstance(walls, Walls)
         self.assertAlmostEqual(walls.left, 1.0)
         self.assertAlmostEqual(walls.right, 1.0)
         self.assertAlmostEqual(walls.center, 1.0)
@@ -188,27 +184,24 @@ class TestObstacleChallengeVisionProcessor(unittest.TestCase):
         # A horizontal line at the centroid x should yield zero distance.
         self.assertEqual(self.processor.horizontal_distance(obj, 5), 0)
 
-    def test_all_black_frame_reports_infinite_walls(self):
-        # A uniformly black frame yields a single wall contour (not two),
-        # so one wall must be reported as infinite distance.
-        frame = np.zeros((208, 512, 3), dtype=np.uint8)
+    def test_all_black_frame_reports_maximum_walls(self):
+        frame = np.zeros((260, 512, 3), dtype=np.uint8)
         result = self.processor.get_walls_and_obstacles(frame)
         self.assertIsInstance(result, WallsAndObstacles)
-        self.assertTrue(result.walls.left == float("inf")
-                        or result.walls.right == float("inf"))
+        self.assertAlmostEqual(result.walls.left, 1.0)
+        self.assertAlmostEqual(result.walls.right, 1.0)
+        self.assertAlmostEqual(result.walls.center, 1.0)
 
     def test_get_target_returns_none_without_obstacles(self):
-        walls = ObstacleChallengeWalls(
-            left=0, right=0, center=0, max_distance=1, center_area=1,
-            left_raw=None, right_raw=None,
+        walls = Walls(
+            left=0, right=0, center=0, area=1, center_area=1,
         )
         container = WallsAndObstacles(walls=walls, obstacles=None, parking_lot=ParkingLot(closer=None, further=None, max_x=1, max_y=1))
         self.assertIsNone(self.processor.get_target(container))
 
     def test_get_target_offset(self):
-        walls = ObstacleChallengeWalls(
-            left=0, right=0, center=0, max_distance=1, center_area=1,
-            left_raw=None, right_raw=None,
+        walls = Walls(
+            left=0, right=0, center=0, area=1, center_area=1,
         )
         obstacle_contour = _square_contour(100, 50, 20)
         obstacle = VisionObject(contour=obstacle_contour, color="red")

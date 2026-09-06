@@ -400,7 +400,7 @@ class Config(Freezeable):
             "size": (512, 384)
         })
         INITIAL_ROI: tuple[slice, slice, slice] = np.s_[
-            384 // 3: 384 - 384 // 8, :, :]
+            384 // 5: 384 - 384 // 8, :, :]
         OUTPUT_WIDTH: int = 512
         OUTPUT_HEIGHT: int = 384
         OUTPUT_CHANNELS: int = 3
@@ -470,6 +470,7 @@ class Config(Freezeable):
         CONNECT_RETRY_SLEEP_SECONDS: float = 0.5
         SERVO_MIN_ANGLE: int = 30
         SERVO_MAX_ANGLE: int = 150
+        SERVO_TRIM: int = 8
 
     @dataclass
     class VisionConfig(Freezeable):
@@ -487,33 +488,39 @@ class Config(Freezeable):
         LOWER_BLACK: tuple[int, int, int] = (0, 0, 0)
         UPPER_BLACK: tuple[int, int, int] = (179, 255, 70)
 
-        # 384 // 3 = 128
+        # 384 // 5 = 76
         # 384 - 384 // 8 = 336
-        # 336 - 128 = 208
+        # 336 - 76 = 260
 
         LEFT_WALL_ROI: tuple[slice, slice] = np.s_[
-            208 // 5: 208 - 208 // 5, :512 // 3]  # // 5, 5, 5 original
+            260 // 5: 260 - 260 // 5, :512 // 3]  # // 5, 5, 5 original
         RIGHT_WALL_ROI: tuple[slice, slice] = np.s_[
-            208 // 5: 208 - 208 // 5, 512 - 512 // 3:]
+            260 // 5: 260 - 260 // 5, 512 - 512 // 3:]
         CENTER_WALL_ROI: tuple[slice, slice] = np.s_[
-            0: 208//12, 512 // 2 - 512 // 10: 512 // 2 + 512 // 10]
+            : 260//12, 512 // 2 - 512 // 10: 512 // 2 + 512 // 10]
 
         # Placeholder HSV thresholds for obstacles
         LOWER_RED_OBSTACLE: np.ndarray[tuple[int], np.dtype[np.uint8]] = field(
-            default_factory=lambda: np.array([112, 162, 142], dtype=np.uint8))
+            default_factory=lambda: np.array([113, 162, 90], dtype=np.uint8))
         UPPER_RED_OBSTACLE: np.ndarray[tuple[int], np.dtype[np.uint8]] = field(
-            default_factory=lambda: np.array([125, 255, 195], dtype=np.uint8))
+            default_factory=lambda: np.array([126, 255, 183], dtype=np.uint8))
         LOWER_GREEN_OBSTACLE: np.ndarray[tuple[int], np.dtype[np.uint8]] = field(
-            default_factory=lambda: np.array([35, 64, 111], dtype=np.uint8))
+            default_factory=lambda: np.array([36, 100, 100], dtype=np.uint8))
         UPPER_GREEN_OBSTACLE: np.ndarray[tuple[int], np.dtype[np.uint8]] = field(
-            default_factory=lambda: np.array([44, 255, 179], dtype=np.uint8))
+            default_factory=lambda: np.array([57, 255, 180], dtype=np.uint8))
+        LOWER_YELLOW_OBSTACLE: np.ndarray[tuple[int], np.dtype[np.uint8]] = field(
+            default_factory=lambda: np.array([87, 78, 121], dtype=np.uint8)
+        )
+        UPPER_YELLOW_OBSTACLE: np.ndarray[tuple[int], np.dtype[np.uint8]] = field(
+            default_factory=lambda: np.array([96, 255, 239], dtype=np.uint8)
+        )
         OBSTACLE_ROI: tuple[slice, slice] = np.s_[
             None: None, None: None]  # Everything
 
         LOWER_PARKING_LOT: np.ndarray[tuple[int], np.dtype[np.uint8]] = field(
-            default_factory=lambda: np.array([127, 137, 108], dtype=np.uint8))
+            default_factory=lambda: np.array([152, 90, 84], dtype=np.uint8))
         UPPER_PARKING_LOT: np.ndarray[tuple[int], np.dtype[np.uint8]] = field(
-            default_factory=lambda: np.array([139, 255, 205], dtype=np.uint8))
+            default_factory=lambda: np.array([175, 193, 236], dtype=np.uint8))
 
     @dataclass
     class SharedChallengeConfig(Freezeable):
@@ -527,7 +534,7 @@ class Config(Freezeable):
         LAP_LENGTH_IN_TURNS: int = 4*3  # 4 turns per lap, 3 laps total
         TURN_DURATION: float = 3
         HYSTERESIS: int = 4  # Number of frames deciding before changing states
-        TURN_COOLDOWN: float = 2.0  # How long it needs to take
+        TURN_COOLDOWN: float = 3.5  # How long it needs to take
         TURN_DETECTION_THRESHOLD: float = 0.12  # used to be 0.1
         # Amount of fill needed for a turn to be counted
         CENTER_FILL_THRESHOLD: float = 0.65
@@ -538,24 +545,24 @@ class Config(Freezeable):
         Includes PD gains, speeds, hysteresis thresholds, shared memory
         settings, and lap-length constants.
         """
-        WALL_FOLLOW_KPKD: tuple[float, float] = (0.7, 0.5)
-        CORNER_TURN_KPKD: tuple[float, float] = (0.75, 0.3)
-        STRAIGHT_SPEED: float = -0.4
-        TURN_SPEED: float = -0.35
+        WALL_FOLLOW_KPKD: tuple[float, float] = (1.0, 0.4)
+        CORNER_TURN_KPKD: tuple[float, float] = (1.8, 0.2)
+        STRAIGHT_SPEED: float = 0.42
+        TURN_SPEED: float = 0.42
 
     @dataclass
     class ParallelParkingConfig(Freezeable):
         """Tuning values for the end-of-challenge parallel parking maneuver."""
-        PARKING_SIDE: Literal["left", "right"] = "left"
-        WALL_FOLLOW_TARGET_DISTANCE: float = 0.2
-        WALL_FOLLOW_KPKD: tuple[float, float] = (0.7, 0.25)
-        WALL_FOLLOW_SPEED: float = 0.45
+        MIN_ENTRY_Y: float = 0.5
+        WALL_FOLLOW_OFFSET_FACTOR: float = 2.75
+        WALL_FOLLOW_KPKD: tuple[float, float] = (1.2, 0.2)
+        WALL_FOLLOW_SPEED: float = 0.3
         FRONTAL_BLACK_RATIO_THRESHOLD: float = 0.7
         ARC_SPEED: float = -0.25
-        ARC_ONE_SERVO_ANGLE: float = 145.0
-        ARC_ONE_DURATION: float = 0.95
-        ARC_TWO_SERVO_ANGLE: float = 35.0
-        ARC_TWO_DURATION: float = 0.95
+        ARC_ONE_SERVO_ANGLE: float = 30.0
+        ARC_ONE_DURATION: float = 7
+        ARC_TWO_SERVO_ANGLE: float = 150.0
+        ARC_TWO_DURATION: float = 7
 
     @dataclass
     class ObstacleChallengeConfig(Freezeable):
@@ -564,18 +571,14 @@ class Config(Freezeable):
         Includes PD gains for wall-following, corner turning, and obstacle
         avoidance, along with speeds and shared memory settings.
         """
-        WALL_FOLLOW_KPKD: tuple[float, float] = (0.65, 0.35)
-        CORNER_TURN_KPKD: tuple[float, float] = (0.7, 0.3)
-        OBSTACLE_AVOID_KPKD: tuple[float, float] = (0.6, 0.25)
+        WALL_FOLLOW_KPKD: tuple[float, float] = (0.6, 0.35)
+        CORNER_TURN_KPKD: tuple[float, float] = (0.65, 0.25)
+        OBSTACLE_AVOID_KPKD: tuple[float, float] = (0.6, 0.35)
         STRAIGHT_SPEED: float = 0.4
-        TURN_SPEED: float = 0.35
-        OBSTACLE_AVOID_SPEED: float = 0.35
-        # Base offset to avoid the obstacle. Positive values move the target point further away from the obstacle.
-        OBSTACLE_BASE_OFFSET: float = 0
-        # Scaling factor applied to proximity to increase offset as obstacle gets closer.
-        OBSTACLE_OFFSET_SCALING_FACTOR: float = 300
-        # Exponent applied to proximity to increase offset as obstacle gets closer.
-        OBSTACLE_SCALING_EXPONENT: float = 0.5
+        TURN_SPEED: float = 0.4
+        OBSTACLE_AVOID_SPEED: float = 0.4
+        OBSTACLE_BASE_OFFSET: float = 0 # Base offset in pixels to avoid the obstacle
+        OBSTACLE_OFFSET_SCALING_FACTOR: float = 3 # Scaling factor * width of obstacle to account for distance changes
 
     @dataclass
     class LiDARConfig(Freezeable):

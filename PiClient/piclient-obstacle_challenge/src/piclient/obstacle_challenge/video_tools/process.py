@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from contextlib import contextmanager
 from time import sleep
 from typing import Self, cast
 
@@ -26,11 +25,11 @@ from ..obstacle_challenge import ObstacleChallengeStateMachine
 from ..transition_determinants import (
     TypedTranisitionManager,
     should_avoid_obstacle,
-    should_final_straight_and_parking,
-    should_final_turn,
     should_straight,
     should_turn,
 )
+from ..parallel_parking import ParallelParkingStateMachine
+
 from .records import DriveCommand, PickleLogWriter, build_log_record
 from .replay import replay_video
 
@@ -196,13 +195,11 @@ def build_transition_manager() -> TypedTranisitionManager:
     :rtype: TypedTranisitionManager
     """
     return TransitionManager(
-        hysteresis_values=[GLOBAL_CONFIG().SharedChallengeConfig.HYSTERESIS] * 5,
-        priorities=[2, 1, 3, 4, 0],
+        hysteresis_values=[GLOBAL_CONFIG().SharedChallengeConfig.HYSTERESIS] * 3,
+        priorities=[3, 1, 2],
         obstacle_avoidance=should_avoid_obstacle,
         straight=should_straight,
         turn=should_turn,
-        final_turn=should_final_turn,
-        final_straight_and_parking=should_final_straight_and_parking,
     )
 
 
@@ -241,6 +238,8 @@ class OfflineObstacleChallengeStateMachine(ObstacleChallengeStateMachine):
             initial_state="straight",
             transition_manager=build_transition_manager(),
             drive_command_executor=cast(DriveCommandExecutor, self._recording_executor),
+            parallel_parking_state_machine=ParallelParkingStateMachine,
+            time_provider=lambda: self._frame_timestamp_s,
         )
 
     @property
@@ -302,9 +301,8 @@ class OfflineObstacleChallengeStateMachine(ObstacleChallengeStateMachine):
             frame_index=self.frame_index,
             timestamp_s=timestamp_s,
             state=self.current_state,
-            turn_counter=self.turn_counter,
-            last_turn_time_s=self.last_turn_time,
-            start_time_s=self.start_time,
+            lap_counter=self.lap_counter,
+            last_lap_time=self.last_lap_time,
             target=self.target_position,
             walls_and_obstacles=walls_and_obstacles,
             wall_error=self.wall_error,
@@ -335,38 +333,11 @@ class OfflineObstacleChallengeStateMachine(ObstacleChallengeStateMachine):
         """
         self._frame_timestamp_s = timestamp_s
         self.frame_index += 1
-        with _video_clock(timestamp_s):
-            super().update(walls_and_obstacles, target_position)
-            finished = super().handle_state_actions()
+        super().update(walls_and_obstacles, target_position)
+        finished = super().handle_state_actions()
 
         self._write_state_telemetry(timestamp_s, finished)
         return finished
-
-
-@contextmanager
-def _video_clock(timestamp_s: float):
-    """Temporarily replace controller clocks with a deterministic video clock.
-
-    The live transition code reads :func:`time.perf_counter`; this context
-    manager substitutes a constant source-video timestamp in both modules and
-    restores the original functions on exit.
-
-    :param timestamp_s: Timestamp returned by the temporary clock.
-    :yields: Control to the block using the deterministic clock.
-    """
-    import piclient.obstacle_challenge.transition_determinants as transition_determinants
-    import piclient.obstacle_challenge.obstacle_challenge as obstacle_challenge_module
-
-    original_perf_counter = transition_determinants.__dict__["perf_counter"]
-    original_state_machine_perf_counter = obstacle_challenge_module.__dict__["perf_counter"]
-
-    setattr(transition_determinants, "perf_counter", lambda: timestamp_s)
-    setattr(obstacle_challenge_module, "perf_counter", lambda: timestamp_s)
-    try:
-        yield
-    finally:
-        transition_determinants.__dict__["perf_counter"] = original_perf_counter
-        obstacle_challenge_module.__dict__["perf_counter"] = original_state_machine_perf_counter
 
 
 def process_video(input_video: Path, output_log: Path, output_replay: Path, display: bool = False) -> Path:

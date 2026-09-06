@@ -16,7 +16,7 @@ from loguru import logger
 
 from ..lib import GLOBAL_CONFIG, export
 from .async_base import AsyncMultiprocessingVisionProcessor
-from .data import OpenChallengeWalls
+from .data import Walls
 from .open_challenge import OpenChallengeVisionProcessor
 
 
@@ -33,12 +33,12 @@ class OpenChallengeAsyncMultiprocessingVisionProcessor(OpenChallengeVisionProces
         super(OpenChallengeAsyncMultiprocessingVisionProcessor,
               self).__init__(*args, **kwargs)
 
-    async def get_normalized_relative_wall_distances_async(self, frame: np.ndarray) -> OpenChallengeWalls:
+    async def get_normalized_relative_wall_distances_async(self, frame: np.ndarray) -> Walls:
         """Async wrapper around the synchronous wall-distance method.
 
         :param frame: Preprocessed HSV frame.
         :returns: Normalised wall distances.
-        :rtype: OpenChallengeWalls
+        :rtype: Walls
         """
         return await self.loop.run_in_executor(self._executor, super(OpenChallengeAsyncMultiprocessingVisionProcessor, self).get_normalized_relative_wall_distances, frame)
 
@@ -72,7 +72,7 @@ class OpenChallengeAsyncMultiprocessingVisionProcessor(OpenChallengeVisionProces
                     (h, w, c), dtype=np.uint8, buffer=shm.buf)
                 frame: np.ndarray[tuple[int, ...],
                                   np.dtype[np.uint8]] = self._preprocess(raw_frame)
-                walls: OpenChallengeWalls = await self.get_normalized_relative_wall_distances_async(frame)
+                walls: Walls = await self.get_normalized_relative_wall_distances_async(frame)
 
                 sender.send(walls)
         except (OSError, EOFError) as e:

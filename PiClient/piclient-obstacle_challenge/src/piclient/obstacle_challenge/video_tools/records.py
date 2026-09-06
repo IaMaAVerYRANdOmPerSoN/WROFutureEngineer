@@ -43,9 +43,8 @@ class LogRecord:
     :ivar frame_index: Zero-based source-frame index.
     :ivar timestamp_s: Frame timestamp in seconds from the source-video clock.
     :ivar state: State-machine state active for the frame.
-    :ivar turn_counter: Number of completed turns at the frame.
-    :ivar last_turn_time_s: Timestamp of the most recent completed turn.
-    :ivar start_time_s: Challenge start timestamp, or ``None`` before startup.
+    :ivar lap_counter: Number of completed laps at the frame.
+    :ivar last_lap_time_s: Timestamp of the most recent completed lap.
     :ivar target: Selected target point as ``(x, y)``, or ``None``.
     :ivar obstacle_count: Number of obstacles detected in the frame.
     :ivar walls_and_obstacles: Full vision result, or ``None`` if unavailable.
@@ -62,9 +61,8 @@ class LogRecord:
     frame_index: int
     timestamp_s: float
     state: ChallengeState
-    turn_counter: int
-    last_turn_time_s: float
-    start_time_s: float | None
+    lap_counter: int
+    last_lap_time_s: float
     target: tuple[int, int] | None
     obstacle_count: int
     walls_and_obstacles: WallsAndObstacles | None
@@ -155,9 +153,8 @@ def build_log_record(
     frame_index: int,
     timestamp_s: float,
     state: ChallengeState,
-    turn_counter: int,
-    last_turn_time_s: float,
-    start_time_s: float | None,
+    lap_counter: int,
+    last_lap_time: float,
     target: tuple[int, int] | None,
     walls_and_obstacles: WallsAndObstacles | None,
     wall_error: float,
@@ -177,9 +174,8 @@ def build_log_record(
     :param frame_index: Source-frame index associated with the update.
     :param timestamp_s: Frame timestamp in seconds.
     :param state: Active obstacle-challenge state.
-    :param turn_counter: Number of turns completed so far.
-    :param last_turn_time_s: Timestamp of the most recent completed turn.
-    :param start_time_s: Challenge start timestamp, or ``None``.
+    :param lap_counter: Number of laps completed so far.
+    :param last_lap_time_s: Timestamp of the most recent completed lap.
     :param target: Selected target point as ``(x, y)``, or ``None``.
     :param walls_and_obstacles: Vision result containing wall and obstacle
         detections, or ``None``.
@@ -202,9 +198,8 @@ def build_log_record(
         frame_index=frame_index,
         timestamp_s=round(timestamp_s, 6),
         state=state,
-        turn_counter=turn_counter,
-        last_turn_time_s=round(last_turn_time_s, 6),
-        start_time_s=None if start_time_s is None else round(start_time_s, 6),
+        lap_counter=lap_counter,
+        last_lap_time_s=round(last_lap_time, 6),
         target=target,
         obstacle_count=obstacle_count,
         walls_and_obstacles=walls_and_obstacles,

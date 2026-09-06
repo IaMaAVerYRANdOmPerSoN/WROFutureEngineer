@@ -2,21 +2,25 @@
 Obstacle Challenge main loop class
 Extends StateMachine to implement the main loop for the Obstacle Challenge.
 """
-# TODO: Create StateMachine class in piclient-core and port the logic from runner.py to here.
+from collections.abc import Callable
+from typing import Literal
 
 from time import perf_counter
 
 from numpy import isfinite
-
 from loguru import logger
+
 from piclient.core.interface import DriveCommandExecutor
-from piclient.core.lib import PD, StateMachine, GLOBAL_CONFIG
+from piclient.core.lib import PD, StateMachine, GLOBAL_CONFIG, calculate_EMA
 from piclient.core.vision import WallsAndObstacles
 
 from .transition_determinants import (
     TypedTranisitionManager,
     ChallengeState,
+    Target,
+    LapCount,
 )
+from .parallel_parking import ParallelParkingStateMachine
 
 
 def get_wall_error(walls_and_obstacles: WallsAndObstacles) -> float:
@@ -32,26 +36,17 @@ def get_wall_error(walls_and_obstacles: WallsAndObstacles) -> float:
     return right_distance - left_distance
 
 
-def calculate_EMA(latest: float, accumulated: float | None, alpha: float = 0.35) -> float:
-    """Calculate the Exponential Moving Average of a series of values."""
-    if accumulated is None:
-        return latest
-    return alpha * latest + (1 - alpha) * accumulated
-
-
 class ObstacleChallengeStateMachine(StateMachine[
     [],
     [
         WallsAndObstacles,
-        tuple[int, int] | None
+        Target
     ],
     [
         WallsAndObstacles,
         ChallengeState,
-        tuple[int, int] | None,
-        float,
-        int,
-        float | None
+        Target,
+        LapCount
     ],
     ChallengeState
 ]):
@@ -93,13 +88,15 @@ class ObstacleChallengeStateMachine(StateMachine[
         initial_state: ChallengeState | None,
         transition_manager: TypedTranisitionManager,
         drive_command_executor: DriveCommandExecutor,
+        parallel_parking_state_machine: type[ParallelParkingStateMachine],
         wall_follow_kpkd: tuple[float, float] | None = None,
         corner_turn_kpkd: tuple[float, float] | None = None,
         obstacle_avoid_kpkd: tuple[float, float] | None = None,
         wall_follow_speed: float | None = None,
         corner_turn_speed: float | None = None,
         obstacle_avoid_speed: float | None = None,
-        drive_command_duration: float | None = None
+        drive_command_duration: float | None = None,
+        time_provider: Callable[[], float] = perf_counter,
     ) -> None:
         """Initialize controllers, state, and command defaults.
 
@@ -115,6 +112,7 @@ class ObstacleChallengeStateMachine(StateMachine[
         :param corner_turn_speed: Optional turning speed.
         :param obstacle_avoid_speed: Optional obstacle-avoidance speed.
         :param drive_command_duration: Optional command duration in seconds.
+        :param parallel_parking_state_machine: The state machine for parallel parking.
         :returns: ``None``.
         :rtype: None
         """
@@ -155,8 +153,8 @@ class ObstacleChallengeStateMachine(StateMachine[
             if drive_command_duration is not None
             else self._DEFAULT_DRIVE_COMMAND_DURATION
         )
-
-        self.previous_state: ChallengeState | None = None
+        self.round_driving_direction: Literal["CLOCKWISE", "COUNTERCLOCKWISE"] | None = None
+        self.time_provider = time_provider
 
         self.walls_and_obstacles: WallsAndObstacles | None = None
         self.target_position: tuple[int, int] | None = None
@@ -168,19 +166,21 @@ class ObstacleChallengeStateMachine(StateMachine[
 
         self.previous_correction: float = 90.0
 
-        self.turn_counter = 0
-        self.start_time = None  # Start time for the final straight
-        self.last_turn_time = 0  # Time of the last detected turn
-        self._setup_start_time: float | None = None
-        self._setup_complete = False
+        self.lap_counter = 0
+        self.last_lap_time = self.time_provider() + 20.0  # Seeing the parking lot at the start of the challenge should not count as a lap, so we set this to a value greater than the lap cooldown.
 
-        self.fps_start_time = perf_counter()
+        self._setup_start_time: float | None = None
+
+        self.fps_start_time = self.time_provider()
         self.frame_count = 0  # Frame counter (resets every second)
         self.fps = 0
 
         self.shm = None
         self.camera_process = None
         self.vision_process = None
+
+        self.parallel_parking_state_machine_type = parallel_parking_state_machine
+        self.parallel_parking_state_machine: ParallelParkingStateMachine | None = None
 
         super().__init__(
             initial_state if initial_state is not None else self._DEFAULT_INITIAL_STATE,
@@ -203,9 +203,11 @@ class ObstacleChallengeStateMachine(StateMachine[
         # calls _populate_transition_params and checks for transitions
         super().update(walls_and_obstacles, target_position)
 
-        if self.current_state == "final_straight_and_parking" and self.start_time is None:
-            self.start_time = perf_counter()
+        # Now state is updated, so we can check to see if we need to update parallel parking state machine
+        if self.current_state == "parallel_park" and self.parallel_parking_state_machine is not None:
+            self.parallel_parking_state_machine.update(walls_and_obstacles)
 
+ 
     def _populate_transition_params(
         self,
         walls_and_obstacles: WallsAndObstacles,
@@ -221,35 +223,30 @@ class ObstacleChallengeStateMachine(StateMachine[
         self.walls_and_obstacles = walls_and_obstacles
         self.target_position = target_position
 
+        if self.walls_and_obstacles.parking_lot.closer is not None and self.time_provider() - self.last_lap_time > 20.0:
+            self.last_lap_time = self.time_provider()
+            self.lap_counter += 1
+
         self.frame_count += 1
-        now = perf_counter()
+        now = self.time_provider()
         if now - self.fps_start_time >= 1.0:
             self.fps = self.frame_count / (now - self.fps_start_time)
             self.frame_count = 0
             self.fps_start_time = now
 
-        self.wall_error = get_wall_error(walls_and_obstacles)
+        self.wall_error = -get_wall_error(walls_and_obstacles)
         self.turn_correction = calculate_EMA(-self.wall_follow.tick(
             self.wall_error) * 90 + 90, self.previous_correction)
         self.corner_turn_correction = calculate_EMA(-self.corner_turn.tick(
-            self.wall_error) * 90 + 90, self.previous_correction)
+            self.wall_error) * 90 + 90, self.previous_correction) - 10 if self.round_driving_direction == "CLOCKWISE" else calculate_EMA(-self.corner_turn.tick(
+            self.wall_error) * 90 + 90, self.previous_correction) + 10
 
         if self.target_position is not None:
             frame_center = GLOBAL_CONFIG().CameraConfig.OUTPUT_WIDTH / 2
-            obstacle_error = (
+            obstacle_error: float = (
                 self.target_position[0] - frame_center) / frame_center
             self.obstacle_avoidance_correction = calculate_EMA(
                 -self.obstacle_avoid.tick(obstacle_error) * 90 + 90, self.previous_correction)
-
-        if (
-            self.previous_state == "turn"
-            and self.current_state != "turn"
-            and perf_counter() - self.last_turn_time >= GLOBAL_CONFIG().SharedChallengeConfig.TURN_COOLDOWN
-        ):
-            self.last_turn_time = perf_counter()
-            self.turn_counter += 1
-
-        self.previous_state = self.current_state
 
         kwargs: dict[str, None] = {}
 
@@ -257,9 +254,7 @@ class ObstacleChallengeStateMachine(StateMachine[
             walls_and_obstacles,
             self.current_state,
             self.target_position,
-            self.last_turn_time,
-            self.turn_counter,
-            self.start_time
+            self.lap_counter
         ), kwargs
 
     def _quick_drive_submit(self, speed: float, correction: float) -> None:
@@ -286,21 +281,23 @@ class ObstacleChallengeStateMachine(StateMachine[
         :returns: ``True`` when the obstacle challenge is complete.
         :rtype: bool
         """
-        super().handle_state_actions()
+        if not self._setup_complete:
+            self._setup_complete = self.setup()
+            return False
 
         match self.current_state:
             case "obstacle_avoidance":
                 self._quick_drive_submit(
                     self.obstacle_avoid_speed,
-                    self.obstacle_avoidance_correction * 0.85 + self.turn_correction * 0.15,
+                    self.obstacle_avoidance_correction * 0.8 + self.turn_correction * 0.2,
                 )
                 self.previous_correction = self.obstacle_avoidance_correction * \
-                    0.85 + self.turn_correction * 0.15
+                    0.8 + self.turn_correction * 0.2
 
             case "straight":
                 self._quick_drive_submit(
                     self.wall_follow_speed,
-                    self.turn_correction,
+                    self.turn_correction
                 )
                 self.previous_correction = self.turn_correction
 
@@ -311,29 +308,13 @@ class ObstacleChallengeStateMachine(StateMachine[
                 )
                 self.previous_correction = self.corner_turn_correction
 
-            case "final_turn":
-                self._quick_drive_submit(
-                    self.corner_turn_speed,
-                    self.corner_turn_correction,
-                )
-                self.previous_correction = self.corner_turn_correction
-
-            case "final_straight_and_parking":
-                self.start_time = perf_counter() if not self.start_time else self.start_time
-                now = perf_counter()
-
-                if now - self.start_time > 0.5:
-                    logger.success("Finished!")
-                    return True  # Return True to indicate that the challenge is finished
-
-                self._quick_drive_submit(
-                    self.wall_follow_speed,
-                    self.turn_correction,
-                )
-                self.previous_correction = self.turn_correction
-
-            case _:
-                logger.error(f"Unrecognized state: {self.current_state}")
+            case "parallel_park":
+                if self.parallel_parking_state_machine is not None:
+                    return self.parallel_parking_state_machine.handle_state_actions()
+                else:
+                    logger.error("Parallel parking state machine is not initialized.")
+                    raise RuntimeError("Parallel parking state machine is not initialized."
+                    " This should not happen if the transition to parallel parking was triggered correctly.")
 
         return False  # Return False to indicate that the challenge is not finished yet
 
@@ -342,19 +323,55 @@ class ObstacleChallengeStateMachine(StateMachine[
         Exit the parking lot before starting the main loop. This method is called repeatedly until it returns True, indicating that the setup is complete.
         :return: True if the setup is complete and the state machine is ready to proceed, False otherwise.
         """
-        now = perf_counter()
+        if self.round_driving_direction is None:
+            self.round_driving_direction =  (
+                ("COUNTERCLOCKWISE" if self.walls_and_obstacles.walls.left < self.walls_and_obstacles.walls.right else "CLOCKWISE")
+                if self.walls_and_obstacles is not None else None
+            ) 
+
+            if self.round_driving_direction is not None:
+                self.parallel_parking_state_machine = self.parallel_parking_state_machine_type(
+                    drive_command_executor=self.drive_command_executor,
+                    round_driving_direction=self.round_driving_direction,
+                    time_provider=self.time_provider,
+                )
+
+        if not self.round_driving_direction:
+            logger.warning("Walls and obstacles data is not available. Cannot determine which side to exit from.")
+            return False
+
+        now = self.time_provider()
         if self._setup_start_time is None:
             self._setup_start_time = now
             logger.info("Exiting parking lot...")
 
         elapsed = now - self._setup_start_time
 
-        if elapsed < 0.8:
+        if elapsed < 3.0:
             self._quick_drive_submit(
-                -0.35,
-                150,
+                0.3,
+                150 if self.round_driving_direction == "COUNTERCLOCKWISE" else 30,
             )
             return False
+        elif elapsed < 5.5:
+            self._quick_drive_submit(
+                0.3,
+                90,
+            )
+            return False
+        elif elapsed < 8.5:
+            self._quick_drive_submit(
+                -0.3,
+                150 if self.round_driving_direction == "COUNTERCLOCKWISE" else 30,
+            )
+            return False
+        elif elapsed < 12:
+            self._quick_drive_submit(
+                -0.3,
+                90,
+            )
+            return False
+
 
         logger.success("Exiting parking lot complete. Starting main loop...")
         return True

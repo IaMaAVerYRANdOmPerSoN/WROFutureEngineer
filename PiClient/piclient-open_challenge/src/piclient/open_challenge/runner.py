@@ -115,24 +115,19 @@ async def run_open_challenge() -> None:
                         corner_turn_correction = corner_turn.tick(
                             walls.right - walls.left)
                         is_turn_detected = walls.center > GLOBAL_CONFIG(
-                        ).SharedChallengeConfig.CENTER_FILL_THRESHOLD
-
-                        if (
-                            is_turn_detected
-                            and time.perf_counter() - last_turn_time >= GLOBAL_CONFIG().SharedChallengeConfig.TURN_COOLDOWN
-                        ):
-                            turn_counter += 1
-                            last_turn_time = time.perf_counter()
-
-                            if turn_counter >= GLOBAL_CONFIG().SharedChallengeConfig.LAP_LENGTH_IN_TURNS:
-                                state = "Final Turn"
+                        ).SharedChallengeConfig.CENTER_FILL_THRESHOLD                
 
                         match state:
                             case "Straight":
-                                if is_turn_detected:
+                                if (
+                                    is_turn_detected
+                                    and time.perf_counter() - last_turn_time >= GLOBAL_CONFIG().SharedChallengeConfig.TURN_COOLDOWN
+                                ):
                                     hysteresis_counter += 1
                                     if hysteresis_counter >= GLOBAL_CONFIG().SharedChallengeConfig.HYSTERESIS:
-                                        state = "Turn"
+                                        turn_counter += 1
+                                        last_turn_time: float = time.perf_counter()
+                                        state = "Final Turn" if turn_counter >= GLOBAL_CONFIG().SharedChallengeConfig.LAP_LENGTH_IN_TURNS else "Turn"
                                         hysteresis_counter = 0
                                 else:
                                     hysteresis_counter = 0
@@ -143,7 +138,7 @@ async def run_open_challenge() -> None:
                                     GLOBAL_CONFIG().SharedChallengeConfig.DRIVE_COMMAND_DURATION,
                                 )
 
-                            case "Turn":
+                            case "Turn": # pyright: ignore[reportUnnecessaryComparison]
                                 if not is_turn_detected:
                                     hysteresis_counter += 1
                                     if hysteresis_counter >= GLOBAL_CONFIG().SharedChallengeConfig.HYSTERESIS:
@@ -158,7 +153,7 @@ async def run_open_challenge() -> None:
                                     GLOBAL_CONFIG().SharedChallengeConfig.DRIVE_COMMAND_DURATION,
                                 )
 
-                            case "Final Turn":
+                            case "Final Turn": # pyright: ignore[reportUnnecessaryComparison]
                                 if not is_turn_detected:
                                     hysteresis_counter += 1
                                     if hysteresis_counter >= GLOBAL_CONFIG().SharedChallengeConfig.HYSTERESIS:
@@ -177,7 +172,7 @@ async def run_open_challenge() -> None:
                                 start_time = time.perf_counter() if not start_time else start_time
                                 now = time.perf_counter()
 
-                                if now - start_time > 0.5:
+                                if now - start_time > 2.0:
                                     logger.success("Finished!")
                                     break
 
@@ -227,7 +222,7 @@ async def run_open_challenge() -> None:
                         cv2.imshow("Debug", debug_frame)
                         cv2.waitKey(1)  # Shows frame for 1 ms
             finally:
-                await client.drive_motors(0, 0, 0.1)  # Stops robot
+                await client.drive_motors(0, 90, 0.1)  # Stops robot
 
     finally:  # Cleans up everything
         logger.info("Stopping Robot..")

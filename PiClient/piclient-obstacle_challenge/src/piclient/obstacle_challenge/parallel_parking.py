@@ -7,42 +7,49 @@ The routine has two phases:
    angles and durations.
 """
 
+from collections.abc import Callable
 from typing import Literal, Self
+from time import perf_counter
 
 from loguru import logger
+
 from piclient.core.interface import DriveCommandExecutor
-from piclient.core.lib import GLOBAL_CONFIG, PD
+from piclient.core.lib import GLOBAL_CONFIG, PD, calculate_EMA, export
 from piclient.core.vision import WallsAndObstacles
 
-ParkingState = Literal["follow_wall", "arc_one", "arc_two", "parked"]
+ParkingState = Literal["follow_wall", "approach_lot", "arc_one", "arc_two", "parked"]
 ParkingSide = Literal["left", "right"]
 
 _parking_cfg = GLOBAL_CONFIG().ParallelParkingConfig
 _client_cfg = GLOBAL_CONFIG().ClientConfig
 
 
+@export
 class ParallelParkingStateMachine:
     """State machine for wall-follow and two-arc parallel parking."""
     
     def __init__(
         self,
         drive_command_executor: DriveCommandExecutor,
+        round_driving_direction: Literal["CLOCKWISE", "COUNTERCLOCKWISE"],
         drive_command_duration_s: float = GLOBAL_CONFIG().SharedChallengeConfig.DRIVE_COMMAND_DURATION,
         wall_follow_speed: float = _parking_cfg.WALL_FOLLOW_SPEED,
-        wall_follow_target_distance: float = _parking_cfg.WALL_FOLLOW_TARGET_DISTANCE,
+        wall_follow_offset_factor: float = _parking_cfg.WALL_FOLLOW_OFFSET_FACTOR,
         wall_follow_kpkd: tuple[float, float] = _parking_cfg.WALL_FOLLOW_KPKD,
         arc_one_servo_angle: float = _parking_cfg.ARC_ONE_SERVO_ANGLE,
         arc_two_servo_angle: float = _parking_cfg.ARC_TWO_SERVO_ANGLE,
         arc_one_duration_s: float = _parking_cfg.ARC_ONE_DURATION,
         arc_two_duration_s: float = _parking_cfg.ARC_TWO_DURATION,
+        time_provider: Callable[[], float] = perf_counter,
     ) -> None:
         """Initialize wall-following and two-arc parking parameters.
 
         :param drive_command_executor: Command sink used for parking motion.
+        :param round_driving_direction: Direction of the round driving, either "CLOCKWISE" or "COUNTERCLOCKWISE".
         :param drive_command_duration_s: Duration of regular wall-following
             commands in seconds.
         :param wall_follow_speed: Speed used while approaching the lot.
-        :param wall_follow_target_distance: Desired normalized wall distance.
+        :param wall_follow_offset_factor: Factor to adjust the wall-following offset.
         :param wall_follow_kpkd: Proportional and derivative wall-following
             gains.
         :param arc_one_servo_angle: Steering angle for the first arc.
@@ -55,22 +62,26 @@ class ParallelParkingStateMachine:
         self.drive_command_executor = drive_command_executor
         self.drive_command_duration_s = drive_command_duration_s
 
+        self.round_driving_direction = round_driving_direction
+
         self.wall_follow_speed = wall_follow_speed
-        self.wall_follow_target_distance = wall_follow_target_distance
+        self.wall_follow_offset_factor = wall_follow_offset_factor
         self.wall_follow_controller = PD(*wall_follow_kpkd)
 
         self.arc_one_servo_angle: float = arc_one_servo_angle
         self.arc_two_servo_angle: float = arc_two_servo_angle
         self.arc_one_duration_s: float = arc_one_duration_s
         self.arc_two_duration_s: float = arc_two_duration_s
+        self.time_provider = time_provider
 
         self.arc_one_start_time_s: float | None = None
         self.arc_two_start_time_s: float | None = None
+        self.approach_lot_start_time_s: float | None = None
 
         self.current_state: ParkingState = "follow_wall"
+        self.parking_lot_error: float = 0.0
+        self.previous_correction: float = 0
         self.parking_side: ParkingSide | None = None
-        self.walls_and_obstacles: WallsAndObstacles | None = None
-        self.wall_distance: float | None = None
 
     async def __aenter__(self) -> Self:
         """Enter the parking context and start command execution.
@@ -100,23 +111,99 @@ class ParallelParkingStateMachine:
         """
         self.walls_and_obstacles = walls_and_obstacles
 
-        if walls_and_obstacles.parking_lot.closer is not None:
-            self.parking_side = "left" if walls_and_obstacles.parking_lot.closer.x_centroid < 0.5 else "right"
-            self.wall_distance = walls_and_obstacles.walls.left if self.parking_side == "left" else walls_and_obstacles.walls.right
-        else:
-            self.parking_side = None
-            self.wall_distance = self.wall_follow_target_distance
+        if (
+            self.walls_and_obstacles.parking_lot.further is None
+            and self.walls_and_obstacles.parking_lot.closer is not None
+            and self.walls_and_obstacles.parking_lot.closer.y_centroid > 0.6
+            and self.current_state == "follow_wall"
+        ):
+            self.current_state = "approach_lot"
+            self.approach_lot_start_time_s = self.time_provider()
+        elif (
+            self.walls_and_obstacles.parking_lot.closer is None
+            and self.walls_and_obstacles.parking_lot.further is None
+            and self.current_state == "approach_lot"
+            and self.approach_lot_start_time_s is not None
+            and self.time_provider() - self.approach_lot_start_time_s >= 2.5
+        ):
+            self.current_state = "arc_one"
+            self.approach_lot_start_time_s = None
 
-        logger.debug(f"Updated state machine:\nparking_side={self.parking_side},\nwall_distance={self.wall_distance},\nwalls_and_obstacles={self.walls_and_obstacles}")
+        if self.walls_and_obstacles.parking_lot.closer is None:
+            self.parking_side = None
+            self.parking_lot_error = 0.0
+            return
+
+        active_wall = self.walls_and_obstacles.parking_lot.closer
+        if self.walls_and_obstacles.parking_lot.closer.bbox[0] + self.walls_and_obstacles.parking_lot.closer.bbox[2] >= 0.9:
+            # Parking lot clipping edge of frame, use the further contour if available
+            if self.walls_and_obstacles.parking_lot.further is not None:
+                active_wall = self.walls_and_obstacles.parking_lot.further
+           
+
+        normalized_x = (active_wall.x_centroid * 2.0) - 1.0
+        wall_follow_offset = self.wall_follow_offset_factor * active_wall.bbox[2]  # bbox[2] is the width of the bounding box
+
+        if self.round_driving_direction == "CLOCKWISE":
+            self.parking_lot_error = -normalized_x - wall_follow_offset
+        else:
+            self.parking_lot_error = -normalized_x + wall_follow_offset
 
     def _handle_follow_wall(self) -> None:
         """Handle the wall-following state.
 
         This method computes the necessary correction based on the current wall distance and submits a drive command to the executor."""
-        if self.wall_distance is None:
-            raise ValueError("Wall distance is not set. Ensure that update() has been called with valid vision data.")
-        correction = self.wall_follow_controller.tick(self.wall_distance, self.wall_follow_target_distance)
+        correction = calculate_EMA(self.wall_follow_controller.tick(self.parking_lot_error), self.previous_correction, 0.35)
+        self.previous_correction = correction
+
         self.drive_command_executor.submit(self.wall_follow_speed, correction * 90 + 90, self.drive_command_duration_s)
+        logger.debug(f"Wall-following: speed={self.wall_follow_speed}, correction={correction:.2f}, servo_angle={correction * 90 + 90:.2f}")
+
+    def _handle_approach_lot(self) -> None:
+        """Handle the approach-lot state.
+
+        This method drives the vehicle straight forwards until the parking lot Y centroid exceeds a threshold,
+        indicating that the vehicle is close enough to the parking lot to begin the parking maneuver."""
+        self.drive_command_executor.submit(self.wall_follow_speed, 95, self.drive_command_duration_s) # Slight steering trim
+        logger.debug(f"Approaching parking lot: speed={self.wall_follow_speed}, servo_angle=90")
+
+    def _handle_arc(self, servo_angle: float, duration_s: float) -> None:
+        """Drive backwards at a fixed steering angle for the configured duration."""
+        servo_angle = servo_angle if self.round_driving_direction == "COUNTERCLOCKWISE" else 180 - servo_angle
+        if self.current_state == "arc_one" and self.arc_one_start_time_s is None:
+            self.arc_one_start_time_s = self.time_provider()
+        elif self.current_state == "arc_two" and self.arc_two_start_time_s is None:
+            self.arc_two_start_time_s = self.time_provider()
+
+        start_time = self.arc_one_start_time_s if self.current_state == "arc_one" else self.arc_two_start_time_s
+        if start_time is None:
+            return
+
+        elapsed = self.time_provider() - start_time
+        if elapsed >= duration_s:
+            if self.current_state == "arc_one":
+                self.current_state = "arc_two"
+                self.arc_one_start_time_s = None
+            else:
+                self.current_state = "parked"
+                self.arc_two_start_time_s = None
+                self.drive_command_executor.submit(0.01, 90, self.drive_command_duration_s)  # Stop the vehicle
+            return
+
+        self.drive_command_executor.submit(_parking_cfg.ARC_SPEED, servo_angle, self.drive_command_duration_s)
+        logger.debug(
+            f"Executing reverse arc: state={self.current_state}, "
+            f"speed={_parking_cfg.ARC_SPEED}, servo_angle={servo_angle}, "
+            f"elapsed={elapsed:.2f}s/{duration_s:.2f}s"
+        )
+
+    def _handle_arc_one(self) -> None:
+        """Drive backwards in the first fixed-angle arc."""
+        self._handle_arc(self.arc_one_servo_angle, self.arc_one_duration_s)
+
+    def _handle_arc_two(self) -> None:
+        """Drive backwards in the second fixed-angle arc and then stop."""
+        self._handle_arc(self.arc_two_servo_angle, self.arc_two_duration_s)
 
     def handle_state_actions(self) -> bool:
         """Handle actions for the current state.
@@ -126,4 +213,12 @@ class ParallelParkingStateMachine:
         """
         if self.current_state == "follow_wall":
             self._handle_follow_wall()
+        elif self.current_state == "approach_lot":
+            self._handle_approach_lot()
+        elif self.current_state == "arc_one":
+            self._handle_arc_one()
+        elif self.current_state == "arc_two":
+            self._handle_arc_two()
+        elif self.current_state == "parked":
+            return True
         return False
