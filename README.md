@@ -166,6 +166,16 @@ We are a three-person team from Explorer Robotics in Whitby, Ontario, Canada. We
 # 1. Mechanical Design
 This section explains the physical design of the robot, including chassis layout, steering, drivetrain, torque/speed reasoning, and mechanical improvements over time.
 
+---
+
+### Files
+- [`docs/mechanical/mechanical_reasoning.md`](docs/01_mechanical/mechanical_reasoning.md)
+- [`docs/mechanical/mechanical_iterations.md`](docs/01_mechanical/mechanical_iterations.md)
+- [`docs/mechanical/torque_speed_reasoning.md`](docs/01_mechanical/torque_speed_reasoning.md)
+
+
+---
+
 - **Dimentions**: 24cm length 10cm wide 28cm high
     - [Dimentions reasoning](docs/01_mechanical/mechanical_reasoning.md#size-reasoning)
 - **Drive Motor**: Furitek Micro Komodo 1212 Stepper Motor
@@ -264,7 +274,7 @@ This section explains how the robot is powered, what sensors are used, where the
 - [`docs/02_power_sensors/sensor_selection.md`](docs/02_power_sensors/sensor_selection.md)
 - [`docs/02_power_sensors/sensor_placement.md`](docs/02_power_sensors/sensor_placement.md)
 - [`docs/02_power_sensors/calibration.md`](docs/02_power_sensors/calibration.md)
-- [`docs/02_power_sensors/wiring.md`](docs/02_power_sensors/wiring.md)
+
 
 ---
 
@@ -411,6 +421,16 @@ This section explains the software that runs on the Raspberry Pi, including how 
 
 ---
 
+### Files
+- [`docs/03_software/architecture.md`](docs/03_software/architecture.md)
+- [`docs/03_software/challenge)running.md`](docs/03_software/challenge_running.md)
+- [`docs/03_software/config.md`](docs/03_software/config.md)
+- [`docs/03_software/hardware_interfaces.md`](docs/03_software/hardware_interfaces.md)
+- [`docs/03_software/state_machine.md`](docs/03_software/state_machine.md)
+- [`docs/03_software/vision.md`](docs/03_software/vision.md)
+
+---
+
 ## Architecture
 
 Three processes run at the same time, camera, vision, and main control. The camera writes frames into shared memory, the vision process reads them and finds walls and obstacles, and the main process runs the state machine and sends commands to the Arduino. The system always uses the freshest data; stale frames and commands are dropped automatically.
@@ -512,7 +532,6 @@ The journal is best viewed on GitHub where all links are clickable. A PDF versio
 
 ### Files
 - [`docs/04_systems_engineering/subsystem_interactions.md`](docs/04_systems_engineering/subsystem_interactions.md)
-- [`docs/04_systems_engineering/engineering_decisions.md`](docs/04_systems_engineering/engineering_decisions.md)
 - [`docs/04_systems_engineering/constraints_tradeoffs.md`](docs/04_systems_engineering/constraints_tradeoffs.md)
 - [`docs/04_systems_engineering/risk_analysis.md`](docs/04_systems_engineering/risk_analysis.md)
 - [`docs/04_systems_engineering/iteration_cycles.md`](docs/04_systems_engineering/iteration_cycles.md)
@@ -590,6 +609,7 @@ This section explains how another team could rebuild, set up, and test the robot
 - [`docs/05_reproducibility/setup_guide.md`](docs/05_reproducibility/setup_guide.md)
 - [`docs/05_reproducibility/building_from_source.md`](docs/05_reproducibility/building_from_source.md)
 - [`docs/05_reproducibility/testing_workflow.md`](docs/05_reproducibility/testing_workflow.md)
+- [`docs/05_reproducibility/release_notes.md`](docs/05_reproducibility/release_notes.md)
 
 ---
 
