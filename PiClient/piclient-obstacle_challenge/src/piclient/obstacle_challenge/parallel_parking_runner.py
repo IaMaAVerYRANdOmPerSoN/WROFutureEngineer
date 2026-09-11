@@ -33,7 +33,7 @@ async def run_parallel_parking() -> None:
             drive_executor = DriveCommandExecutor(client=client)
             async with ParallelParkingStateMachine(
                 drive_command_executor=drive_executor,
-                round_driving_direction="CLOCKWISE"  # Arbitrary choice for testing determined by environment in real obstacle challenge
+                round_driving_direction="COUNTERCLOCKWISE"  # Arbitrary choice for testing determined by environment in real obstacle challenge
             ) as state_machine:
                 with process_manager as process_context:
                     if process_context.output_stream is None:

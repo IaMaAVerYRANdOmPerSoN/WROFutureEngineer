@@ -19,6 +19,9 @@ yarn-error.log*
 firebase-debug.log*
 firebase-debug.*.log*
 
+# systemd service templates (may leak sensitive information, though not critical)
+*.service
+
 # Firebase cache
 .firebase/
 

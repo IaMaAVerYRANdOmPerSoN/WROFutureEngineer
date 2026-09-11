@@ -225,7 +225,7 @@ class ObstacleChallengeVisionProcessor(OpenChallengeVisionProcessor):
             [obstacle_masked_red, obstacle_masked_green], ["red", "green"], min_area=200, max_results=3)
         if len(obstacles) == 0:
             obstacles = None
-        parking_lot = list(self._find_blocks([parking_masked], ["parking_lot"]))
+        parking_lot = list(self._find_blocks([parking_masked], ["parking_lot"], min_area=150, max_results=2))
         parking_lot.sort(key=lambda marker: marker.y_centroid, reverse=True)  # Y increases downwards (bigger = closer)
 
         return WallsAndObstacles(
@@ -238,13 +238,6 @@ class ObstacleChallengeVisionProcessor(OpenChallengeVisionProcessor):
                 max_y=self.frame_height
             )
         )
-
-
-    def get_parking_lot_markers(self, frame: np.ndarray) -> tuple[VisionObject, ...]:
-        """Detect magenta parking-lot markers in a preprocessed HSV frame."""
-        parking_mask = cv2.inRange(frame, self.lower_parking_lot, self.upper_parking_lot)
-        markers = self._find_blocks([parking_mask], ["parking_lot"], min_area=200, max_results=4)
-        return tuple(sorted(markers, key=lambda marker: marker.x_centroid))
 
     def _get_target_point(self, obstacle: VisionObject) -> tuple[float, float]:
         """

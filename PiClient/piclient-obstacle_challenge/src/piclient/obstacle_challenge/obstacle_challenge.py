@@ -5,6 +5,7 @@ Extends StateMachine to implement the main loop for the Obstacle Challenge.
 from collections.abc import Callable
 from typing import Literal
 
+import asyncio
 from time import perf_counter
 
 from numpy import isfinite
@@ -104,6 +105,7 @@ class ObstacleChallengeStateMachine(StateMachine[
         obstacle_avoid_speed: float | None = None,
         drive_command_duration: float | None = None,
         time_provider: Callable[[], float] = perf_counter,
+        start_event: asyncio.Event | None = None,
     ) -> None:
         """Initialize controllers, state, and command defaults.
 
@@ -120,6 +122,7 @@ class ObstacleChallengeStateMachine(StateMachine[
         :param obstacle_avoid_speed: Optional obstacle-avoidance speed.
         :param drive_command_duration: Optional command duration in seconds.
         :param parallel_parking_state_machine: The state machine for parallel parking.
+        :param start_event: Optional event that gates timer initialization.
         :returns: ``None``.
         :rtype: None
         """
@@ -175,14 +178,13 @@ class ObstacleChallengeStateMachine(StateMachine[
         self.previous_correction: float = 90.0
 
         self.lap_counter = 0
-        # Seeing the parking lot at the start of the challenge should not count as a lap, so we set this to a value greater than the lap cooldown.
-        self.last_lap_time = self.time_provider() + 20.0
-
+        self.last_lap_time: float
         self._setup_start_time: float | None = None
-
-        self.fps_start_time = self.time_provider()
+        self.fps_start_time: float
         self.frame_count = 0  # Frame counter (resets every second)
         self.fps = 0
+        self._start_event = start_event
+        self._timers_initialized = False
 
         self.shm = None
         self.camera_process = None
@@ -196,6 +198,26 @@ class ObstacleChallengeStateMachine(StateMachine[
             transition_manager,
             drive_command_executor
         )
+
+        if self._start_event is None:
+            self._initialize_timers()
+
+    def _initialize_timers(self) -> None:
+        """Capture challenge timer origins once the run is ready to start."""
+        if self._timers_initialized:
+            return
+
+        now = self.time_provider()
+        # Seeing the parking lot at the start of the challenge should not count as a lap, so we set this to a value greater than the lap cooldown.
+        self.last_lap_time = now + 10.0
+        self.fps_start_time = now
+        self._timers_initialized = True
+
+    async def wait_for_start(self) -> None:
+        """Wait for the injected start event before starting challenge timers."""
+        if self._start_event is not None:
+            await self._start_event.wait()
+        self._initialize_timers()
 
     def update(
         self,
@@ -231,7 +253,7 @@ class ObstacleChallengeStateMachine(StateMachine[
         self.walls_and_obstacles = walls_and_obstacles
         self.target_position = target_position
 
-        if self.walls_and_obstacles.parking_lot.closer is not None and self.time_provider() - self.last_lap_time > 20.0:
+        if self.walls_and_obstacles.parking_lot.closer is not None and self.time_provider() - self.last_lap_time > 10.0:
             self.last_lap_time = self.time_provider()
             self.lap_counter += 1
 
@@ -359,27 +381,27 @@ class ObstacleChallengeStateMachine(StateMachine[
 
         elapsed = now - self._setup_start_time
 
-        if elapsed < 3.0:
+        if elapsed < 2.75:
             self._quick_drive_submit(
                 0.3,
                 150 if self.round_driving_direction == "COUNTERCLOCKWISE" else 30,
             )
             return False
-        elif elapsed < 5.5:
+        elif elapsed < 7.0:
             self._quick_drive_submit(
                 0.3,
                 90,
             )
             return False
-        elif elapsed < 8.5:
+        elif elapsed < 9.75:
             self._quick_drive_submit(
                 -0.3,
                 150 if self.round_driving_direction == "COUNTERCLOCKWISE" else 30,
             )
             return False
-        elif elapsed < 12:
+        elif elapsed < 11.75:
             self._quick_drive_submit(
-                -0.3,
+                -0.3 if self.round_driving_direction == "COUNTERCLOCKWISE" else 0.3,
                 90,
             )
             return False

@@ -589,6 +589,8 @@ class Config(Freezeable):
         TURN_DETECTION_THRESHOLD: float = 0.12  # used to be 0.1
         # Amount of fill needed for a turn to be counted
         CENTER_FILL_THRESHOLD: float = 0.65
+        BUTTON_CHIP: str = "/dev/gpiochip0"
+        BUTTON_PIN: int = 14
 
     @dataclass
     class OpenChallengeConfig(Freezeable):
@@ -603,8 +605,8 @@ class Config(Freezeable):
         """
         WALL_FOLLOW_KPKD: tuple[float, float] = (1.0, 0.4)
         CORNER_TURN_KPKD: tuple[float, float] = (1.8, 0.2)
-        STRAIGHT_SPEED: float = 0.42
-        TURN_SPEED: float = 0.42
+        STRAIGHT_SPEED: float = 0.40
+        TURN_SPEED: float = 0.40
 
     @dataclass
     class ParallelParkingConfig(Freezeable):
@@ -613,10 +615,13 @@ class Config(Freezeable):
         Distances and coordinates are normalized unless a field explicitly says
         seconds or degrees; speeds are normalized drive-client values.
         """
-        MIN_ENTRY_Y: float = 0.5
-        WALL_FOLLOW_OFFSET_FACTOR: float = 2.75
-        WALL_FOLLOW_KPKD: tuple[float, float] = (1.2, 0.2)
-        WALL_FOLLOW_SPEED: float = 0.3
+        MIN_ENTRY_Y: float = 0.0
+        WALL_FOLLOW_1_OFFSET_FACTOR: float = 4
+        WALL_FOLLOW_1_KPKD: tuple[float, float] = (1.0, 0.4)
+        WALL_FOLLOW_1_SPEED: float = 0.35
+        WALL_FOLLOW_2_OFFSET_FACTOR: float = 2.75
+        WALL_FOLLOW_2_KPKD: tuple[float, float] = (1.2, 0.2)
+        WALL_FOLLOW_2_SPEED: float = 0.3
         FRONTAL_BLACK_RATIO_THRESHOLD: float = 0.7
         ARC_SPEED: float = -0.25
         ARC_ONE_SERVO_ANGLE: float = 30.0

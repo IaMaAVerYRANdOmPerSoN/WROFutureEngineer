@@ -22,8 +22,7 @@ from ..lib.exporter import export
 picamera2: Any = None
 
 try:
-    # pyright: ignore[reportMissingImports, reportMissingTypeStubs]
-    import picamera2
+    import picamera2 # pyright: ignore[reportMissingImports]
 except ImportError:
     # Probably not on Pi
     logger.warning("picamera2 import failed, are you running on a Raspberry Pi? "

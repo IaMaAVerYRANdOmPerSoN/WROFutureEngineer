@@ -1,8 +1,13 @@
+from typing import Any
+
 import asyncio
 from multiprocessing.connection import Connection as PipeConnection
-from typing import Any
 from collections.abc import AsyncGenerator
 
+from ..lib import export
+
+
+@export
 async def async_pipe_reader(receiver: PipeConnection) -> AsyncGenerator[Any, None]:
     """
     Asynchronously read from a multiprocessing pipe connection, latest wins.
@@ -32,14 +37,16 @@ async def async_pipe_reader(receiver: PipeConnection) -> AsyncGenerator[Any, Non
         finally:
             loop.remove_reader(receiver.fileno())
 
-    except NotImplementedError:  # Windows
+    except NotImplementedError:  # Non-POSIX
         while True:
             try:
                 data = await loop.run_in_executor(None, receiver.recv)
             except (EOFError, OSError):
                 break
             yield data
-    
+
+
+@export
 async def async_pipe_reader_fifo(receiver: PipeConnection) -> AsyncGenerator[Any, None]:
     """
     Asynchronously read from a multiprocessing pipe connection in FIFO order.
@@ -64,7 +71,7 @@ async def async_pipe_reader_fifo(receiver: PipeConnection) -> AsyncGenerator[Any
         finally:
             loop.remove_reader(receiver.fileno())
 
-    except NotImplementedError:  # Windows
+    except NotImplementedError:  # Non-POSIX
         while True:
             try:
                 data = await loop.run_in_executor(None, receiver.recv)
