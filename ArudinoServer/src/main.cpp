@@ -14,14 +14,14 @@ struct Request {
     int processed;
 };
 
-#define MOTOR 9   // Motor PWM
+#define MOTOR 12   // Motor PWM
 #define STEERING_PWM 11 // Servo PWM
 #define SERIAL_TIMEOUT 10 // Serial read timeout in milliseconds
 
 Servo steering;
 Servo motor;
 
-class Server {
+class CommandServer {
     private:
         Stream* _serial;
         Hashtable<String, Request> currentProcesses;
@@ -131,7 +131,7 @@ class Server {
         }
         
     public:
-        Server(Stream& s, Servo& motor, Servo& steering) : _serial(&s), _motor(motor), _steering(steering) {
+        CommandServer(Stream& s, Servo& motor, Servo& steering) : _serial(&s), _motor(motor), _steering(steering) {
             commands.push_back("PING");
             commands.push_back("SET_SERVO");
             commands.push_back("INC_SERVO");
@@ -142,7 +142,7 @@ class Server {
 
         void processRequest() {
             Request incoming = parseRequest();
-            if (incoming.tid != 0) {
+            if (incoming.count >= 2) {
                 currentProcesses[incoming.command] = incoming;
                 start(currentProcesses[incoming.command]);
             }
@@ -162,14 +162,12 @@ class Server {
         }
 
         void stop() {
-            for (auto &cmd : commands) {
-                end(cmd);
-            }
+            _motor.writeMicroseconds(1500); // Stop the motor without generating responses.
             currentProcesses.clear();
         }
 };
 
-Server* server;
+CommandServer* server;
 
 void setup() {
     pinMode(6, OUTPUT); // LED
@@ -180,7 +178,7 @@ void setup() {
     motor.attach(MOTOR);
     motor.writeMicroseconds(1500); // Stop the motor
     delay(1000); // give the motor some time to stop before accepting commands
-    server = new Server(Serial, motor, steering);
+    server = new CommandServer(Serial, motor, steering);
 }
 
 void loop() {
