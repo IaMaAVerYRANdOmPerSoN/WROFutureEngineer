@@ -757,6 +757,11 @@ Detailed records:
 </p>
 <p align="center"><i>Full electronics schematic showing power distribution and signal connections.</i></p>
 
+## API Reference
+
+Full API documentation for every package in this release is at
+**[apostla-api-reference.web.app](https://apostla-api-reference.web.app/)**.
+
 ### Videos
 ### Open Challenge Run
 [![Open Challenge Run](https://img.youtube.com/vi/WqN3tuj8LFo/maxresdefault.jpg)](https://www.youtube.com/watch?v=WqN3tuj8LFo)
