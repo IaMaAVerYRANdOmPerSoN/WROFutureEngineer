@@ -36,6 +36,7 @@ We are a three-person team from Explorer Robotics in Whitby, Ontario, Canada. We
   ### Information
   - *I love building!!!!!!!*
   - 15 years old
+  - Hi, my name is Elvis. I'm 15. I enjoy building and 3D modeling various objects with Fusion 360. I've been with Explorer Robotics ever since I was 8 years old.
   </td>
 </tr>
 </table>
@@ -55,6 +56,7 @@ We are a three-person team from Explorer Robotics in Whitby, Ontario, Canada. We
   ### Information
   - *I love coding!!!!!!*
   - 14 years old
+  - I'm Michael. I'm 14, love coding and solving problems. I've been involved in WRO for several years and enjoy using my programming skills to help our team build and improve our robot.
   </td>
 </tr>
 </table>
@@ -74,6 +76,7 @@ We are a three-person team from Explorer Robotics in Whitby, Ontario, Canada. We
   ### Information
   - *I love dogs*
   - 15 years old
+  - Hi! I'm Ryan. I'm 15, love to write, play badminton, listen to music, and travel. I've been involved in robotics for nearly a decade and participated in both FLL and WRO Robo Mission.
   </td>
 </tr>
 </table>
@@ -739,7 +742,7 @@ Example points:
 
 Detailed records:
 - [`docs/04_systems_engineering/iteration_cycles.md`](docs/04_systems_engineering/iteration_cycles.md)
- - [View Journal](docs/Journal/CHANGELOG.md)
+ - [View Journal](docs/journal/CHANGELOG.md)
 
 ---
 
