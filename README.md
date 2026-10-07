@@ -439,7 +439,9 @@ Because of the decently short battery life, we have had between 4-5 batteries.
 - **Camera (OV5647)**: Detects walls, corner lines, and colored pillars via CSI-2 at 640x480 up to 62.50 fps
     - [Camera selection](docs/02_power_sensors/sensor_selection.md#camera--ov5647)
     - [Camera placement](docs/02_power_sensors/sensor_placement.md)
-
+- **IMU**: Detects rotation and acceleration
+    - [IMU purpose](docs/02_power_sensors/sensor_selection.md#camera--ov5647)
+      
 ---
 
 ### Compute
