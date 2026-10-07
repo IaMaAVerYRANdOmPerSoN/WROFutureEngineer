@@ -63,7 +63,7 @@ Explain how the robot is powered and why this power system was selected.
 | Servo Motor (Hitec HS-5055MG) | 4.8V–6.0V | 120mA no-load, 700mA stall | ESC BEC (5V or 6.5V) |
 | Raspberry Pi 5 8GB | 5V | 2A–5A (idle ~1A, full load ~2.4A) | Step-down regulator from battery |
 | Camera (OV5647 5MP) | 3.3V | ~250mA | Raspberry Pi 5 (CSI / 3.3V rail) |
-| Microcontroller (Arduino Uno R3) | 5V | ~50mA | Raspberry Pi 5 (USB) |
+| Microcontroller (Arduino Nano) | 5V | ~50mA | Raspberry Pi 5 (USB) |
 | Power Switch | 7.4V | Up to 20A | In series with battery main rail |
 
 ---
