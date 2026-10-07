@@ -62,14 +62,6 @@ We also considered using the Pi Camera Module 3 Wide, which supports higher fram
 - **USB webcam** — higher latency due to USB overhead, more bandwidth contention with Arduino
 - **Pi Camera Module 3 Wide** — supports 120 fps at higher resolution, but significantly more expensive; considered as a future upgrade
 
----
-
-## Single Sensor Approach
-
-It's easy to underestimate the difficulty of process/thread synchronization and data fusion when multiple sensors are used. At the same time, multiple sensors can provide redundancy and improve accuracy.
-It's a complex trade-off between cost, weight, complexity, and performance. Historically, a single camera has been sufficient for WRO FE robots, and we expect it to be sufficient for our robot as well.
-There aren't any perception problems that cannot be solved with a single camera in the context of our application, and while adding ToF or LiDAR sensors might improve performance in some aspects, it would also introduce new problems and increase the complexity of the system.
-Adding LiDAR or ToF sensors would only be justified if there was a real constraint that the camera couldn't overcome, such as a requirement to detect objects in complete darkness. Since the camera is sufficient for our current design, we have chosen to keep the system simple and use only the camera.
 
 ---
 
