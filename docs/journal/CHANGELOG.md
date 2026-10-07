@@ -353,6 +353,27 @@ The first versions of all 3D printed parts were adapted from last year's robot. 
 - Current differential confirmed as a pre-built off-the-shelf unit.
 - Voltage regulator identified - Yahboom buck converter (6V–24V to 5V/5A) designed specifically for Raspberry Pi 5.
 
+## Week 38 (Sep 7–13)
+
+- Began switching the main microcontroller from the Arduino Uno R3 to an Arduino Nano.
+- New 3D-printed mounts designed so the Nano fits on the chassis in place of the Uno.
+
+## Week 39 (Sep 14–20)
+
+- Nano installed on the robot using the new mounts.
+- LiDAR mount designed and printed.
+- Decided not to use the LiDAR.
+
+## Week 40 (Sep 21–27)
+
+- Microcontroller code ported from the Uno to the Nano.
+- Started reading heading data from the Nano's built-in IMU.
+
+## Week 41 (Sep 28–Oct 4)
+
+- IMU heading readings were inconsistent.
+- Cause found: `Serial.printf("Heading: %f\n", heading);` does not format floats correctly on the Nano, so the printed values were wrong. The IMU itself was working.
+- Replaced it with `Serial.print("Heading: "); Serial.println(heading);`. Heading readings are now consistent.
 ---
 
 ## Major Problems
