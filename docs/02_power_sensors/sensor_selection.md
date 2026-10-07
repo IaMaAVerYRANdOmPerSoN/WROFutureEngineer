@@ -89,27 +89,34 @@ The OV5647 camera covers all sensing requirements for the competition. The camer
 
 ---
 
-## Arduino Uno R3
+## Arduino Nano 
 
-**Purpose:** Low-level hardware controller that handles PWM output to the ESC and servo, and receives drive commands from the Raspberry Pi over USB serial.
+**Purpose:** Low-level hardware controller that handles PWM output to the ESC and servo, reads heading data from its built-in IMU, and exchanges commands and sensor data with the Raspberry Pi over USB serial.
 
 **Why it was selected:**
-The Raspberry Pi 5 runs Linux, which is not a real-time operating system. It cannot guarantee microsecond-level PWM timing under load. When the vision pipeline and control loop are running at 62.5 fps, the CPU is busy enough that GPIO-based PWM timing becomes unreliable. The Arduino handles PWM output in a tight bare-metal loop with no operating system overhead, guaranteeing consistent pulse widths to the ESC and servo regardless of what the Pi is doing.
+The Raspberry Pi 5 runs Linux, which is not a real-time operating system. It cannot guarantee microsecond-level PWM timing under load. When the vision pipeline and control loop are running at 62.5 fps, the CPU is busy enough that GPIO-based PWM timing becomes unreliable. A dedicated microcontroller produces PWM in hardware, guaranteeing consistent pulse widths to the ESC and servo regardless of what the Pi is doing.
+
+**Why we switched from the Arduino Uno R3:**
+- **Size:** The Nano is a fraction of the Uno's footprint. Switching let us condense the whole robot layout and free up internal space (see Arduino Layout V4 in Mechanical Iterations).
+- **Built-in IMU:** The Nano has an onboard IMU, which gives the robot a heading reading without adding a separate sensor or extra wiring. Heading data can support turn detection and lap counting alongside vision.
+- **Same role, same interface:** The Nano still connects to the Pi over USB serial, so the Pi-side communication code needed only minor changes.
 
 **Advantages:**
 - Guarantees precise PWM timing independent of Pi CPU load
+- Onboard IMU provides heading data with no extra hardware
+- Much smaller footprint than the Uno
 - Simple USB serial connection to the Pi
-- Well-documented with broad library support for servo and ESC control
 - Easy to flash and modify via PlatformIO
-- Low cost and widely available
 
 **Limitations:**
 - Adds a serial communication step between the control loop and the hardware, introducing a small amount of latency
 - Requires a separate USB cable and port on the Pi
+- Some Uno code did not port directly. For example, `Serial.printf` with `%f` did not print floats correctly on the Nano and had to be replaced with `Serial.print` (see Week 41)
 
 **Alternatives considered:**
-- **Direct Pi GPIO PWM** — unreliable under Linux without a dedicated real-time co-processor
-- **ESP32** — more capable but significantly more complex to set up; overkill for this application
-- **Hiwonder controller (used last year)**, replaced with the Arduino Uno for simpler software control and better documentation
+- **Arduino Uno R3 (used earlier this season)**: reliable, but too large for the condensed layout and has no onboard IMU
+- **Direct Pi GPIO PWM**: unreliable under Linux without a dedicated real-time co-processor
+- **ESP32**: more capable but significantly more complex to set up; overkill for this application
+- **Hiwonder controller (used last year)**: replaced for simpler software control and better documentation
 
 ---
