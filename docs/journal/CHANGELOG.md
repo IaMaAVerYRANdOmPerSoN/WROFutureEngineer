@@ -318,7 +318,7 @@ The first versions of all 3D printed parts were adapted from last year's robot. 
  
 ## Week 35 (Aug 18–24)
  
-**Mechanical Iterations — Final Versions**
+**Mechanical Iterations**
 - Turning system V3: curved front bumper added to allow robot to slide off walls in obstacle challenge instead of getting stuck.
 - Arduino layout V3: servo moved rearward to shorten robot length; front section extended to support bumper attachment.
 - Connectors V3: shortened to C-shape to keep robot compact while routing around the battery.
@@ -366,8 +366,21 @@ The first versions of all 3D printed parts were adapted from last year's robot. 
 
 ## Week 40 (Sep 21–27)
 
+**Mechanical Iterations**
+## Week 40 (Sep 21–27)
+
 - Microcontroller code ported from the Uno to the Nano.
 - Started reading heading data from the Nano's built-in IMU.
+
+**Mechanical Iterations**
+- Turning system V4: front bumper upgraded.
+- Arduino layout V4: redesigned around the Arduino Nano, which takes up much less space than the Uno.
+- Power switch mount V1: dedicated mount added so the switch is held securely instead of loose in the chassis.
+- Overall design condensed, making the robot more compact and freeing up internal space.
+> For the full version history of all printed parts see [Mechanical Iterations](../01_mechanical/mechanical_iterations.md).
+
+---
+
 
 ## Week 41 (Sep 28–Oct 4)
 
@@ -459,7 +472,7 @@ We needed more track time earlier on, since a lot of our biggest issues, like PD
  
 ### Hardware
  
-We want to replace the OV5647 camera with the Raspberry Pi Camera Module 3 Wide, since its higher resolution and 120fps would give the vision pipeline a lot more headroom, especially for the obstacle challenge at higher speeds. We'd also like to design a proper PCB for power distribution instead of relying on point-to-point wiring, which would cut down on failure points and make the electronics a lot more compact and reliable. The LD19 LiDAR is already wired up and parsing data but was never actually connected to the control loop, so integrating it into the challenge runners would make wall following a lot more reliable than counting pixels under lighting that keeps changing. We also want to design a proper Ackermann steering geometry to get rid of the tire scrub we get during turns, which should improve how accurately the robot follows its path at higher speeds.
+We want to replace the OV5647 camera with the Raspberry Pi Camera Module 3 Wide, since its higher resolution and 120fps would give the vision pipeline a lot more headroom, especially for the obstacle challenge at higher speeds. We'd also like to design a proper PCB for power distribution instead of relying on point-to-point wiring, which would cut down on failure points and make the electronics a lot more compact and reliable. A LiDAR would also be nice however we did not have enough time to finish fully coding it. We also want to design a proper Ackermann steering geometry to get rid of the tire scrub we get during turns, which should improve how accurately the robot follows its path at higher speeds.
  
 ### Software
  
