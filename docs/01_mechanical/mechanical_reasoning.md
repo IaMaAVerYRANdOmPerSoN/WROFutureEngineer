@@ -88,6 +88,15 @@ We chose RWD because it is the simplest design, which makes it easier to build a
     - Rack and pinion is simple to 3D print and assemble reliably compared to a multi-link Ackermann setup, and converts the servo's rotational output into linear rack travel directly.
     - True Ackermann geometry only pays off at speeds where the inner/outer wheel angle difference meaningfully reduces tire scrub. At the robot's operating speed of 1.5-2.0 m/s (see [torque_speed_reasoning.md](./torque_speed_reasoning.md)), that difference doesn't matter enough to justify the added linkage complexity.
 
+### Wheel Placement
+
+We placed the front and rear axles as close together as the chassis allows. The wheels sit
+right up against the battery and steering servo without touching either one.
+
+A shorter wheelbase gives the car a smaller turning radius at the same steering angle. That
+lets it take the corners of the Open Challenge track tighter, and it leaves more room to steer
+around traffic-sign pillars in the Obstacle Challenge.
+
 ---
 
 ## Servo Motor
