@@ -109,7 +109,7 @@ We are a three-person team from Explorer Robotics in Whitby, Ontario, Canada. We
 
 ## Robot Summary
 
-> Our robot is a self-driving car built for the WRO 2026 Future Engineers challenge. It uses one downward-angled camera to spot track walls, corner lines, and colored obstacle pillars, and follows the track using a state-machine control loop. The robot runs on a Raspberry Pi 5 for vision, an Arduino Uno for motor and servo control, a Furitek Micro Komodo 1212 brushless motor that drives the rear wheels through a differential gearbox, and rack-and-pinion steering run by an HS-5055MG servo. Our design is simple and reliable, using one sensor for all detection and a sturdy build that's easy to fix during competition.
+> Our robot is a self-driving car built for the WRO 2026 Future Engineers challenge. It uses one downward-angled camera to spot track walls, corner lines, and colored obstacle pillars, and follows the track using a state-machine control loop. The robot runs on a Raspberry Pi 5 for vision, an Arduino Nano for motor and servo control, a Furitek Micro Komodo 1212 brushless motor that drives the rear wheels through a differential gearbox, and rack-and-pinion steering run by an HS-5055MG servo. Our design is simple and reliable, using one sensor for all detection and a sturdy build that's easy to fix during competition.
 
 ---
 
@@ -278,7 +278,7 @@ To get our current design, we took inspiration from our previous robot we used l
 #### Changes
 - Rotating the Raspiberry Pi 90 degrees would allow for a slimmer design
 - Implimenting more supports on the sides of the robot
-- We use the Arduino Uno instead of Hiwonder
+- We use the Arduino Nano instead of Hiwonder
 - Changed the camera angle and added a place for the stepdown voltage
 
 ![Photo 1](docs/img/robot%20left.png)
@@ -296,8 +296,8 @@ To get our current design, we took inspiration from our previous robot we used l
 
 ![RP5 and Camera Mount](docs/img/rp5_camera_mount.png)
 
-- **Arduino Uno Layout**: Main chassis plate holding the Arduino, servo, and front assembly; redesigned for compactness across three versions
-    - [Arduino layout iterations](docs/01_mechanical/mechanical_iterations.md#arduino-uno-layout)
+- **Arduino Nano Layout**: Main chassis plate holding the Arduino, servo, and front assembly; redesigned for compactness across four versions
+    - [Arduino layout iterations](docs/01_mechanical/mechanical_iterations.md#europe-design)
 
 ![Arduino Layout](docs/img/arduino_layout.png)
 
@@ -351,7 +351,7 @@ This section explains how the robot is powered, what sensors are used, where the
 
 Everything starts with a single Gens Ace 1300mAh 2S LiPo battery. From there, power splits into two separate paths so the compute side and the actuator side never interfere with each other.
 
-The first path goes through our Yahboom voltage regulator board, which steps the battery's 7.4V down to a clean 5V. That 5V feeds into the Raspberry Pi 5 through USB-C. The Arduino Uno doesn't connect to the battery at all, it gets powered straight from the Pi over a USB-B cable. The camera is also powered off the Pi, through its flat CSI ribbon cable, which carries both data and power in one connector.
+The first path goes through our Yahboom voltage regulator board, which steps the battery's 7.4V down to a clean 5V. That 5V feeds into the Raspberry Pi 5 through USB-C. The Arduino Nano doesn't connect to the battery at all, it gets powered straight from the Pi over a USB-B cable. The camera is also powered off the Pi, through its flat CSI ribbon cable, which carries both data and power in one connector.
 
 The second path runs through the ESC. The ESC takes power directly from the battery and has its own built-in BEC (battery eliminator circuit) to regulate it. On the output side, the ESC's voltage pin powers the servo, and the ESC also drives the brushless motor directly since the motor doesn't need to be stepped down first.
 
@@ -379,7 +379,7 @@ On the actuator side, the ESC handles throttle control for the drive motor based
 | Component | Current Draw |
 |-----------|-------------|
 | Raspberry Pi 5 | 2.40A |
-| Arduino Uno R3 | 0.05A |
+| Arduino Nano | 0.05A |
 | Servo Motor (stall) | 0.70A |
 | Camera (OV5647) | 0.25A |
 | **Total 5V current** | **3.40A** |
@@ -446,8 +446,8 @@ Because of the decently short battery life, we have had between 4-5 batteries.
 
 - **Raspberry Pi 5 (8GB)**: Main compute unit running the vision pipeline, control loop, and Arduino communication
     - [Raspberry Pi details](docs/02_power_sensors/sensor_selection.md#raspberry-pi-5-8gb)
-- **Arduino Uno R3**: Handles PWM output to ESC and servo; receives drive commands from the Pi over USB serial
-    - [Arduino details](docs/02_power_sensors/sensor_selection.md#arduino-uno-r3)
+- **Arduino Nano**: Handles PWM output to ESC and servo; receives drive commands from the Pi over USB serial
+    - [Arduino details](docs/02_power_sensors/sensor_selection.md#arduino-nano)
 
 ---
 
