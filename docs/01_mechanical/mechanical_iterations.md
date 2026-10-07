@@ -147,3 +147,14 @@ Despite pivoting our design in fundamentally different directions two times, we 
 <p align="center"><i>Final version of the differential layout</i></p>
 
 ---
+
+## Changes after Nationals
+
+**Mechanical Iterations**
+- Turning system V4: front bumper upgraded.
+- Arduino layout V4: redesigned around the Arduino Nano, which takes up much less space than the Uno.
+- Power switch mount V1: dedicated mount added so the switch is held securely instead of loose in the chassis.
+- Overall design condensed, making the robot more compact and freeing up internal space.
+
+
+---
