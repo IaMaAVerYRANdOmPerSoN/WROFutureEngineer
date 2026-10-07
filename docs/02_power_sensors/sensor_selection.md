@@ -22,9 +22,8 @@ The robot needs to:
 
 Our robot only uses a single sensor: An OV5647 camera with a wide angle lens. The camera is mounted on the front of the robot, facing forward, and captures frames at 640x480 resolution at up to 62.50 fps. The camera is the only data source for our system, and it is used for all sensing tasks. The camera's raw BGR arrays are first converted to HSV color space, then fed to downstream pipelines for object detection.
 
-We selected the OV5647 camera because it is the only sensor that can detect color, which is required for both the obstacle challenge (pillar colors) and the open challenge (corner line colors). The camera is also compact, lightweight, and fully supported by the `picamera2` library on Raspberry Pi OS (64-bit) Bookworm or later. The camera is elevated above the robot's body to give it a clear view of the track and obstacles.
+We selected the OV5647 camera because it is the only sensor that can detect color, which is required for both the obstacle challenge (pillar colors) and the open challenge (corner line colors). The camera is also compact, lightweight, and fully supported by the `picamera2` library on Raspberry Pi OS (64-bit) Bookworm or later. The camera is elevated above the robot's body to give it a clear view of the track and obstacles. We also have an IMU which combines a gyroscope, which measures how fast the robot is rotating, and an accelerometer, which measures acceleration and tilt. 
 
-While the single-sensor approach may have limitations, it simplifies the design and reduces cost, weight, and complexity. The camera is sufficient for all sensing tasks when combined with robust computer vision algorithms.
 We considered adding a 2D LiDAR sensor, which can offer precise distance measurements, but introduces serial/I2C communication latency, extra CPU overhead for multi-sensor synchronization, and additional mass. Since monocular vision boundary tracking meets our positional accuracy requirements within our 62.5 FPS loop, adding distance sensors introduced unnecessary architectural complexity.
 
 We also considered using the Pi Camera Module 3 Wide, which supports higher frame rates and resolutions, but is significantly more expensive and was not necessary for our current design. The OV5647 camera provides adequate performance for our needs at a lower cost. While the current camera is a performance bottleneck, our system does not operate at speeds where the frequency of the control loop is a limiting factor. Despite operating at the camera's maximum frame rate of 62.50 fps, the robot can still navigate the track effectively at the speeds required for the competition.
@@ -78,6 +77,15 @@ We also considered using the Pi Camera Module 3 Wide, which supports higher fram
 ## Final Decision
 
 The OV5647 camera covers all sensing requirements for the competition. The camera is a lightweight, compact, and cost-effective solution that provides sufficient performance for both the open and obstacle challenges. While there are trade-offs in terms of accuracy and redundancy, the single-sensor approach simplifies the design and reduces potential points of failure.
+
+---
+
+## IMU 
+
+**Purpose:** Measures the robot's rotation so it always knows which direction it is facing (its heading). The IMU is built into the Arduino Nano, and the Nano sends the heading to the Raspberry Pi over USB serial.
+
+**What it does:**
+An IMU combines a gyroscope, which measures how fast the robot is rotating, and an accelerometer, which measures acceleration and tilt. By adding up the gyroscope's rotation readings over time, the Nano calculates the robot's heading in degrees relative to its starting direction. 
 
 ---
 
