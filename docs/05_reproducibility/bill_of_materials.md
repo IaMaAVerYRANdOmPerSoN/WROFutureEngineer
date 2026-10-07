@@ -11,7 +11,7 @@ This document lists all components used to build the robot, including electronic
 | Component | Model | Purpose | Quantity | Price (CAD) |
 | ----------- | ------- | --------- | ---------- | ------------- |
 | Main Compute | [Raspberry Pi 5 (8GB)](https://www.amazon.ca/RasTech-Raspberry-Pi-refroidisseur-inclus/dp/B0DQX6JPVM) | Vision, control logic, Arduino communication | 1 | $170 |
-| Microcontroller | [Arduino Uno R3](https://grabcad.com/library/arduino-uno-r3-1) | PWM output to ESC and servo | 1 | $13 |
+| Microcontroller | [Arduino Nano](https://store-usa.arduino.cc/products/arduino-nano?srsltid=AU7gw4XRifAV98_qsDaaalWA_onyBToaefALP1aNtn2j-a8VciVBMD5G) | PWM output to ESC and servo | 1 | $26 |
 | Drive Motor | [Furitek Micro Komodo 1212 3450KV](https://furitek.com/products/furitek-micro-komodo-1212-3456kv-brushless-motor-with-15t-steel-pinion-for-fury-wagon-fx118) | Rear wheel drive | 1 | $35 |
 | ESC | [Furitek Lizard Pro 30A/50A](https://furitek.com/products/combo-of-furitek-lizard-pro-30a-50a-brushed-brushless-esc-for-axial-scx24-with-bluetooth) | Motor speed control | 1 | $80 |
 | Servo Motor | [Hitec HS-5055MG](https://hitecrcd.com/hs-5055mg-economy-metal-gear-feather-servo/) | Steering control | 1 | $25 |
@@ -57,9 +57,9 @@ This document lists all components used to build the robot, including electronic
 
 | Category | Estimated Cost (CAD) |
 | ---------- | ---------------------- |
-| Electronics | ~$419 |
+| Electronics | ~$442 |
 | Mechanical | ~$27 |
 | Filament | ~$10 |
-| **Total** | **~$456** |
+| **Total** | **~$469** |
 
 *Prices are approximate and based on retail cost at time of purchase. Some components were sourced from existing supplies.*
