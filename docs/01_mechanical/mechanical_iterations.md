@@ -148,13 +148,18 @@ Despite pivoting our design in fundamentally different directions two times, we 
 
 ---
 
-## Changes after Nationals
+## Europe Design
 
 **Mechanical Iterations**
 - Turning system V4: front bumper upgraded.
-- Arduino layout V4: redesigned around the Arduino Nano, which takes up much less space than the Uno.
+- Arduino layout V4: redesigned around the Arduino Nano, which takes up much less space than the Uno. We added a rack for the Nano to sit on
 - Power switch mount V1: dedicated mount added so the switch is held securely instead of loose in the chassis.
 - Overall design condensed, making the robot more compact and freeing up internal space.
+- Moved the switch to the back of the car
 
+<p align="center">
+  <img src="../../docs/img/europe.png" width="600">
+</p>
+<p align="center"><i>Final version of the robot</i></p>
 
 ---
