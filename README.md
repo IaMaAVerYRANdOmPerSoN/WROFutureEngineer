@@ -783,26 +783,4 @@ Suggested folders:
 - [`Journal`](docs/journal/CHANGELOG.md)
 
 
-
 ---
-
-## Contribution and Documentation Rules
-Use this section to keep the repo organized.
-
-Example:
-- use clear commit messages
-- add photos when mechanical changes are made
-- document sensor changes in `sensor_placement.md`
-- document tuning changes in `tuning_validation.md`
-- document major engineering decisions in `engineering_decisions.md`
-
----
-
-## Final Notes
-This repository is intended to document not only the final robot, but also the engineering process behind it:
-- design choices
-- testing evidence
-- failures and improvements
-- reproducibility
-
-The goal is to make the project understandable, traceable, and reproducible.
